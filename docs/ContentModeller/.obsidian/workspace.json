@@ -1,0 +1,220 @@
+{
+  "main": {
+    "id": "700b40d2e7dfe8dd",
+    "type": "split",
+    "children": [
+      {
+        "id": "7560c420066ae1a8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5ef25de6a5d3a1ac",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "10 Project Setup.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "10 Project Setup"
+            }
+          }
+        ]
+      },
+      {
+        "id": "2c5aa8ff27de4d00",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3dc35517b3158f19",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "0968662b49a93697",
+    "type": "split",
+    "children": [
+      {
+        "id": "0ad4f4c438d2cb9f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "84e02d179e1c3cd2",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "e5212967dca6b17d",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "3fe558abcd7c9af7",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "d1ff73a445667832",
+    "type": "split",
+    "children": [
+      {
+        "id": "2948e255b0dfa59e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3d94b775c1d31c67",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "10 Project Setup.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for 10 Project Setup"
+            }
+          },
+          {
+            "id": "ce886e6c2c7d5435",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "10 Project Setup.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from 10 Project Setup"
+            }
+          },
+          {
+            "id": "a1d2a2fa1f121d10",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "1a40331210d43767",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "b1dfb2daf59ec8ca",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "10 Project Setup.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 10 Project Setup"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "5ef25de6a5d3a1ac",
+  "lastOpenFiles": [
+    "01 Purpose.md",
+    "10 Project Setup.md",
+    "03 Data Structures.md",
+    "61 Create Field.md",
+    "60 Create Bundle.md",
+    "50 List Entity Types.md",
+    "20 Project Management.md",
+    "30 Config Parser.md",
+    "31 Sync Configuration.md",
+    "40 CLI Interface.md",
+    "51 List Fields.md",
+    "02 Research.md",
+    "README.md",
+    "00 Ticket Template.md",
+    "Welcome.md"
+  ]
+}

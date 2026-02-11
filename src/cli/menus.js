@@ -14,7 +14,17 @@ import {
   validateConfigDirectory
 } from './prompts.js';
 import { createProject, loadProject, listProjects } from '../commands/project.js';
-import { syncProject, getSyncSummary } from '../commands/sync.js';
+import { syncProject } from '../commands/sync.js';
+import {
+  formatLastSync,
+  groupBundlesByEntityType,
+  getBundleSummary,
+  formatEntityTypeTable,
+  getFieldsForEntityType,
+  getFieldsForBundle,
+  formatEntityFieldsTable,
+  formatBundleFieldsTable
+} from '../commands/list.js';
 
 /**
  * Display the main menu and handle user selection
@@ -196,25 +206,25 @@ async function handleSync(project) {
  * @param {object} project - The current project
  */
 function handleListEntities(project) {
-  const summary = getSyncSummary(project);
+  const summary = getBundleSummary(project);
 
-  if (summary.totalBundles === 0) {
-    console.log(chalk.yellow('No entities found. Run sync first.'));
+  if (!summary.synced) {
+    console.log(chalk.yellow('Project has not been synced. Run sync first.'));
     return;
   }
 
   console.log();
-  console.log(chalk.cyan('Entity Types:'));
+  console.log(chalk.cyan(`Entity Types for "${project.name}"`));
+  console.log(`Last synced: ${formatLastSync(summary.lastSync)}`);
+  console.log();
 
-  const entityTypes = ['node', 'media', 'paragraph', 'taxonomy_term'];
-  for (const entityType of entityTypes) {
-    if (summary[entityType] > 0) {
-      console.log(`  ${entityType}: ${summary[entityType]} bundles`);
-    }
+  const groups = groupBundlesByEntityType(project.entities);
+
+  for (const [entityType, group] of Object.entries(groups)) {
+    console.log(formatEntityTypeTable(entityType, group));
   }
 
-  console.log();
-  console.log(`Total: ${summary.totalBundles} bundles, ${summary.totalFields} fields`);
+  console.log(`Total: ${summary.bundleCount} bundles across ${summary.entityTypeCount} entity types`);
   console.log();
 }
 
@@ -224,8 +234,10 @@ function handleListEntities(project) {
  * @returns {Promise<void>}
  */
 async function handleListEntityFields(project) {
-  if (!project.entities) {
-    console.log(chalk.yellow('No entities found. Run sync first.'));
+  const summary = getBundleSummary(project);
+
+  if (!summary.synced) {
+    console.log(chalk.yellow('Project has not been synced. Run sync first.'));
     return;
   }
 
@@ -234,7 +246,7 @@ async function handleListEntityFields(project) {
   );
 
   if (entityTypes.length === 0) {
-    console.log(chalk.yellow('No entities found. Run sync first.'));
+    console.log(chalk.yellow('No entities found.'));
     return;
   }
 
@@ -248,21 +260,15 @@ async function handleListEntityFields(project) {
     choices
   });
 
-  console.log();
-  console.log(chalk.cyan(`Fields in ${selectedType}:`));
+  const fields = getFieldsForEntityType(project.entities, selectedType);
+  const bundleCount = Object.keys(project.entities[selectedType]).length;
 
-  const bundles = project.entities[selectedType];
-  for (const [bundleId, bundle] of Object.entries(bundles)) {
-    console.log(`  ${bundle.label || bundleId} (${bundleId}):`);
-    if (bundle.fields && Object.keys(bundle.fields).length > 0) {
-      for (const [fieldName, field] of Object.entries(bundle.fields)) {
-        const required = field.required ? ' *' : '';
-        console.log(`    - ${field.label || fieldName} (${fieldName}): ${field.type}${required}`);
-      }
-    } else {
-      console.log('    No custom fields');
-    }
-  }
+  console.log();
+  console.log(chalk.cyan(`Fields for ${selectedType} types in "${project.name}"`));
+  console.log();
+  console.log(formatEntityFieldsTable(fields));
+  console.log();
+  console.log(`Total: ${fields.length} unique fields across ${bundleCount} ${selectedType} types`);
   console.log();
 }
 
@@ -272,8 +278,10 @@ async function handleListEntityFields(project) {
  * @returns {Promise<void>}
  */
 async function handleListBundleFields(project) {
-  if (!project.entities) {
-    console.log(chalk.yellow('No entities found. Run sync first.'));
+  const summary = getBundleSummary(project);
+
+  if (!summary.synced) {
+    console.log(chalk.yellow('Project has not been synced. Run sync first.'));
     return;
   }
 
@@ -282,7 +290,7 @@ async function handleListBundleFields(project) {
   );
 
   if (entityTypes.length === 0) {
-    console.log(chalk.yellow('No entities found. Run sync first.'));
+    console.log(chalk.yellow('No entities found.'));
     return;
   }
 
@@ -299,10 +307,12 @@ async function handleListBundleFields(project) {
 
   // Select bundle
   const bundles = project.entities[selectedType];
-  const bundleChoices = Object.entries(bundles).map(([id, bundle]) => ({
-    value: id,
-    name: `${bundle.label || id} (${id})`
-  }));
+  const bundleChoices = Object.entries(bundles)
+    .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+    .map(([id, bundle]) => ({
+      value: id,
+      name: `${bundle.label || id} (${id})`
+    }));
 
   const selectedBundle = await select({
     message: 'Select bundle:',
@@ -310,22 +320,13 @@ async function handleListBundleFields(project) {
   });
 
   const bundle = bundles[selectedBundle];
+  const fields = getFieldsForBundle(project.entities, selectedType, selectedBundle);
 
   console.log();
-  console.log(chalk.cyan(`Fields in ${selectedType}.${selectedBundle}:`));
-
-  if (bundle.fields && Object.keys(bundle.fields).length > 0) {
-    for (const [fieldName, field] of Object.entries(bundle.fields)) {
-      const required = field.required ? ' (required)' : '';
-      const cardinality = field.cardinality === -1 ? 'unlimited' : field.cardinality;
-      console.log(`  ${field.label || fieldName} (${fieldName})`);
-      console.log(`    Type: ${field.type}`);
-      console.log(`    Cardinality: ${cardinality}`);
-      if (required) console.log(`    Required: yes`);
-      if (field.description) console.log(`    Description: ${field.description}`);
-    }
-  } else {
-    console.log('  No custom fields');
-  }
+  console.log(chalk.cyan(`Fields for ${selectedType} > ${bundle.label || selectedBundle} in "${project.name}"`));
+  console.log();
+  console.log(formatBundleFieldsTable(fields));
+  console.log();
+  console.log(`Total: ${fields.length} fields`);
   console.log();
 }

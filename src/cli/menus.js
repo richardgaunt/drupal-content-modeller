@@ -25,6 +25,27 @@ import {
   formatEntityFieldsTable,
   formatBundleFieldsTable
 } from '../commands/list.js';
+import { createBundle, validateBundleMachineName } from '../commands/create.js';
+import { generateMachineName } from '../generators/bundleGenerator.js';
+
+/**
+ * Entity type choices for bundle creation
+ */
+const ENTITY_TYPE_CHOICES = [
+  { value: 'node', name: 'Node (Content Type)' },
+  { value: 'media', name: 'Media Type' },
+  { value: 'paragraph', name: 'Paragraph Type' },
+  { value: 'taxonomy_term', name: 'Taxonomy Vocabulary' }
+];
+
+/**
+ * Media source type choices
+ */
+const MEDIA_SOURCE_CHOICES = [
+  { value: 'image', name: 'Image' },
+  { value: 'file', name: 'File' },
+  { value: 'remote_video', name: 'Remote Video' }
+];
 
 /**
  * Display the main menu and handle user selection
@@ -167,7 +188,9 @@ async function showProjectMenu(project) {
           await handleListBundleFields(project);
           break;
         case 'create-bundle':
-          console.log(chalk.yellow('Create bundle not yet implemented'));
+          await handleCreateBundle(project);
+          // Reload project to get updated data
+          project = await loadProject(project.slug);
           break;
         case 'create-field':
           console.log(chalk.yellow('Create field not yet implemented'));
@@ -329,4 +352,73 @@ async function handleListBundleFields(project) {
   console.log();
   console.log(`Total: ${fields.length} fields`);
   console.log();
+}
+
+/**
+ * Handle create bundle action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleCreateBundle(project) {
+  try {
+    // Select entity type
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: ENTITY_TYPE_CHOICES
+    });
+
+    // Prompt for label
+    const label = await input({
+      message: 'Label (human-readable name)?',
+      validate: (value) => {
+        if (!value || value.trim().length === 0) {
+          return 'Label is required';
+        }
+        return true;
+      }
+    });
+
+    // Generate and prompt for machine name
+    const suggestedMachineName = generateMachineName(label);
+    const machineName = await input({
+      message: 'Machine name?',
+      default: suggestedMachineName,
+      validate: (value) => validateBundleMachineName(project, entityType, value)
+    });
+
+    // Prompt for description
+    const description = await input({
+      message: 'Description (optional)?'
+    });
+
+    // For media types, prompt for source type
+    let sourceType = null;
+    if (entityType === 'media') {
+      sourceType = await select({
+        message: 'Media source type?',
+        choices: MEDIA_SOURCE_CHOICES
+      });
+    }
+
+    // Create the bundle
+    const result = await createBundle(project, entityType, {
+      label,
+      machineName,
+      description,
+      sourceType
+    });
+
+    console.log();
+    console.log(chalk.green(`Bundle "${result.label}" created successfully!`));
+    console.log(chalk.cyan('Created files:'));
+    for (const file of result.createdFiles) {
+      console.log(`  - ${file}`);
+    }
+    console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
 }

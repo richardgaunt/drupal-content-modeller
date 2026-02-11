@@ -3,5 +3,5 @@
  * Calls pure functions and handles I/O coordination.
  */
 
-export * from './project';
-export * from './sync';
+export * from './project.js';
+export * from './sync.js';

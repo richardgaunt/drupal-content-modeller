@@ -4,7 +4,7 @@
  */
 
 import { join } from 'path';
-import { listFiles, readTextFile, directoryExists } from './fileSystem';
+import { listFiles, readTextFile, directoryExists } from './fileSystem.js';
 import {
   parseYaml,
   parseBundleConfig,
@@ -13,7 +13,7 @@ import {
   filterBundleFiles,
   filterFieldStorageFiles,
   filterFieldInstanceFiles
-} from '../parsers/configParser';
+} from '../parsers/configParser.js';
 
 /**
  * Parse bundle configs from a config directory

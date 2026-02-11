@@ -3,8 +3,8 @@
  * Orchestrates pure functions and I/O operations.
  */
 
-import { generateSlug, isValidProjectName } from '../utils/slug';
-import { createProjectObject, getProjectSummary } from '../utils/project';
+import { generateSlug, isValidProjectName } from '../utils/slug.js';
+import { createProjectObject, getProjectSummary } from '../utils/project.js';
 import {
   projectExists,
   directoryExists,
@@ -15,7 +15,7 @@ import {
   listProjectDirectories,
   deleteProjectDirectory,
   ensureProjectsDir
-} from '../io/fileSystem';
+} from '../io/fileSystem.js';
 
 /**
  * Create a new project

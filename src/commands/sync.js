@@ -3,8 +3,8 @@
  * Analyzes the config directory and updates the project's entity/field index.
  */
 
-import { parseConfigDirectory } from '../io/configReader';
-import { saveProject } from './project';
+import { parseConfigDirectory } from '../io/configReader.js';
+import { saveProject } from './project.js';
 
 /**
  * Sync a project's configuration

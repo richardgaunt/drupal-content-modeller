@@ -1,6 +1,6 @@
 /**
- * CLI module - I/O layer for inquirer prompts and console output
- * This is a thin layer that handles user interaction.
+ * CLI module - Interactive command-line interface
  */
 
-export { };
+export * from './menus.js';
+export * from './prompts.js';

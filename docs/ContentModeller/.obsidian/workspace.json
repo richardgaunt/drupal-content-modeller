@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "31 Sync Configuration.md",
+                "file": "40 CLI Interface.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "31 Sync Configuration"
+              "title": "40 CLI Interface"
             }
           }
         ]
@@ -110,7 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "31 Sync Configuration.md",
+                "file": "40 CLI Interface.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -120,7 +120,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for 31 Sync Configuration"
+              "title": "Backlinks for 40 CLI Interface"
             }
           },
           {
@@ -129,12 +129,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "31 Sync Configuration.md",
+                "file": "40 CLI Interface.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from 31 Sync Configuration"
+              "title": "Outgoing links from 40 CLI Interface"
             }
           },
           {
@@ -172,13 +172,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "31 Sync Configuration.md",
+                "file": "40 CLI Interface.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of 31 Sync Configuration"
+              "title": "Outline of 40 CLI Interface"
             }
           }
         ]
@@ -201,6 +201,7 @@
   },
   "active": "5ef25de6a5d3a1ac",
   "lastOpenFiles": [
+    "31 Sync Configuration.md",
     "30 Config Parser.md",
     "20 Project Management.md",
     "README.md",
@@ -210,7 +211,6 @@
     "61 Create Field.md",
     "60 Create Bundle.md",
     "50 List Entity Types.md",
-    "31 Sync Configuration.md",
     "40 CLI Interface.md",
     "51 List Fields.md",
     "02 Research.md",

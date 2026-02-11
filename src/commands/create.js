@@ -85,6 +85,10 @@ export function validateFieldMachineName(fieldName) {
  * @param {object} project - Project object
  * @param {string} entityType - Entity type (node, media, paragraph, taxonomy_term)
  * @param {object} options - Bundle options
+ * @param {string} options.label - Human-readable label
+ * @param {string} options.machineName - Machine name
+ * @param {string} [options.description] - Description
+ * @param {string} [options.sourceType] - For media: source type
  * @returns {Promise<object>} - Result with created files
  */
 export async function createBundle(project, entityType, options) {

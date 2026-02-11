@@ -4,3 +4,4 @@
  */
 
 export * from './project';
+export * from './sync';

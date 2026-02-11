@@ -1,0 +1,8 @@
+langcode: en
+status: true
+dependencies: {}
+name: Test Tags
+vid: test_tags
+description: 'A test vocabulary for tags.'
+weight: 0
+new_revision: false

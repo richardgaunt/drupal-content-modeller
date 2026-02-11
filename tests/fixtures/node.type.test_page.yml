@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies: {}
+name: Test Page
+type: test_page
+description: 'A test page content type.'
+help: null
+new_revision: true
+preview_mode: 1
+display_submitted: false

@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies: {}
+name: Test Article
+type: test_article
+description: 'A test article content type.'
+help: null
+new_revision: true
+preview_mode: 1
+display_submitted: true

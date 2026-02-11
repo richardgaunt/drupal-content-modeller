@@ -45,7 +45,7 @@ export function parseYaml(yamlString) {
   try {
     const result = yaml.load(yamlString);
     return result || null;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

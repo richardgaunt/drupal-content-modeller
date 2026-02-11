@@ -2,7 +2,8 @@
 node_modules/
 
 # Project data (user-specific)
-projects/
+projects/*
+!projects/.gitkeep
 
 # Sample config (not part of repo)
 config/

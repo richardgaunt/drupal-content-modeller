@@ -173,7 +173,7 @@ export async function listFiles(dirPath) {
  * @returns {Promise<string>} - File content
  */
 export async function readTextFile(filePath) {
-  return await readFile(filePath, 'utf-8');
+  return readFile(filePath, 'utf-8');
 }
 
 /**

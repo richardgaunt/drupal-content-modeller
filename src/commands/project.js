@@ -3,8 +3,8 @@
  * Orchestrates pure functions and I/O operations.
  */
 
-import { generateSlug, isValidProjectName } from '../utils/slug.js';
-import { createProjectObject, getProjectSummary } from '../utils/project.js';
+import { generateSlug, isValidProjectName } from '../utils/slug';
+import { createProjectObject, getProjectSummary } from '../utils/project';
 import {
   projectExists,
   directoryExists,
@@ -15,7 +15,7 @@ import {
   listProjectDirectories,
   deleteProjectDirectory,
   ensureProjectsDir
-} from '../io/fileSystem.js';
+} from '../io/fileSystem';
 
 /**
  * Create a new project
@@ -78,7 +78,7 @@ export async function loadProject(slug) {
   }
 
   const projectJsonPath = getProjectJsonPath(slug);
-  return await readJsonFile(projectJsonPath);
+  return readJsonFile(projectJsonPath);
 }
 
 /**
@@ -121,5 +121,5 @@ export async function listProjects() {
  * @returns {Promise<boolean>} - True if deleted successfully
  */
 export async function deleteProject(slug) {
-  return await deleteProjectDirectory(slug);
+  return deleteProjectDirectory(slug);
 }

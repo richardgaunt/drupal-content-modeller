@@ -1,0 +1,27 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_tags
+    - node.type.test_page
+    - taxonomy.vocabulary.test_tags
+id: node.test_page.field_tags
+field_name: field_tags
+entity_type: node
+bundle: test_page
+label: Tags
+description: 'Tag this content.'
+required: true
+translatable: false
+default_value: []
+default_value_callback: ''
+settings:
+  handler: 'default:taxonomy_term'
+  handler_settings:
+    target_bundles:
+      test_tags: test_tags
+    sort:
+      field: name
+      direction: asc
+    auto_create: true
+field_type: entity_reference

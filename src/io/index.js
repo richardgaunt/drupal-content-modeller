@@ -4,3 +4,4 @@
  */
 
 export * from './fileSystem.js';
+export * from './configReader.js';

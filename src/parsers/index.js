@@ -3,4 +3,4 @@
  * Parse YAML strings to objects. No file I/O.
  */
 
-export { };
+export * from './configParser.js';

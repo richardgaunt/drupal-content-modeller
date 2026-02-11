@@ -150,3 +150,41 @@ export async function ensureProjectsDir() {
     await mkdir(projectsDir, { recursive: true });
   }
 }
+
+/**
+ * List all files in a directory
+ * @param {string} dirPath - Path to directory
+ * @returns {Promise<string[]>} - Array of filenames
+ */
+export async function listFiles(dirPath) {
+  if (!existsSync(dirPath)) {
+    throw new Error(`Directory does not exist: ${dirPath}`);
+  }
+
+  const entries = await readdir(dirPath, { withFileTypes: true });
+  return entries
+    .filter(entry => entry.isFile())
+    .map(entry => entry.name);
+}
+
+/**
+ * Read a file as text
+ * @param {string} filePath - Path to file
+ * @returns {Promise<string>} - File content
+ */
+export async function readTextFile(filePath) {
+  return await readFile(filePath, 'utf-8');
+}
+
+/**
+ * Write a YAML file
+ * @param {string} filePath - Path to write to
+ * @param {string} content - YAML content
+ */
+export async function writeYamlFile(filePath, content) {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(filePath, content, 'utf-8');
+}

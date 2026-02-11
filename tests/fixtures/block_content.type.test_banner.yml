@@ -1,0 +1,7 @@
+langcode: en
+status: true
+dependencies: {}
+id: test_banner
+label: Test Banner
+revision: false
+description: A test banner block type.

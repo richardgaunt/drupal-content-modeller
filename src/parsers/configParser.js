@@ -33,6 +33,12 @@ export const ENTITY_TYPE_PATTERNS = {
     bundleSuffix: '.yml',
     fieldStoragePrefix: 'field.storage.taxonomy_term.',
     fieldInstancePrefix: 'field.field.taxonomy_term.'
+  },
+  block_content: {
+    bundlePrefix: 'block_content.type.',
+    bundleSuffix: '.yml',
+    fieldStoragePrefix: 'field.storage.block_content.',
+    fieldInstancePrefix: 'field.field.block_content.'
   }
 };
 
@@ -169,6 +175,19 @@ export function parseTaxonomyVocabularyBundle(config) {
 }
 
 /**
+ * Parse a block content type bundle config
+ * @param {object} config - Parsed YAML config
+ * @returns {object} - Bundle info {id, label, description}
+ */
+export function parseBlockContentTypeBundle(config) {
+  return {
+    id: config.id || '',
+    label: config.label || '',
+    description: config.description || ''
+  };
+}
+
+/**
  * Parse a bundle config based on entity type
  * @param {object} config - Parsed YAML config
  * @param {string} entityType - Entity type
@@ -184,6 +203,8 @@ export function parseBundleConfig(config, entityType) {
       return parseParagraphTypeBundle(config);
     case 'taxonomy_term':
       return parseTaxonomyVocabularyBundle(config);
+    case 'block_content':
+      return parseBlockContentTypeBundle(config);
     default:
       return { id: '', label: '', description: '' };
   }

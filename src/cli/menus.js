@@ -3,7 +3,7 @@
  * Handles interactive menu navigation and actions.
  */
 
-import { select, input } from '@inquirer/prompts';
+import { select, input, checkbox } from '@inquirer/prompts';
 import chalk from 'chalk';
 
 import {
@@ -25,8 +25,9 @@ import {
   formatEntityFieldsTable,
   formatBundleFieldsTable
 } from '../commands/list.js';
-import { createBundle, validateBundleMachineName } from '../commands/create.js';
+import { createBundle, validateBundleMachineName, createField, validateFieldMachineName } from '../commands/create.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
+import { generateFieldName, FIELD_TYPES } from '../generators/fieldGenerator.js';
 
 /**
  * Entity type choices for bundle creation
@@ -35,7 +36,8 @@ const ENTITY_TYPE_CHOICES = [
   { value: 'node', name: 'Node (Content Type)' },
   { value: 'media', name: 'Media Type' },
   { value: 'paragraph', name: 'Paragraph Type' },
-  { value: 'taxonomy_term', name: 'Taxonomy Vocabulary' }
+  { value: 'taxonomy_term', name: 'Taxonomy Vocabulary' },
+  { value: 'block_content', name: 'Block Content Type' }
 ];
 
 /**
@@ -45,6 +47,17 @@ const MEDIA_SOURCE_CHOICES = [
   { value: 'image', name: 'Image' },
   { value: 'file', name: 'File' },
   { value: 'remote_video', name: 'Remote Video' }
+];
+
+/**
+ * Entity reference target type choices
+ */
+const REFERENCE_TARGET_CHOICES = [
+  { value: 'node', name: 'Content (Node)' },
+  { value: 'media', name: 'Media' },
+  { value: 'taxonomy_term', name: 'Taxonomy Term' },
+  { value: 'paragraph', name: 'Paragraph' },
+  { value: 'block_content', name: 'Block Content' }
 ];
 
 /**
@@ -75,7 +88,6 @@ export async function showMainMenu() {
           return;
       }
     } catch (error) {
-      // Handle Ctrl+C or other interrupts
       if (error.name === 'ExitPromptError') {
         console.log();
         console.log(chalk.green('Goodbye!'));
@@ -92,7 +104,6 @@ export async function showMainMenu() {
  */
 async function handleCreateProject() {
   try {
-    // Prompt for project name
     const name = await input({
       message: 'Project name?',
       validate: (value) => {
@@ -102,19 +113,16 @@ async function handleCreateProject() {
       }
     });
 
-    // Prompt for config directory
     const configDir = await input({
       message: 'Configuration directory path?',
       validate: validateConfigDirectory
     });
 
-    // Create the project
     const project = await createProject(name, configDir);
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
     console.log();
 
-    // Show project menu
     await showProjectMenu(project);
   } catch (error) {
     if (error.name === 'ExitPromptError') {
@@ -175,7 +183,6 @@ async function showProjectMenu(project) {
       switch (action) {
         case 'sync':
           await handleSync(project);
-          // Reload project to get updated data
           project = await loadProject(project.slug);
           break;
         case 'list-entities':
@@ -189,11 +196,11 @@ async function showProjectMenu(project) {
           break;
         case 'create-bundle':
           await handleCreateBundle(project);
-          // Reload project to get updated data
           project = await loadProject(project.slug);
           break;
         case 'create-field':
-          console.log(chalk.yellow('Create field not yet implemented'));
+          await handleCreateField(project);
+          project = await loadProject(project.slug);
           break;
         case 'back':
           return;
@@ -317,7 +324,6 @@ async function handleListBundleFields(project) {
     return;
   }
 
-  // Select entity type
   const entityChoices = entityTypes.map(type => ({
     value: type,
     name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
@@ -328,7 +334,6 @@ async function handleListBundleFields(project) {
     choices: entityChoices
   });
 
-  // Select bundle
   const bundles = project.entities[selectedType];
   const bundleChoices = Object.entries(bundles)
     .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
@@ -361,13 +366,11 @@ async function handleListBundleFields(project) {
  */
 async function handleCreateBundle(project) {
   try {
-    // Select entity type
     const entityType = await select({
       message: 'Select entity type:',
       choices: ENTITY_TYPE_CHOICES
     });
 
-    // Prompt for label
     const label = await input({
       message: 'Label (human-readable name)?',
       validate: (value) => {
@@ -378,7 +381,6 @@ async function handleCreateBundle(project) {
       }
     });
 
-    // Generate and prompt for machine name
     const suggestedMachineName = generateMachineName(label);
     const machineName = await input({
       message: 'Machine name?',
@@ -386,12 +388,10 @@ async function handleCreateBundle(project) {
       validate: (value) => validateBundleMachineName(project, entityType, value)
     });
 
-    // Prompt for description
     const description = await input({
       message: 'Description (optional)?'
     });
 
-    // For media types, prompt for source type
     let sourceType = null;
     if (entityType === 'media') {
       sourceType = await select({
@@ -400,7 +400,6 @@ async function handleCreateBundle(project) {
       });
     }
 
-    // Create the bundle
     const result = await createBundle(project, entityType, {
       label,
       machineName,
@@ -421,4 +420,312 @@ async function handleCreateBundle(project) {
     }
     console.log(chalk.red(`Error: ${error.message}`));
   }
+}
+
+/**
+ * Handle create field action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleCreateField(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No bundles found. Create a bundle first.'));
+      return;
+    }
+
+    const entityChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityChoices
+    });
+
+    // Select bundle(s)
+    const bundles = project.entities[entityType];
+    const bundleOptions = Object.entries(bundles)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([id, bundle]) => ({
+        value: id,
+        name: `${bundle.label || id} (${id})`
+      }));
+
+    const selectedBundles = await checkbox({
+      message: 'Select bundle(s):',
+      choices: bundleOptions,
+      required: true
+    });
+
+    if (selectedBundles.length === 0) {
+      console.log(chalk.yellow('At least one bundle is required.'));
+      return;
+    }
+
+    // Select field type
+    const fieldType = await select({
+      message: 'Select field type:',
+      choices: FIELD_TYPES
+    });
+
+    // Prompt for label
+    const label = await input({
+      message: 'Field label?',
+      validate: (value) => {
+        if (!value || value.trim().length === 0) {
+          return 'Label is required';
+        }
+        return true;
+      }
+    });
+
+    // Generate and prompt for field name
+    const suggestedFieldName = generateFieldName(entityType, label);
+    const fieldName = await input({
+      message: 'Machine name?',
+      default: suggestedFieldName,
+      validate: validateFieldMachineName
+    });
+
+    // Prompt for description
+    const description = await input({
+      message: 'Description (optional)?'
+    });
+
+    // Prompt for required
+    const required = await select({
+      message: 'Required?',
+      choices: [
+        { value: false, name: 'No' },
+        { value: true, name: 'Yes' }
+      ]
+    });
+
+    // Prompt for cardinality
+    const cardinality = await select({
+      message: 'Cardinality?',
+      choices: [
+        { value: 1, name: 'Single value' },
+        { value: -1, name: 'Unlimited' }
+      ]
+    });
+
+    // Type-specific settings
+    const settings = await getTypeSpecificSettings(fieldType, project);
+
+    // Create the field
+    const result = await createField(project, entityType, selectedBundles, {
+      fieldName,
+      fieldType,
+      label,
+      description,
+      required,
+      cardinality,
+      settings
+    });
+
+    console.log();
+    console.log(chalk.green(`Field "${result.label}" created successfully!`));
+    if (result.storageCreated) {
+      console.log(chalk.cyan('Created storage and instance files:'));
+    } else {
+      console.log(chalk.cyan('Storage already exists. Created instance files:'));
+    }
+    for (const file of result.createdFiles) {
+      console.log(`  - ${file}`);
+    }
+    console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Get type-specific field settings
+ * @param {string} fieldType - Field type
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Settings object
+ */
+async function getTypeSpecificSettings(fieldType, project) {
+  const settings = {};
+
+  switch (fieldType) {
+    case 'string':
+      settings.maxLength = await input({
+        message: 'Max length?',
+        default: '255',
+        validate: (value) => {
+          const num = parseInt(value, 10);
+          if (isNaN(num) || num < 1) {
+            return 'Must be a positive number';
+          }
+          return true;
+        }
+      });
+      settings.maxLength = parseInt(settings.maxLength, 10);
+      break;
+
+    case 'list_string':
+      settings.allowedValues = await promptForListValues();
+      break;
+
+    case 'entity_reference':
+    case 'entity_reference_revisions': {
+      if (fieldType === 'entity_reference_revisions') {
+        settings.targetType = 'paragraph';
+      } else {
+        settings.targetType = await select({
+          message: 'Target entity type?',
+          choices: REFERENCE_TARGET_CHOICES
+        });
+      }
+
+      // Get target bundles from project
+      const targetBundles = await selectTargetBundles(project, settings.targetType);
+      settings.targetBundles = targetBundles;
+      break;
+    }
+
+    case 'link':
+      settings.allowExternal = await select({
+        message: 'Allow external URLs?',
+        choices: [
+          { value: true, name: 'Yes' },
+          { value: false, name: 'No (internal only)' }
+        ]
+      });
+
+      settings.titleOption = await select({
+        message: 'Link title?',
+        choices: [
+          { value: 'optional', name: 'Optional' },
+          { value: 'required', name: 'Required' },
+          { value: 'disabled', name: 'Disabled' }
+        ]
+      });
+      break;
+
+    case 'image':
+      settings.fileExtensions = await input({
+        message: 'Allowed extensions?',
+        default: 'png gif jpg jpeg svg'
+      });
+
+      settings.altRequired = await select({
+        message: 'Alt text required?',
+        choices: [
+          { value: true, name: 'Yes' },
+          { value: false, name: 'No' }
+        ]
+      });
+
+      settings.fileDirectory = await input({
+        message: 'File directory?',
+        default: 'images/[date:custom:Y]-[date:custom:m]'
+      });
+
+      settings.maxFileSize = await input({
+        message: 'Max file size (e.g., 2MB, leave empty for default)?',
+        default: ''
+      });
+      break;
+
+    case 'file':
+      settings.fileExtensions = await input({
+        message: 'Allowed extensions?',
+        default: 'txt pdf doc docx xls xlsx'
+      });
+
+      settings.fileDirectory = await input({
+        message: 'File directory?',
+        default: 'documents/[date:custom:Y]-[date:custom:m]'
+      });
+
+      settings.maxFileSize = await input({
+        message: 'Max file size (e.g., 10MB, leave empty for default)?',
+        default: ''
+      });
+      break;
+  }
+
+  return settings;
+}
+
+/**
+ * Prompt for list values (key|label pairs)
+ * @returns {Promise<object[]>} - Array of {value, label} objects
+ */
+async function promptForListValues() {
+  const values = [];
+  console.log(chalk.cyan('Enter list options (key|label format). Empty input to finish.'));
+
+  while (true) {
+    const entry = await input({
+      message: `Option ${values.length + 1}:`,
+      default: ''
+    });
+
+    if (!entry || entry.trim() === '') {
+      break;
+    }
+
+    const parts = entry.split('|');
+    if (parts.length === 2) {
+      values.push({ value: parts[0].trim(), label: parts[1].trim() });
+    } else {
+      values.push({ value: entry.trim(), label: entry.trim() });
+    }
+  }
+
+  return values;
+}
+
+/**
+ * Select target bundles for entity reference field
+ * @param {object} project - Project object
+ * @param {string} targetType - Target entity type
+ * @returns {Promise<string[]>} - Selected bundle IDs
+ */
+async function selectTargetBundles(project, targetType) {
+  if (!project.entities || !project.entities[targetType]) {
+    console.log(chalk.yellow(`No ${targetType} bundles found in project.`));
+    return [];
+  }
+
+  const bundles = project.entities[targetType];
+  if (Object.keys(bundles).length === 0) {
+    console.log(chalk.yellow(`No ${targetType} bundles found in project.`));
+    return [];
+  }
+
+  const bundleOptions = Object.entries(bundles)
+    .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+    .map(([id, bundle]) => ({
+      value: id,
+      name: `${bundle.label || id} (${id})`
+    }));
+
+  const selected = await checkbox({
+    message: 'Select target bundles:',
+    choices: bundleOptions
+  });
+
+  return selected;
 }

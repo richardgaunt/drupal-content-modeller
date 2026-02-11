@@ -12,6 +12,7 @@ import {
   generateMediaType,
   generateParagraphType,
   generateVocabulary,
+  generateBlockContentType,
   generateMediaSourceFieldStorage,
   generateMediaSourceFieldInstance,
   generateBundle
@@ -113,6 +114,10 @@ describe('Bundle Generator', () => {
 
     test('returns correct name for taxonomy', () => {
       expect(getBundleFilename('taxonomy_term', 'tags')).toBe('taxonomy.vocabulary.tags.yml');
+    });
+
+    test('returns correct name for block_content', () => {
+      expect(getBundleFilename('block_content', 'banner')).toBe('block_content.type.banner.yml');
     });
 
     test('throws for unknown entity type', () => {
@@ -293,6 +298,45 @@ describe('Bundle Generator', () => {
     });
   });
 
+  describe('generateBlockContentType', () => {
+    test('returns valid YAML', () => {
+      const result = generateBlockContentType({
+        label: 'Banner',
+        machineName: 'banner',
+        description: 'A banner block type.'
+      });
+
+      const parsed = yaml.load(result);
+      expect(parsed).toBeDefined();
+    });
+
+    test('includes all required fields', () => {
+      const result = generateBlockContentType({
+        label: 'Banner',
+        machineName: 'banner',
+        description: 'A banner block type.'
+      });
+
+      const parsed = yaml.load(result);
+      expect(parsed.langcode).toBe('en');
+      expect(parsed.status).toBe(true);
+      expect(parsed.id).toBe('banner');
+      expect(parsed.label).toBe('Banner');
+      expect(parsed.description).toBe('A banner block type.');
+      expect(parsed.revision).toBe(false);
+    });
+
+    test('handles empty description', () => {
+      const result = generateBlockContentType({
+        label: 'Banner',
+        machineName: 'banner'
+      });
+
+      const parsed = yaml.load(result);
+      expect(parsed.description).toBe('');
+    });
+  });
+
   describe('generateMediaSourceFieldStorage', () => {
     test('creates valid storage YAML for image', () => {
       const result = generateMediaSourceFieldStorage({
@@ -388,6 +432,18 @@ describe('Bundle Generator', () => {
 
       const parsed = yaml.load(result);
       expect(parsed.vid).toBe('tags');
+    });
+
+    test('generates block_content type', () => {
+      const result = generateBundle('block_content', {
+        label: 'Banner',
+        machineName: 'banner'
+      });
+
+      const parsed = yaml.load(result);
+      expect(parsed.id).toBe('banner');
+      expect(parsed.label).toBe('Banner');
+      expect(parsed.revision).toBe(false);
     });
 
     test('throws for unknown entity type', () => {

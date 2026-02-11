@@ -4,3 +4,4 @@
  */
 
 export * from './bundleGenerator.js';
+export * from './fieldGenerator.js';

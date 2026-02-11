@@ -12,6 +12,7 @@ config/
 .idea/
 .vscode/
 docs/ContentModeller/.obsidian/
+docs/ContentModeller/.obsidian/workspace.json
 *.swp
 *.swo
 

@@ -41,6 +41,7 @@ export function validateMachineName(machineName) {
     return false;
   }
 
+  // Must be lowercase letters and underscores only, not starting/ending with underscore
   return /^[a-z][a-z0-9_]*[a-z0-9]$|^[a-z]$/.test(machineName);
 }
 
@@ -84,6 +85,9 @@ export function getSourceFieldName(machineName, sourceType) {
 /**
  * Generate node type YAML
  * @param {object} options - Bundle options
+ * @param {string} options.label - Human-readable label
+ * @param {string} options.machineName - Machine name
+ * @param {string} [options.description] - Description
  * @returns {string} - YAML string
  */
 export function generateNodeType({ label, machineName, description = '' }) {
@@ -106,6 +110,11 @@ export function generateNodeType({ label, machineName, description = '' }) {
 /**
  * Generate media type YAML
  * @param {object} options - Bundle options
+ * @param {string} options.label - Human-readable label
+ * @param {string} options.machineName - Machine name
+ * @param {string} [options.description] - Description
+ * @param {string} options.sourceType - Source type (image, file, remote_video)
+ * @param {string} options.sourceField - Source field name
  * @returns {string} - YAML string
  */
 export function generateMediaType({ label, machineName, description = '', sourceType, sourceField }) {
@@ -133,6 +142,9 @@ export function generateMediaType({ label, machineName, description = '', source
 /**
  * Generate paragraph type YAML
  * @param {object} options - Bundle options
+ * @param {string} options.label - Human-readable label
+ * @param {string} options.machineName - Machine name
+ * @param {string} [options.description] - Description
  * @returns {string} - YAML string
  */
 export function generateParagraphType({ label, machineName, description = '' }) {
@@ -154,6 +166,9 @@ export function generateParagraphType({ label, machineName, description = '' }) 
 /**
  * Generate taxonomy vocabulary YAML
  * @param {object} options - Bundle options
+ * @param {string} options.label - Human-readable label
+ * @param {string} options.machineName - Machine name
+ * @param {string} [options.description] - Description
  * @returns {string} - YAML string
  */
 export function generateVocabulary({ label, machineName, description = '' }) {
@@ -174,6 +189,8 @@ export function generateVocabulary({ label, machineName, description = '' }) {
 /**
  * Generate media source field storage YAML
  * @param {object} options - Field options
+ * @param {string} options.fieldName - Field machine name
+ * @param {string} options.sourceType - Source type (image, file, remote_video)
  * @returns {string} - YAML string
  */
 export function generateMediaSourceFieldStorage({ fieldName, sourceType }) {
@@ -209,6 +226,10 @@ export function generateMediaSourceFieldStorage({ fieldName, sourceType }) {
 /**
  * Generate media source field instance YAML
  * @param {object} options - Field options
+ * @param {string} options.fieldName - Field machine name
+ * @param {string} options.bundleName - Bundle machine name
+ * @param {string} options.sourceType - Source type (image, file, remote_video)
+ * @param {string} options.label - Field label
  * @returns {string} - YAML string
  */
 export function generateMediaSourceFieldInstance({ fieldName, bundleName, sourceType, label }) {

@@ -25,9 +25,14 @@ import {
   formatEntityFieldsTable,
   formatBundleFieldsTable
 } from '../commands/list.js';
+<<<<<<< HEAD
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName } from '../commands/create.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
 import { generateFieldName, FIELD_TYPES } from '../generators/fieldGenerator.js';
+=======
+import { createBundle, validateBundleMachineName } from '../commands/create.js';
+import { generateMachineName } from '../generators/bundleGenerator.js';
+>>>>>>> main
 
 /**
  * Entity type choices for bundle creation
@@ -47,6 +52,7 @@ const MEDIA_SOURCE_CHOICES = [
   { value: 'file', name: 'File' },
   { value: 'remote_video', name: 'Remote Video' }
 ];
+<<<<<<< HEAD
 
 /**
  * Entity reference target type choices
@@ -57,6 +63,8 @@ const REFERENCE_TARGET_CHOICES = [
   { value: 'taxonomy_term', name: 'Taxonomy Term' },
   { value: 'paragraph', name: 'Paragraph' }
 ];
+=======
+>>>>>>> main
 
 /**
  * Display the main menu and handle user selection
@@ -194,6 +202,10 @@ async function showProjectMenu(project) {
           break;
         case 'create-bundle':
           await handleCreateBundle(project);
+<<<<<<< HEAD
+=======
+          // Reload project to get updated data
+>>>>>>> main
           project = await loadProject(project.slug);
           break;
         case 'create-field':
@@ -364,11 +376,19 @@ async function handleListBundleFields(project) {
  */
 async function handleCreateBundle(project) {
   try {
+<<<<<<< HEAD
+=======
+    // Select entity type
+>>>>>>> main
     const entityType = await select({
       message: 'Select entity type:',
       choices: ENTITY_TYPE_CHOICES
     });
 
+<<<<<<< HEAD
+=======
+    // Prompt for label
+>>>>>>> main
     const label = await input({
       message: 'Label (human-readable name)?',
       validate: (value) => {
@@ -379,6 +399,10 @@ async function handleCreateBundle(project) {
       }
     });
 
+<<<<<<< HEAD
+=======
+    // Generate and prompt for machine name
+>>>>>>> main
     const suggestedMachineName = generateMachineName(label);
     const machineName = await input({
       message: 'Machine name?',
@@ -386,10 +410,18 @@ async function handleCreateBundle(project) {
       validate: (value) => validateBundleMachineName(project, entityType, value)
     });
 
+<<<<<<< HEAD
+=======
+    // Prompt for description
+>>>>>>> main
     const description = await input({
       message: 'Description (optional)?'
     });
 
+<<<<<<< HEAD
+=======
+    // For media types, prompt for source type
+>>>>>>> main
     let sourceType = null;
     if (entityType === 'media') {
       sourceType = await select({
@@ -398,6 +430,10 @@ async function handleCreateBundle(project) {
       });
     }
 
+<<<<<<< HEAD
+=======
+    // Create the bundle
+>>>>>>> main
     const result = await createBundle(project, entityType, {
       label,
       machineName,
@@ -419,6 +455,7 @@ async function handleCreateBundle(project) {
     console.log(chalk.red(`Error: ${error.message}`));
   }
 }
+<<<<<<< HEAD
 
 /**
  * Handle create field action
@@ -727,3 +764,5 @@ async function selectTargetBundles(project, targetType) {
 
   return selected;
 }
+=======
+>>>>>>> main

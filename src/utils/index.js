@@ -3,5 +3,5 @@
  * Slug generation, validation, formatting helpers.
  */
 
-export * from './slug';
-export * from './project';
+export * from './slug.js';
+export * from './project.js';

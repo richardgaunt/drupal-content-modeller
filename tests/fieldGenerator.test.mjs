@@ -87,6 +87,10 @@ describe('Field Generator', () => {
       expect(generateFieldName('taxonomy_term', 'My Field')).toBe('field_c_t_my_field');
     });
 
+    test('adds correct prefix for block_content', () => {
+      expect(generateFieldName('block_content', 'My Field')).toBe('field_c_b_my_field');
+    });
+
     test('converts label to machine name', () => {
       expect(generateFieldName('node', 'My Field')).toBe('field_c_n_my_field');
       expect(generateFieldName('node', 'Related Topics')).toBe('field_c_n_related_topics');
@@ -308,6 +312,20 @@ describe('Field Generator', () => {
       const parsed = yamlLoad(result);
       expect(parsed.dependencies.config).toContain('field.storage.node.field_body');
       expect(parsed.dependencies.config).toContain('node.type.page');
+    });
+
+    test('includes block_content type dependency', () => {
+      const result = generateFieldInstance({
+        entityType: 'block_content',
+        bundle: 'banner',
+        fieldName: 'field_c_b_theme',
+        fieldType: 'list_string',
+        label: 'Theme'
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.config).toContain('field.storage.block_content.field_c_b_theme');
+      expect(parsed.dependencies.config).toContain('block_content.type.banner');
     });
 
     test('sets required', () => {

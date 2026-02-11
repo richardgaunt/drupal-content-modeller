@@ -33,7 +33,8 @@ export const ENTITY_PREFIXES = {
   node: 'field_c_n_',
   media: 'field_c_m_',
   paragraph: 'field_c_p_',
-  taxonomy_term: 'field_c_t_'
+  taxonomy_term: 'field_c_t_',
+  block_content: 'field_c_b_'
 };
 
 /**
@@ -336,6 +337,9 @@ export function generateFieldInstance(options) {
       break;
     case 'taxonomy_term':
       configDeps.push(`taxonomy.vocabulary.${bundle}`);
+      break;
+    case 'block_content':
+      configDeps.push(`block_content.type.${bundle}`);
       break;
   }
 

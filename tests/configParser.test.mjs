@@ -14,6 +14,7 @@ import {
   parseMediaTypeBundle,
   parseParagraphTypeBundle,
   parseTaxonomyVocabularyBundle,
+  parseBlockContentTypeBundle,
   parseBundleConfig,
   parseFieldStorage,
   parseFieldInstance,
@@ -66,6 +67,10 @@ describe('Config Parser - Pure Functions', () => {
 
     test('extracts taxonomy vocabulary id', () => {
       expect(extractBundleIdFromFilename('taxonomy.vocabulary.tags.yml', 'taxonomy_term')).toBe('tags');
+    });
+
+    test('extracts block content type id', () => {
+      expect(extractBundleIdFromFilename('block_content.type.banner.yml', 'block_content')).toBe('banner');
     });
 
     test('returns null for non-matching filename', () => {
@@ -184,6 +189,27 @@ describe('Config Parser - Pure Functions', () => {
     });
   });
 
+  describe('parseBlockContentTypeBundle', () => {
+    test('extracts id, label, description', () => {
+      const config = {
+        id: 'banner',
+        label: 'Banner',
+        description: 'A banner block type'
+      };
+      const result = parseBlockContentTypeBundle(config);
+      expect(result).toEqual({
+        id: 'banner',
+        label: 'Banner',
+        description: 'A banner block type'
+      });
+    });
+
+    test('handles missing fields', () => {
+      const result = parseBlockContentTypeBundle({});
+      expect(result).toEqual({ id: '', label: '', description: '' });
+    });
+  });
+
   describe('parseBundleConfig', () => {
     test('uses correct parser for node', () => {
       const config = { type: 'page', name: 'Page' };
@@ -207,6 +233,12 @@ describe('Config Parser - Pure Functions', () => {
       const config = { vid: 'tags', name: 'Tags' };
       const result = parseBundleConfig(config, 'taxonomy_term');
       expect(result.id).toBe('tags');
+    });
+
+    test('uses correct parser for block_content', () => {
+      const config = { id: 'banner', label: 'Banner' };
+      const result = parseBundleConfig(config, 'block_content');
+      expect(result.id).toBe('banner');
     });
   });
 
@@ -365,6 +397,13 @@ describe('Config Reader - I/O Functions', () => {
       expect(bundles[0].id).toBe('test_tags');
     });
 
+    test('finds block content types', async () => {
+      const bundles = await parseBundleConfigs(fixturesPath, 'block_content');
+      expect(bundles.length).toBe(1);
+      expect(bundles[0].id).toBe('test_banner');
+      expect(bundles[0].label).toBe('Test Banner');
+    });
+
     test('extracts id, label, description', async () => {
       const bundles = await parseBundleConfigs(fixturesPath, 'node');
       const page = bundles.find(b => b.id === 'test_page');
@@ -454,6 +493,7 @@ describe('Config Reader - I/O Functions', () => {
       expect(result).toHaveProperty('media');
       expect(result).toHaveProperty('paragraph');
       expect(result).toHaveProperty('taxonomy_term');
+      expect(result).toHaveProperty('block_content');
     });
 
     test('includes bundles with fields', async () => {

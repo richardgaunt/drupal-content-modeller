@@ -36,7 +36,8 @@ const ENTITY_TYPE_CHOICES = [
   { value: 'node', name: 'Node (Content Type)' },
   { value: 'media', name: 'Media Type' },
   { value: 'paragraph', name: 'Paragraph Type' },
-  { value: 'taxonomy_term', name: 'Taxonomy Vocabulary' }
+  { value: 'taxonomy_term', name: 'Taxonomy Vocabulary' },
+  { value: 'block_content', name: 'Block Content Type' }
 ];
 
 /**
@@ -55,7 +56,8 @@ const REFERENCE_TARGET_CHOICES = [
   { value: 'node', name: 'Content (Node)' },
   { value: 'media', name: 'Media' },
   { value: 'taxonomy_term', name: 'Taxonomy Term' },
-  { value: 'paragraph', name: 'Paragraph' }
+  { value: 'paragraph', name: 'Paragraph' },
+  { value: 'block_content', name: 'Block Content' }
 ];
 
 /**

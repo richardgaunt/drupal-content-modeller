@@ -129,7 +129,7 @@ export async function parseConfigDirectory(configPath) {
     throw new Error(`Configuration directory does not exist: ${configPath}`);
   }
 
-  const entityTypes = ['node', 'media', 'paragraph', 'taxonomy_term'];
+  const entityTypes = ['node', 'media', 'paragraph', 'taxonomy_term', 'block_content'];
   const result = {};
 
   for (const entityType of entityTypes) {

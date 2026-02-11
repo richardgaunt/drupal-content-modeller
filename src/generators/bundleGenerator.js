@@ -60,6 +60,8 @@ export function getBundleFilename(entityType, machineName) {
       return `paragraphs.paragraphs_type.${machineName}.yml`;
     case 'taxonomy_term':
       return `taxonomy.vocabulary.${machineName}.yml`;
+    case 'block_content':
+      return `block_content.type.${machineName}.yml`;
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }
@@ -172,6 +174,25 @@ export function generateVocabulary({ label, machineName, description = '' }) {
 }
 
 /**
+ * Generate block content type YAML
+ * @param {object} options - Bundle options
+ * @returns {string} - YAML string
+ */
+export function generateBlockContentType({ label, machineName, description = '' }) {
+  const config = {
+    langcode: 'en',
+    status: true,
+    dependencies: {},
+    id: machineName,
+    label: label,
+    revision: false,
+    description: description
+  };
+
+  return yaml.dump(config, { quotingType: "'", forceQuotes: false });
+}
+
+/**
  * Generate media source field storage YAML
  * @param {object} options - Field options
  * @returns {string} - YAML string
@@ -258,6 +279,8 @@ export function generateBundle(entityType, options) {
       return generateParagraphType(options);
     case 'taxonomy_term':
       return generateVocabulary(options);
+    case 'block_content':
+      return generateBlockContentType(options);
     default:
       throw new Error(`Unknown entity type: ${entityType}`);
   }

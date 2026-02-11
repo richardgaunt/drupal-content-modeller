@@ -20,7 +20,7 @@ import {
   filterBundleFiles,
   filterFieldStorageFiles,
   filterFieldInstanceFiles
-} from '../src/parsers/configParser.js';
+} from '../src/parsers/configParser';
 
 // Import I/O functions
 import {
@@ -28,7 +28,7 @@ import {
   parseFieldStorages,
   parseFieldInstances,
   parseConfigDirectory
-} from '../src/io/configReader.js';
+} from '../src/io/configReader';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesPath = join(__dirname, 'fixtures');

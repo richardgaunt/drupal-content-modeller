@@ -3,5 +3,5 @@
  * Isolated I/O functions that can be mocked in tests.
  */
 
-export * from './fileSystem.js';
-export * from './configReader.js';
+export * from './fileSystem';
+export * from './configReader';

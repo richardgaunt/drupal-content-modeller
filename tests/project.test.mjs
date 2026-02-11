@@ -4,11 +4,11 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 // Import pure utility functions
-import { generateSlug, isValidProjectName } from '../src/utils/slug.js';
-import { createProjectObject, getProjectSummary } from '../src/utils/project.js';
+import { generateSlug, isValidProjectName } from '../src/utils/slug';
+import { createProjectObject, getProjectSummary } from '../src/utils/project';
 
 // Import I/O functions - use setProjectsDir for testing
-import { setProjectsDir } from '../src/io/fileSystem.js';
+import { setProjectsDir } from '../src/io/fileSystem';
 
 // Import commands
 import {
@@ -17,7 +17,7 @@ import {
   saveProject,
   listProjects,
   deleteProject
-} from '../src/commands/project.js';
+} from '../src/commands/project';
 
 describe('Slug Utilities (Pure)', () => {
   describe('generateSlug', () => {

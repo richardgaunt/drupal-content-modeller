@@ -3,4 +3,4 @@
  * Isolated I/O functions that can be mocked in tests.
  */
 
-export { };
+export * from './fileSystem.js';

@@ -74,3 +74,42 @@ Use a temporary directory for test fixtures (cleaned up after each test).
 - [ ] `deleteProject removes project directory` - directory no longer exists
 - [ ] `deleteProject returns false for missing project` - handles non-existent
 
+## Notes
+
+Need helper functions to support the CRUD:
+
+For convert project name to slug use:
+
+
+```js
+/**  
+ * Convert a human-readable project name to a valid directory name * @param {string} name - The human-readable project name  
+ * @returns {string} - The converted directory name  
+ */
+export function convertProjectNameToDirectory(name) {  
+  // Replace non-alphanumeric characters with hyphens  
+  // Remove leading/trailing hyphens  // Replace multiple hyphens with single hyphen  return name  
+    .toLowerCase()  
+    .replace(/[^a-z0-9]+/g, '-')  
+  
+    .replace(/^-+|-+$/g, '')  
+    .replace(/-+/g, '-');  
+}
+```
+
+Need a function to check if project exists:
+
+```js
+/**  
+ * Check if a project with the given directory name already exists * @param {string} directoryName - The directory name to check  
+ * @returns {boolean} - True if the project exists  
+ */
+ export function checkProjectExists(directoryName) {  
+  const projectPath = join(projectsDir, directoryName);  
+  return existsSync(projectPath);  
+}
+```
+
+
+
+Ensure we have unit tests for this as well.

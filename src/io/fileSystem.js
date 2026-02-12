@@ -3,7 +3,7 @@
  * These functions handle all file system interactions and can be mocked in tests.
  */
 
-import { readdir, readFile, writeFile, mkdir, rm } from 'fs/promises';
+import { readdir, readFile, writeFile, mkdir, rm, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -139,6 +139,28 @@ export async function deleteProjectDirectory(slug) {
 
   await rm(projectPath, { recursive: true });
   return true;
+}
+
+/**
+ * Rename a project directory
+ * @param {string} oldSlug - Current project slug
+ * @param {string} newSlug - New project slug
+ * @returns {Promise<void>}
+ * @throws {Error} - If rename fails
+ */
+export async function renameProjectDirectory(oldSlug, newSlug) {
+  const oldPath = getProjectPath(oldSlug);
+  const newPath = getProjectPath(newSlug);
+
+  if (!existsSync(oldPath)) {
+    throw new Error(`Project directory does not exist: ${oldPath}`);
+  }
+
+  if (existsSync(newPath)) {
+    throw new Error(`Target directory already exists: ${newPath}`);
+  }
+
+  await rename(oldPath, newPath);
 }
 
 /**

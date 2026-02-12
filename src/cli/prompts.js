@@ -26,6 +26,7 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'list-bundle-fields', name: 'List fields of bundle' },
   { value: 'create-bundle', name: 'Create a bundle' },
   { value: 'create-field', name: 'Create a field' },
+  { value: 'edit-project', name: 'Edit project' },
   { value: 'report-entity', name: 'Generate report for entity type' },
   { value: 'report-project', name: 'Generate report for project' },
   { value: 'back', name: 'Back to main menu' }
@@ -124,4 +125,23 @@ export async function validateConfigDirectory(dirPath) {
   }
 
   return true;
+}
+
+/**
+ * Validate base URL format
+ * @param {string} url - URL to validate
+ * @returns {boolean|string} true if valid (or empty), error message if invalid
+ */
+export function validateBaseUrl(url) {
+  // Allow empty value - base URL is optional
+  if (!url || url.trim() === '') {
+    return true;
+  }
+
+  try {
+    new URL(url.trim());
+    return true;
+  } catch {
+    return 'Please enter a valid URL (e.g., https://example.com)';
+  }
 }

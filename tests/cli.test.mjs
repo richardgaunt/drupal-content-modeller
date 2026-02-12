@@ -10,6 +10,7 @@ import {
   validateProjectName,
   validateProjectNameUnique,
   validateConfigDirectory,
+  validateBaseUrl,
   MAIN_MENU_CHOICES,
   PROJECT_MENU_CHOICES
 } from '../src/cli/prompts';
@@ -48,7 +49,7 @@ describe('CLI Prompts', () => {
       const result = getProjectMenuChoices('My Test Project');
 
       expect(result.choices).toEqual(PROJECT_MENU_CHOICES);
-      expect(result.choices.length).toBe(9);
+      expect(result.choices.length).toBe(10);
 
       const values = result.choices.map(c => c.value);
       expect(values).toContain('sync');
@@ -57,6 +58,7 @@ describe('CLI Prompts', () => {
       expect(values).toContain('list-bundle-fields');
       expect(values).toContain('create-bundle');
       expect(values).toContain('create-field');
+      expect(values).toContain('edit-project');
       expect(values).toContain('report-entity');
       expect(values).toContain('report-project');
       expect(values).toContain('back');
@@ -223,6 +225,44 @@ describe('CLI Prompts', () => {
       const result = generateSlug('  My Project  ');
 
       expect(result).toBe('my-project');
+    });
+  });
+
+  describe('Validation - Base URL', () => {
+    test('validateBaseUrl accepts empty string', () => {
+      const result = validateBaseUrl('');
+      expect(result).toBe(true);
+    });
+
+    test('validateBaseUrl accepts null', () => {
+      const result = validateBaseUrl(null);
+      expect(result).toBe(true);
+    });
+
+    test('validateBaseUrl accepts valid http URL', () => {
+      const result = validateBaseUrl('http://example.com');
+      expect(result).toBe(true);
+    });
+
+    test('validateBaseUrl accepts valid https URL', () => {
+      const result = validateBaseUrl('https://example.com');
+      expect(result).toBe(true);
+    });
+
+    test('validateBaseUrl accepts URL with path', () => {
+      const result = validateBaseUrl('https://example.com/path/to/page');
+      expect(result).toBe(true);
+    });
+
+    test('validateBaseUrl rejects invalid URL', () => {
+      const result = validateBaseUrl('not a url');
+      expect(result).not.toBe(true);
+      expect(result).toContain('valid URL');
+    });
+
+    test('validateBaseUrl rejects URL without protocol', () => {
+      const result = validateBaseUrl('example.com');
+      expect(result).not.toBe(true);
     });
   });
 });

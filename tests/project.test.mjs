@@ -16,8 +16,12 @@ import {
   loadProject,
   saveProject,
   listProjects,
-  deleteProject
+  deleteProject,
+  updateProject
 } from '../src/commands/project';
+
+// Import filesystem functions for testing
+import { getProjectPath } from '../src/io/fileSystem';
 
 describe('Slug Utilities (Pure)', () => {
   describe('generateSlug', () => {
@@ -90,6 +94,7 @@ describe('Project Utilities (Pure)', () => {
         name: 'My Project',
         slug: 'my-project',
         configDirectory: '/path/to/config',
+        baseUrl: '',
         lastSync: null,
         entities: {
           node: {},
@@ -98,6 +103,12 @@ describe('Project Utilities (Pure)', () => {
           taxonomy_term: {}
         }
       });
+    });
+
+    test('creates project with base URL', () => {
+      const project = createProjectObject('My Project', 'my-project', '/path/to/config', 'https://example.com');
+
+      expect(project.baseUrl).toBe('https://example.com');
     });
   });
 
@@ -269,6 +280,108 @@ describe('Project Commands', () => {
     test('returns false for missing project', async () => {
       const result = await deleteProject('nonexistent');
       expect(result).toBe(false);
+    });
+  });
+
+  describe('updateProject', () => {
+    test('updates project name', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+
+      const updated = await updateProject(project, {
+        name: 'Updated Project',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      });
+
+      expect(updated.name).toBe('Updated Project');
+    });
+
+    test('updates base URL', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+
+      const updated = await updateProject(project, {
+        name: 'My Project',
+        configDirectory: tempConfigDir,
+        baseUrl: 'https://example.com'
+      });
+
+      expect(updated.baseUrl).toBe('https://example.com');
+    });
+
+    test('updates config directory', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+      const newConfigDir = await mkdtemp(join(tmpdir(), 'dcm-config2-'));
+      await writeFile(join(newConfigDir, 'test.yml'), 'test: true');
+
+      try {
+        const updated = await updateProject(project, {
+          name: 'My Project',
+          configDirectory: newConfigDir,
+          baseUrl: ''
+        });
+
+        expect(updated.configDirectory).toBe(newConfigDir);
+      } finally {
+        await rm(newConfigDir, { recursive: true, force: true });
+      }
+    });
+
+    test('renames directory when name changes slug', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+      expect(existsSync(getProjectPath('my-project'))).toBe(true);
+
+      const updated = await updateProject(project, {
+        name: 'New Name',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      });
+
+      expect(updated.slug).toBe('new-name');
+      expect(existsSync(getProjectPath('new-name'))).toBe(true);
+      expect(existsSync(getProjectPath('my-project'))).toBe(false);
+    });
+
+    test('preserves slug when name change results in same slug', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+
+      const updated = await updateProject(project, {
+        name: 'My  Project',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      });
+
+      expect(updated.slug).toBe('my-project');
+    });
+
+    test('throws for empty name', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+
+      await expect(updateProject(project, {
+        name: '',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      })).rejects.toThrow('Project name is required');
+    });
+
+    test('throws for non-existent config directory', async () => {
+      const project = await createProject('My Project', tempConfigDir);
+
+      await expect(updateProject(project, {
+        name: 'My Project',
+        configDirectory: '/nonexistent/path',
+        baseUrl: ''
+      })).rejects.toThrow('does not exist');
+    });
+
+    test('throws for slug conflict', async () => {
+      await createProject('First Project', tempConfigDir);
+      const second = await createProject('Second Project', tempConfigDir);
+
+      await expect(updateProject(second, {
+        name: 'First Project',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      })).rejects.toThrow('already exists');
     });
   });
 });

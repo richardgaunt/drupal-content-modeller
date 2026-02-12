@@ -135,6 +135,17 @@ export function getEntityReferenceSettings(options = {}) {
 }
 
 /**
+ * Get entity reference revisions field settings (storage)
+ * Always targets paragraphs
+ * @returns {object} - Settings object
+ */
+export function getEntityReferenceRevisionsStorageSettings() {
+  return {
+    target_type: 'paragraph'
+  };
+}
+
+/**
  * Get entity reference handler settings (instance)
  * @param {object} options - Field options
  * @returns {object} - Handler settings object
@@ -155,6 +166,35 @@ export function getEntityReferenceHandlerSettings(options = {}) {
         field: '_none'
       },
       auto_create: false
+    }
+  };
+}
+
+/**
+ * Get entity reference revisions handler settings (instance)
+ * Used for paragraph references with drag-drop ordering
+ * @param {object} options - Field options
+ * @returns {object} - Handler settings object
+ */
+export function getEntityReferenceRevisionsHandlerSettings(options = {}) {
+  const targetBundles = options.targetBundles || [];
+  const bundleSettings = {};
+  const dragDropSettings = {};
+
+  targetBundles.forEach((bundle, index) => {
+    bundleSettings[bundle] = bundle;
+    dragDropSettings[bundle] = {
+      weight: index,
+      enabled: true
+    };
+  });
+
+  return {
+    handler: 'default:paragraph',
+    handler_settings: {
+      target_bundles: bundleSettings,
+      negate: 0,
+      target_bundles_drag_drop: dragDropSettings
     }
   };
 }
@@ -230,8 +270,9 @@ export function getStorageSettings(fieldType, options = {}) {
     case 'list_string':
       return getListStringSettings(options);
     case 'entity_reference':
-    case 'entity_reference_revisions':
       return getEntityReferenceSettings(options);
+    case 'entity_reference_revisions':
+      return getEntityReferenceRevisionsStorageSettings();
     default:
       return {};
   }
@@ -252,8 +293,9 @@ export function getInstanceSettings(fieldType, options = {}) {
     case 'file':
       return getFileSettings(options);
     case 'entity_reference':
-    case 'entity_reference_revisions':
       return getEntityReferenceHandlerSettings(options);
+    case 'entity_reference_revisions':
+      return getEntityReferenceRevisionsHandlerSettings(options);
     default:
       return {};
   }
@@ -276,11 +318,16 @@ export function generateFieldStorage(options) {
   const module = getModuleForFieldType(fieldType);
   const storageSettings = getStorageSettings(fieldType, settings);
 
+  // For entity_reference_revisions, include both modules
+  const moduleDeps = fieldType === 'entity_reference_revisions'
+    ? ['entity_reference_revisions', 'paragraphs']
+    : [module];
+
   const config = {
     langcode: 'en',
     status: true,
     dependencies: {
-      module: [module]
+      module: moduleDeps
     },
     id: `${entityType}.${fieldName}`,
     field_name: fieldName,
@@ -341,6 +388,13 @@ export function generateFieldInstance(options) {
     case 'block_content':
       configDeps.push(`block_content.type.${bundle}`);
       break;
+  }
+
+  // For entity_reference_revisions, add paragraph type dependencies
+  if (fieldType === 'entity_reference_revisions' && settings.targetBundles) {
+    for (const targetBundle of settings.targetBundles) {
+      configDeps.push(`paragraphs.paragraphs_type.${targetBundle}`);
+    }
   }
 
   const config = {

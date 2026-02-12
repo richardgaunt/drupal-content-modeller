@@ -27,8 +27,10 @@ import {
   formatBundleFieldsTable
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName } from '../commands/create.js';
+import { createEntityReport, createProjectReport } from '../commands/report.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
 import { generateFieldName, FIELD_TYPES } from '../generators/fieldGenerator.js';
+import { getEntityTypeLabel } from '../generators/reportGenerator.js';
 
 /**
  * Entity type choices for bundle creation
@@ -210,6 +212,12 @@ async function showProjectMenu(project) {
           break;
         case 'edit-project':
           project = await handleEditProject(project);
+          break;
+        case 'report-entity':
+          await handleEntityReport(project);
+          break;
+        case 'report-project':
+          await handleProjectReport(project);
           break;
         case 'back':
           return;
@@ -624,6 +632,118 @@ async function handleEditProject(project) {
     console.log(chalk.red(`Error: ${error.message}`));
     return project;
   }
+}
+
+/**
+ * Handle entity type report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleEntityReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const choices = entityTypes.map(type => ({
+      value: type,
+      name: `${getEntityTypeLabel(type)} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices
+    });
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Generate filename
+    const filename = `${project.slug}-${entityType}-report.md`;
+    const outputPath = `${process.cwd()}/${filename}`;
+
+    await createEntityReport(project, entityType, outputPath, baseUrl);
+    console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle full project report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleProjectReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Generate filename
+    const filename = `${project.slug}-content-model.md`;
+    const outputPath = `${process.cwd()}/${filename}`;
+
+    await createProjectReport(project, outputPath, baseUrl);
+    console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Prompt for report base URL
+ * @param {object} project - Project object
+ * @returns {Promise<string>} - Base URL to use
+ */
+async function promptForReportUrl(project) {
+  const projectUrl = project.baseUrl || '';
+
+  if (projectUrl) {
+    const useProjectUrl = await select({
+      message: `Use project base URL (${projectUrl})?`,
+      choices: [
+        { value: true, name: 'Yes' },
+        { value: false, name: 'No, enter a different URL' }
+      ]
+    });
+
+    if (useProjectUrl) {
+      return projectUrl;
+    }
+  }
+
+  const customUrl = await input({
+    message: 'Enter base URL for report links (leave empty for relative paths):',
+    default: ''
+  });
+
+  return customUrl.trim();
 }
 
 /**

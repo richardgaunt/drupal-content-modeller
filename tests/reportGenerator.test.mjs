@@ -40,7 +40,7 @@ describe('Report Generator', () => {
   describe('getFieldAdminPath', () => {
     test('returns correct path', () => {
       expect(getFieldAdminPath('node', 'page', 'field_title'))
-        .toBe('/admin/structure/types/manage/page/fields/field_title');
+        .toBe('/admin/structure/types/manage/page/fields/node.page.field_title');
     });
   });
 
@@ -68,14 +68,28 @@ describe('Report Generator', () => {
       expect(getFieldOtherInfo(field)).toBe('References: page, article');
     });
 
-    test('returns options count for list_string', () => {
+    test('returns options with key|value pairs for list_string, one per line', () => {
       const field = {
         type: 'list_string',
         settings: {
-          allowed_values: [{ value: 'a' }, { value: 'b' }, { value: 'c' }]
+          allowed_values: [
+            { value: 'draft', label: 'Draft' },
+            { value: 'published', label: 'Published' },
+            { value: 'archived', label: 'Archived' }
+          ]
         }
       };
-      expect(getFieldOtherInfo(field)).toBe('Options: 3');
+      expect(getFieldOtherInfo(field)).toBe('draft::Draft<br>published::Published<br>archived::Archived');
+    });
+
+    test('returns dash for list_string with empty allowed_values', () => {
+      const field = {
+        type: 'list_string',
+        settings: {
+          allowed_values: []
+        }
+      };
+      expect(getFieldOtherInfo(field)).toBe('-');
     });
 
     test('returns max length for string', () => {

@@ -11,9 +11,10 @@ import {
   getProjectMenuChoices,
   validateProjectName,
   validateProjectNameUnique,
-  validateConfigDirectory
+  validateConfigDirectory,
+  validateBaseUrl
 } from './prompts.js';
-import { createProject, loadProject, listProjects } from '../commands/project.js';
+import { createProject, loadProject, listProjects, updateProject } from '../commands/project.js';
 import { syncProject } from '../commands/sync.js';
 import {
   formatLastSync,
@@ -118,7 +119,12 @@ async function handleCreateProject() {
       validate: validateConfigDirectory
     });
 
-    const project = await createProject(name, configDir);
+    const baseUrl = await input({
+      message: 'Base URL of the project (optional, e.g., https://example.com)?',
+      validate: validateBaseUrl
+    });
+
+    const project = await createProject(name, configDir, baseUrl);
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
     console.log();
@@ -201,6 +207,9 @@ async function showProjectMenu(project) {
         case 'create-field':
           await handleCreateField(project);
           project = await loadProject(project.slug);
+          break;
+        case 'edit-project':
+          project = await handleEditProject(project);
           break;
         case 'back':
           return;
@@ -554,6 +563,66 @@ async function handleCreateField(project) {
       return;
     }
     console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle edit project action
+ * @param {object} project - The current project
+ * @returns {Promise<object>} - Updated project object
+ */
+async function handleEditProject(project) {
+  try {
+    console.log();
+    console.log(chalk.cyan('Edit project settings'));
+    console.log(chalk.cyan('Press Enter to keep current value'));
+    console.log();
+
+    const name = await input({
+      message: 'Project name:',
+      default: project.name,
+      validate: (value) => {
+        if (!value || value.trim().length === 0) {
+          return 'Project name is required';
+        }
+        return true;
+      }
+    });
+
+    const configDirectory = await input({
+      message: 'Configuration directory:',
+      default: project.configDirectory,
+      validate: validateConfigDirectory
+    });
+
+    const baseUrl = await input({
+      message: 'Base URL (e.g., https://example.com):',
+      default: project.baseUrl || '',
+      validate: validateBaseUrl
+    });
+
+    const updates = {
+      name: name.trim(),
+      configDirectory: configDirectory.trim(),
+      baseUrl: baseUrl.trim()
+    };
+
+    const updatedProject = await updateProject(project, updates);
+
+    console.log();
+    console.log(chalk.green('Project updated successfully!'));
+    if (updatedProject.slug !== project.slug) {
+      console.log(chalk.cyan(`Slug changed: ${project.slug} → ${updatedProject.slug}`));
+    }
+    console.log();
+
+    return updatedProject;
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return project;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+    return project;
   }
 }
 

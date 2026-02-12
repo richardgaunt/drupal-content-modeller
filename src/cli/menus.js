@@ -3,7 +3,7 @@
  * Handles interactive menu navigation and actions.
  */
 
-import { select, input, checkbox } from '@inquirer/prompts';
+import { select, input, checkbox, search } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { join } from 'path';
 
@@ -475,25 +475,28 @@ async function handleCreateField(project) {
       choices: entityChoices
     });
 
-    // Select bundle(s)
+    // Select bundle
     const bundles = project.entities[entityType];
-    const bundleOptions = Object.entries(bundles)
+    const bundleEntries = Object.entries(bundles)
       .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
       .map(([id, bundle]) => ({
         value: id,
-        name: `${bundle.label || id} (${id})`
+        name: `${bundle.label || id} (${id})`,
+        label: bundle.label || id
       }));
 
-    const selectedBundles = await checkbox({
-      message: 'Select bundle(s):',
-      choices: bundleOptions,
-      required: true
+    const selectedBundle = await search({
+      message: 'Select bundle (type to search):',
+      source: async (input) => {
+        const searchTerm = (input || '').toLowerCase();
+        return bundleEntries.filter(b =>
+          b.name.toLowerCase().includes(searchTerm) ||
+          b.value.toLowerCase().includes(searchTerm)
+        );
+      }
     });
 
-    if (selectedBundles.length === 0) {
-      console.log(chalk.yellow('At least one bundle is required.'));
-      return;
-    }
+    const selectedBundles = [selectedBundle];
 
     // Select field type
     const fieldType = await select({

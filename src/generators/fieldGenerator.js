@@ -38,6 +38,18 @@ export const ENTITY_PREFIXES = {
 };
 
 /**
+ * Entity type to module mapping
+ * Used for dependency declarations in field config
+ */
+export const ENTITY_TYPE_MODULES = {
+  node: 'node',
+  media: 'media',
+  paragraph: 'paragraphs',
+  taxonomy_term: 'taxonomy',
+  block_content: 'block_content'
+};
+
+/**
  * Supported field types for UI selection
  */
 export const FIELD_TYPES = [
@@ -334,10 +346,29 @@ export function generateFieldStorage(options) {
   const module = getModuleForFieldType(fieldType);
   const storageSettings = getStorageSettings(fieldType, settings);
 
-  // For entity_reference_revisions, include both modules
-  const moduleDeps = fieldType === 'entity_reference_revisions'
-    ? ['entity_reference_revisions', 'paragraphs']
-    : [module];
+  // Build module dependencies - never include 'core' as a dependency
+  const moduleDeps = [];
+
+  if (fieldType === 'entity_reference_revisions') {
+    // Paragraphs fields depend on entity_reference_revisions and paragraphs modules
+    moduleDeps.push('entity_reference_revisions', 'paragraphs');
+  } else if (fieldType === 'entity_reference') {
+    // Entity reference fields depend on the target entity type's module
+    const targetType = settings.targetType || 'node';
+    const targetModule = ENTITY_TYPE_MODULES[targetType];
+    if (targetModule) {
+      moduleDeps.push(targetModule);
+    }
+  } else if (module !== 'core') {
+    // For non-core field types, include the field type's module
+    moduleDeps.push(module);
+  }
+
+  // Always include the host entity type's module
+  const entityModule = ENTITY_TYPE_MODULES[entityType];
+  if (entityModule && !moduleDeps.includes(entityModule)) {
+    moduleDeps.push(entityModule);
+  }
 
   const config = {
     langcode: 'en',
@@ -382,7 +413,7 @@ export function generateFieldInstance(options) {
   const module = getModuleForFieldType(fieldType);
   const instanceSettings = getInstanceSettings(fieldType, settings);
 
-  // Build dependencies
+  // Build config dependencies
   const configDeps = [
     `field.storage.${entityType}.${fieldName}`
   ];
@@ -413,13 +444,48 @@ export function generateFieldInstance(options) {
     }
   }
 
+  // For entity_reference, add target bundle config dependencies
+  if (fieldType === 'entity_reference' && settings.targetBundles) {
+    const targetType = settings.targetType || 'node';
+    for (const targetBundle of settings.targetBundles) {
+      switch (targetType) {
+        case 'node':
+          configDeps.push(`node.type.${targetBundle}`);
+          break;
+        case 'media':
+          configDeps.push(`media.type.${targetBundle}`);
+          break;
+        case 'paragraph':
+          configDeps.push(`paragraphs.paragraphs_type.${targetBundle}`);
+          break;
+        case 'taxonomy_term':
+          configDeps.push(`taxonomy.vocabulary.${targetBundle}`);
+          break;
+        case 'block_content':
+          configDeps.push(`block_content.type.${targetBundle}`);
+          break;
+      }
+    }
+  }
+
+  // Build module dependencies - only include non-core modules
+  const moduleDeps = [];
+  if (module !== 'core') {
+    moduleDeps.push(module);
+  }
+
+  // Build dependencies object - only include module key if there are module deps
+  const dependencies = {
+    config: configDeps
+  };
+  if (moduleDeps.length > 0) {
+    dependencies.module = moduleDeps;
+  }
+
   const config = {
     langcode: 'en',
     status: true,
-    dependencies: {
-      config: configDeps,
-      module: [module]
-    },
+    dependencies: dependencies,
     id: `${entityType}.${bundle}.${fieldName}`,
     field_name: fieldName,
     entity_type: entityType,

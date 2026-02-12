@@ -430,6 +430,48 @@ describe('Field Generator', () => {
       expect(parsed.module).toBe('datetime_range');
       expect(parsed.settings.datetime_type).toBe('datetime');
     });
+
+    test('does not include core in dependencies.module for string field', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_n_title',
+        fieldType: 'string',
+        cardinality: 1
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.module).toBe('core');
+      expect(parsed.dependencies.module).not.toContain('core');
+      expect(parsed.dependencies.module).toContain('node');
+    });
+
+    test('does not include core in dependencies.module for entity_reference', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_n_image',
+        fieldType: 'entity_reference',
+        cardinality: 1,
+        settings: { targetType: 'media' }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.module).toBe('core');
+      expect(parsed.dependencies.module).not.toContain('core');
+      expect(parsed.dependencies.module).toContain('media');
+      expect(parsed.dependencies.module).toContain('node');
+    });
+
+    test('includes host entity module in dependencies', () => {
+      const result = generateFieldStorage({
+        entityType: 'paragraph',
+        fieldName: 'field_p_text',
+        fieldType: 'string',
+        cardinality: 1
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.module).toContain('paragraphs');
+    });
   });
 
   describe('generateFieldInstance', () => {
@@ -568,6 +610,50 @@ describe('Field Generator', () => {
       const parsed = yamlLoad(result);
       expect(parsed.dependencies.config).toContain('paragraphs.paragraphs_type.accordion');
       expect(parsed.dependencies.config).toContain('paragraphs.paragraphs_type.content');
+    });
+
+    test('does not include dependencies.module for core field types', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_n_title',
+        fieldType: 'string',
+        label: 'Title'
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.module).toBeUndefined();
+    });
+
+    test('does not include core in dependencies.module for entity_reference', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_n_image',
+        fieldType: 'entity_reference',
+        label: 'Image',
+        settings: {
+          targetType: 'media',
+          targetBundles: ['image']
+        }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.module).toBeUndefined();
+    });
+
+    test('includes module dependency for non-core field types', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_n_body',
+        fieldType: 'text_long',
+        label: 'Body'
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.module).toContain('text');
+      expect(parsed.dependencies.module).not.toContain('core');
     });
   });
 

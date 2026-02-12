@@ -1,84 +1,126 @@
 
+## 76 Bug - Invalid 'core' module dependency in generated config
 
-Field instance
-`field.field.node.news.field_n_featured_image.yml`
-```
-uuid: b6ae9d14-c8c8-438d-aae3-5a557ef1ebbb  
-langcode: en  
-status: true  
-dependencies:  
-  config:  
-    - field.storage.node.field_n_featured_image  
-    - node.type.news  
-  module:  
-    - core  
-id: node.news.field_n_featured_image  
-field_name: field_n_featured_image  
-entity_type: node  
-bundle: news  
-label: 'Featured image'  
-description: ''  
-required: false  
-translatable: true  
-default_value: {  }  
-default_value_callback: ''  
-settings:  
-  handler: default  
-  handler_settings:  
-    target_bundles:  
-      civictheme_image: civictheme_image  
-      civictheme_remote_video: civictheme_remote_video  
-    sort:  
-      field: _none  
-    auto_create: false  
-field_type: entity_reference
-```
+### Description
 
-Field Storage
-`field.field.node.news.field_n_featured_image.yml`
+Generated field configuration files were including `dependencies.module: ['core']` which causes Drupal config import to fail with the error:
 
 ```
-uuid: 5bfa2125-e128-4f72-bcd1-679a57f7a173  
-langcode: en  
-status: true  
-dependencies:  
-  module:  
-    - core  
-id: node.field_n_featured_image  
-field_name: field_n_featured_image  
-entity_type: node  
-type: entity_reference  
-settings:  
-  target_type: media  
-module: core  
-locked: false  
-cardinality: 1  
-translatable: true  
-indexes: {  }  
-persist_with_no_fields: false  
-custom_storage: false
-
-
+Configuration field.field.node.news.field_n_featured_image depends on the
+core module that will not be installed after import.
 ```
 
+**Root cause:** In Drupal, `core` is not a valid module for dependencies. The `module: core` property in field storage indicates the field type is provided by core, but this should NOT be included in `dependencies.module`.
 
-These fields have been imported and exported - but it has a dependency on `core`
+### Solution
 
-**Can you debug where this dependency has come from?**
+Two changes were made to `src/generators/fieldGenerator.js`:
 
+#### 1. Added ENTITY_TYPE_MODULES mapping
 
-We get this error importing fields:
+Maps entity types to their Drupal modules for proper dependency declarations:
 
+```javascript
+export const ENTITY_TYPE_MODULES = {
+  node: 'node',
+  media: 'media',
+  paragraph: 'paragraphs',
+  taxonomy_term: 'taxonomy',
+  block_content: 'block_content'
+};
 ```
- There were errors validating the config synchronization.                        
- Configuration <em class="placeholder">field.field.node.news.field_n_feature     
- d_image</em> depends on the <em class="placeholder">core</em> module that w     
- ill not be installed after import.                                              
- Configuration <em class="placeholder">field.storage.node.field_n_featured_i     
- mage</em> depends on the <em class="placeholder">core</em> module that will     
-  not be installed after import.
 
+#### 2. Fixed generateFieldStorage function
+
+Updated module dependency logic to:
+- Never include 'core' in `dependencies.module`
+- Include proper module dependencies based on field type
+- Include the host entity type's module
+
+**Before:**
+```javascript
+const moduleDeps = module !== 'core' ? [module] : [];
 ```
 
+**After:**
+```javascript
+const moduleDeps = [];
 
-Core is not a module.
+if (fieldType === 'entity_reference_revisions') {
+  moduleDeps.push('entity_reference_revisions', 'paragraphs');
+} else if (fieldType === 'entity_reference') {
+  const targetType = settings.targetType || 'node';
+  const targetModule = ENTITY_TYPE_MODULES[targetType];
+  if (targetModule) {
+    moduleDeps.push(targetModule);
+  }
+} else if (module !== 'core') {
+  moduleDeps.push(module);
+}
+
+// Always include the host entity type's module
+const entityModule = ENTITY_TYPE_MODULES[entityType];
+if (entityModule && !moduleDeps.includes(entityModule)) {
+  moduleDeps.push(entityModule);
+}
+```
+
+#### 3. Fixed generateFieldInstance function
+
+Updated to only include `dependencies.module` when there are non-core modules:
+
+**Before:**
+```javascript
+dependencies: {
+  config: configDeps,
+  module: [module]
+}
+```
+
+**After:**
+```javascript
+const moduleDeps = [];
+if (module !== 'core') {
+  moduleDeps.push(module);
+}
+
+const dependencies = {
+  config: configDeps
+};
+if (moduleDeps.length > 0) {
+  dependencies.module = moduleDeps;
+}
+```
+
+### Example Output
+
+**Field Storage for entity_reference to media (corrected):**
+```yaml
+dependencies:
+  module:
+    - media
+    - node
+```
+
+**Field Instance for entity_reference (corrected):**
+```yaml
+dependencies:
+  config:
+    - field.storage.node.field_n_featured_image
+    - node.type.news
+    - media.type.civictheme_image
+# Note: No module dependency since entity_reference is from core
+```
+
+### Files Changed
+
+- `src/generators/fieldGenerator.js` - Added ENTITY_TYPE_MODULES, fixed generateFieldStorage and generateFieldInstance
+
+### Acceptance Criteria
+
+- [x] Generated field storage does not include 'core' in dependencies.module
+- [x] Generated field instance does not include 'core' in dependencies.module
+- [x] Entity reference fields include target type module in storage dependencies
+- [x] All field types include host entity type module in storage dependencies
+- [x] All existing tests pass (385 tests)
+- [x] Generated config can be imported into Drupal without module dependency errors

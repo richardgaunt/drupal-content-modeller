@@ -40,11 +40,11 @@ docs/            # Tickets and documentation in Obsidian format
 
 | Entity Type | Config Prefix | Field Prefix |
 |-------------|---------------|--------------|
-| node | `node.type` | `field_c_n_` |
-| media | `media.type` | `field_c_m_` |
-| paragraph | `paragraphs.paragraphs_type` | `field_c_p_` |
-| taxonomy_term | `taxonomy.vocabulary` | `field_c_t_` |
-| block_content | `block_content.type` | `field_c_b_` |
+| node | `node.type` | `field_n_` |
+| media | `media.type` | `field_m_` |
+| paragraph | `paragraphs.paragraphs_type` | `field_p_` |
+| taxonomy_term | `taxonomy.vocabulary` | `field_t_` |
+| block_content | `block_content.type` | `field_b_` |
 
 ## Supported Field Types
 

@@ -127,15 +127,15 @@ describe('Bundle Generator', () => {
 
   describe('getSourceFieldName', () => {
     test('returns correct name for image', () => {
-      expect(getSourceFieldName('my_media', 'image')).toBe('field_c_m_my_media_image');
+      expect(getSourceFieldName('my_media', 'image')).toBe('field_m_my_media_image');
     });
 
     test('returns correct name for file', () => {
-      expect(getSourceFieldName('my_media', 'file')).toBe('field_c_m_my_media_file');
+      expect(getSourceFieldName('my_media', 'file')).toBe('field_m_my_media_file');
     });
 
     test('returns correct name for remote_video', () => {
-      expect(getSourceFieldName('my_media', 'remote_video')).toBe('field_c_m_my_media_video_url');
+      expect(getSourceFieldName('my_media', 'remote_video')).toBe('field_m_my_media_video_url');
     });
   });
 
@@ -185,7 +185,7 @@ describe('Bundle Generator', () => {
         machineName: 'image',
         description: 'Image media type.',
         sourceType: 'image',
-        sourceField: 'field_c_m_image_image'
+        sourceField: 'field_m_image_image'
       });
 
       const parsed = yaml.load(result);
@@ -197,12 +197,12 @@ describe('Bundle Generator', () => {
         label: 'Image',
         machineName: 'image',
         sourceType: 'image',
-        sourceField: 'field_c_m_image_image'
+        sourceField: 'field_m_image_image'
       });
 
       const parsed = yaml.load(result);
       expect(parsed.source_configuration).toBeDefined();
-      expect(parsed.source_configuration.source_field).toBe('field_c_m_image_image');
+      expect(parsed.source_configuration.source_field).toBe('field_m_image_image');
     });
 
     test('sets correct source plugin for image', () => {
@@ -210,7 +210,7 @@ describe('Bundle Generator', () => {
         label: 'Image',
         machineName: 'image',
         sourceType: 'image',
-        sourceField: 'field_c_m_image_image'
+        sourceField: 'field_m_image_image'
       });
 
       const parsed = yaml.load(result);
@@ -222,7 +222,7 @@ describe('Bundle Generator', () => {
         label: 'Document',
         machineName: 'document',
         sourceType: 'file',
-        sourceField: 'field_c_m_document_file'
+        sourceField: 'field_m_document_file'
       });
 
       const parsed = yaml.load(result);
@@ -234,7 +234,7 @@ describe('Bundle Generator', () => {
         label: 'Video',
         machineName: 'video',
         sourceType: 'remote_video',
-        sourceField: 'field_c_m_video_video_url'
+        sourceField: 'field_m_video_video_url'
       });
 
       const parsed = yaml.load(result);
@@ -340,20 +340,20 @@ describe('Bundle Generator', () => {
   describe('generateMediaSourceFieldStorage', () => {
     test('creates valid storage YAML for image', () => {
       const result = generateMediaSourceFieldStorage({
-        fieldName: 'field_c_m_image_image',
+        fieldName: 'field_m_image_image',
         sourceType: 'image'
       });
 
       const parsed = yaml.load(result);
-      expect(parsed.id).toBe('media.field_c_m_image_image');
-      expect(parsed.field_name).toBe('field_c_m_image_image');
+      expect(parsed.id).toBe('media.field_m_image_image');
+      expect(parsed.field_name).toBe('field_m_image_image');
       expect(parsed.entity_type).toBe('media');
       expect(parsed.type).toBe('image');
     });
 
     test('creates valid storage YAML for file', () => {
       const result = generateMediaSourceFieldStorage({
-        fieldName: 'field_c_m_doc_file',
+        fieldName: 'field_m_doc_file',
         sourceType: 'file'
       });
 
@@ -363,7 +363,7 @@ describe('Bundle Generator', () => {
 
     test('creates valid storage YAML for remote_video', () => {
       const result = generateMediaSourceFieldStorage({
-        fieldName: 'field_c_m_video_video_url',
+        fieldName: 'field_m_video_video_url',
         sourceType: 'remote_video'
       });
 
@@ -375,15 +375,15 @@ describe('Bundle Generator', () => {
   describe('generateMediaSourceFieldInstance', () => {
     test('creates valid instance YAML', () => {
       const result = generateMediaSourceFieldInstance({
-        fieldName: 'field_c_m_image_image',
+        fieldName: 'field_m_image_image',
         bundleName: 'image',
         sourceType: 'image',
         label: 'Image'
       });
 
       const parsed = yaml.load(result);
-      expect(parsed.id).toBe('media.image.field_c_m_image_image');
-      expect(parsed.field_name).toBe('field_c_m_image_image');
+      expect(parsed.id).toBe('media.image.field_m_image_image');
+      expect(parsed.field_name).toBe('field_m_image_image');
       expect(parsed.entity_type).toBe('media');
       expect(parsed.bundle).toBe('image');
       expect(parsed.label).toBe('Image');
@@ -407,7 +407,7 @@ describe('Bundle Generator', () => {
         label: 'Image',
         machineName: 'image',
         sourceType: 'image',
-        sourceField: 'field_c_m_image_image'
+        sourceField: 'field_m_image_image'
       });
 
       const parsed = yaml.load(result);

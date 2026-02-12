@@ -74,28 +74,28 @@ describe('Field Generator', () => {
 
   describe('generateFieldName', () => {
     test('adds correct prefix for node', () => {
-      expect(generateFieldName('node', 'My Field')).toBe('field_c_n_my_field');
+      expect(generateFieldName('node', 'My Field')).toBe('field_n_my_field');
     });
 
     test('adds correct prefix for media', () => {
-      expect(generateFieldName('media', 'My Field')).toBe('field_c_m_my_field');
+      expect(generateFieldName('media', 'My Field')).toBe('field_m_my_field');
     });
 
     test('adds correct prefix for paragraph', () => {
-      expect(generateFieldName('paragraph', 'My Field')).toBe('field_c_p_my_field');
+      expect(generateFieldName('paragraph', 'My Field')).toBe('field_p_my_field');
     });
 
     test('adds correct prefix for taxonomy_term', () => {
-      expect(generateFieldName('taxonomy_term', 'My Field')).toBe('field_c_t_my_field');
+      expect(generateFieldName('taxonomy_term', 'My Field')).toBe('field_t_my_field');
     });
 
     test('adds correct prefix for block_content', () => {
-      expect(generateFieldName('block_content', 'My Field')).toBe('field_c_b_my_field');
+      expect(generateFieldName('block_content', 'My Field')).toBe('field_b_my_field');
     });
 
     test('converts label to machine name', () => {
-      expect(generateFieldName('node', 'My Field')).toBe('field_c_n_my_field');
-      expect(generateFieldName('node', 'Related Topics')).toBe('field_c_n_related_topics');
+      expect(generateFieldName('node', 'My Field')).toBe('field_n_my_field');
+      expect(generateFieldName('node', 'Related Topics')).toBe('field_n_related_topics');
     });
   });
 
@@ -344,7 +344,7 @@ describe('Field Generator', () => {
     test('includes both modules for entity_reference_revisions', () => {
       const result = generateFieldStorage({
         entityType: 'node',
-        fieldName: 'field_c_n_components',
+        fieldName: 'field_n_components',
         fieldType: 'entity_reference_revisions',
         cardinality: -1
       });
@@ -357,7 +357,7 @@ describe('Field Generator', () => {
     test('uses paragraph target_type for entity_reference_revisions', () => {
       const result = generateFieldStorage({
         entityType: 'node',
-        fieldName: 'field_c_n_components',
+        fieldName: 'field_n_components',
         fieldType: 'entity_reference_revisions',
         cardinality: -1
       });
@@ -400,13 +400,13 @@ describe('Field Generator', () => {
       const result = generateFieldInstance({
         entityType: 'block_content',
         bundle: 'banner',
-        fieldName: 'field_c_b_theme',
+        fieldName: 'field_b_theme',
         fieldType: 'list_string',
         label: 'Theme'
       });
 
       const parsed = yamlLoad(result);
-      expect(parsed.dependencies.config).toContain('field.storage.block_content.field_c_b_theme');
+      expect(parsed.dependencies.config).toContain('field.storage.block_content.field_b_theme');
       expect(parsed.dependencies.config).toContain('block_content.type.banner');
     });
 
@@ -457,7 +457,7 @@ describe('Field Generator', () => {
       const result = generateFieldInstance({
         entityType: 'node',
         bundle: 'page',
-        fieldName: 'field_c_n_components',
+        fieldName: 'field_n_components',
         fieldType: 'entity_reference_revisions',
         label: 'Components',
         settings: {
@@ -473,7 +473,7 @@ describe('Field Generator', () => {
       const result = generateFieldInstance({
         entityType: 'node',
         bundle: 'page',
-        fieldName: 'field_c_n_components',
+        fieldName: 'field_n_components',
         fieldType: 'entity_reference_revisions',
         label: 'Components',
         settings: {
@@ -492,7 +492,7 @@ describe('Field Generator', () => {
       const result = generateFieldInstance({
         entityType: 'node',
         bundle: 'page',
-        fieldName: 'field_c_n_components',
+        fieldName: 'field_n_components',
         fieldType: 'entity_reference_revisions',
         label: 'Components',
         settings: {
@@ -609,7 +609,7 @@ description: A page.
 
     test('accepts valid name', () => {
       expect(validateFieldMachineName('field_body')).toBe(true);
-      expect(validateFieldMachineName('field_c_n_my_field')).toBe(true);
+      expect(validateFieldMachineName('field_n_my_field')).toBe(true);
     });
   });
 

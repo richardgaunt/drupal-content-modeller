@@ -81,7 +81,7 @@ export function getSourceFieldName(machineName, sourceType) {
     remote_video: 'video_url'
   };
 
-  return `field_c_m_${machineName}_${suffix[sourceType] || 'source'}`;
+  return `field_m_${machineName}_${suffix[sourceType] || 'source'}`;
 }
 
 /**

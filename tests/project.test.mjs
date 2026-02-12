@@ -21,7 +21,7 @@ import {
 } from '../src/commands/project';
 
 // Import filesystem functions for testing
-import { getProjectPath } from '../src/io/fileSystem';
+import { getProjectPath, getReportsDir } from '../src/io/fileSystem';
 
 describe('Slug Utilities (Pure)', () => {
   describe('generateSlug', () => {
@@ -129,6 +129,17 @@ describe('Project Utilities (Pure)', () => {
         slug: 'my-project',
         lastSync: '2025-01-15T10:30:00.000Z'
       });
+    });
+  });
+});
+
+describe('File System Utilities', () => {
+  describe('getReportsDir', () => {
+    test('returns reports subdirectory of project path', () => {
+      const reportsDir = getReportsDir('my-project');
+      const projectPath = getProjectPath('my-project');
+
+      expect(reportsDir).toBe(`${projectPath}/reports`);
     });
   });
 });

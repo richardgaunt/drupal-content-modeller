@@ -49,7 +49,7 @@ export function getEntityAdminPath(entityType, bundle) {
  */
 export function getFieldAdminPath(entityType, bundle, fieldName) {
   const basePath = getEntityAdminPath(entityType, bundle);
-  return `${basePath}/${fieldName}`;
+  return `${basePath}/${entityType}.${bundle}.${fieldName}`;
 }
 
 /**
@@ -81,8 +81,9 @@ export function getFieldOtherInfo(field) {
 
   if (field.type === 'list_string' || field.type === 'list_integer') {
     const values = field.settings?.allowed_values;
-    if (values && Array.isArray(values)) {
-      parts.push(`Options: ${values.length}`);
+    if (values && Array.isArray(values) && values.length > 0) {
+      const optionsList = values.map(v => `${v.value}::${v.label}`).join('<br>');
+      parts.push(optionsList);
     }
   }
 

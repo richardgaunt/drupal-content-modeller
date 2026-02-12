@@ -5,6 +5,7 @@
 
 import { select, input, checkbox } from '@inquirer/prompts';
 import chalk from 'chalk';
+import { join } from 'path';
 
 import {
   getMainMenuChoices,
@@ -28,6 +29,7 @@ import {
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName } from '../commands/create.js';
 import { createEntityReport, createProjectReport } from '../commands/report.js';
+import { getReportsDir } from '../io/fileSystem.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
 import { generateFieldName, FIELD_TYPES } from '../generators/fieldGenerator.js';
 import { getEntityTypeLabel } from '../generators/reportGenerator.js';
@@ -671,9 +673,9 @@ async function handleEntityReport(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
-    // Generate filename
+    // Generate filename in project reports directory
     const filename = `${project.slug}-${entityType}-report.md`;
-    const outputPath = `${process.cwd()}/${filename}`;
+    const outputPath = join(getReportsDir(project.slug), filename);
 
     await createEntityReport(project, entityType, outputPath, baseUrl);
     console.log(chalk.green(`Report saved to: ${outputPath}`));
@@ -702,9 +704,9 @@ async function handleProjectReport(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
-    // Generate filename
+    // Generate filename in project reports directory
     const filename = `${project.slug}-content-model.md`;
-    const outputPath = `${process.cwd()}/${filename}`;
+    const outputPath = join(getReportsDir(project.slug), filename);
 
     await createProjectReport(project, outputPath, baseUrl);
     console.log(chalk.green(`Report saved to: ${outputPath}`));

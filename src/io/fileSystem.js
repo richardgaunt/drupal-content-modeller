@@ -52,6 +52,15 @@ export function getProjectJsonPath(slug) {
 }
 
 /**
+ * Get the path to a project's reports directory
+ * @param {string} slug - Project slug
+ * @returns {string} - Absolute path to reports directory
+ */
+export function getReportsDir(slug) {
+  return join(getProjectPath(slug), 'reports');
+}
+
+/**
  * Check if a directory exists
  * @param {string} dirPath - Path to check
  * @returns {boolean} - True if exists

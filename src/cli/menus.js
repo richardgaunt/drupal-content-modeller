@@ -27,7 +27,7 @@ import {
   formatEntityFieldsTable,
   formatBundleFieldsTable
 } from '../commands/list.js';
-import { createBundle, validateBundleMachineName, createField, validateFieldMachineName } from '../commands/create.js';
+import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields } from '../commands/create.js';
 import { createEntityReport, createProjectReport } from '../commands/report.js';
 import { getReportsDir } from '../io/fileSystem.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
@@ -501,50 +501,123 @@ async function handleCreateField(project) {
       choices: FIELD_TYPES
     });
 
-    // Prompt for label
-    const label = await input({
-      message: 'Field label?',
-      validate: (value) => {
-        if (!value || value.trim().length === 0) {
-          return 'Label is required';
+    // Check for reusable fields
+    const reusableFields = getReusableFields(project, entityType, fieldType, selectedBundles);
+
+    let fieldName;
+    let label;
+    let description;
+    let required;
+    let cardinality;
+    let settings;
+    let isReuse = false;
+
+    if (reusableFields.length > 0) {
+      // Offer choice to reuse or create new
+      const reuseChoice = await select({
+        message: 'Field options:',
+        choices: [
+          { value: 'reuse', name: 'Reuse existing field' },
+          { value: 'new', name: 'Create new field' }
+        ]
+      });
+
+      if (reuseChoice === 'reuse') {
+        // Show list of reusable fields
+        const fieldChoices = reusableFields.map(f => ({
+          value: f.fieldName,
+          name: `${f.label} (${f.fieldName}) - used in: ${f.usedInBundles.join(', ')}`
+        }));
+        fieldChoices.push({ value: '__new__', name: 'Create new field' });
+
+        const selectedField = await select({
+          message: 'Select field to reuse:',
+          choices: fieldChoices
+        });
+
+        if (selectedField !== '__new__') {
+          isReuse = true;
+          const reusedField = reusableFields.find(f => f.fieldName === selectedField);
+          fieldName = reusedField.fieldName;
+          cardinality = reusedField.cardinality;
+          settings = reusedField.settings;
+
+          // Prompt for label (default to existing)
+          label = await input({
+            message: 'Field label?',
+            default: reusedField.label,
+            validate: (value) => {
+              if (!value || value.trim().length === 0) {
+                return 'Label is required';
+              }
+              return true;
+            }
+          });
+
+          // Prompt for description
+          description = await input({
+            message: 'Description (optional)?'
+          });
+
+          // Prompt for required
+          required = await select({
+            message: 'Required?',
+            choices: [
+              { value: false, name: 'No' },
+              { value: true, name: 'Yes' }
+            ]
+          });
         }
-        return true;
       }
-    });
+    }
 
-    // Generate and prompt for field name
-    const suggestedFieldName = generateFieldName(entityType, label);
-    const fieldName = await input({
-      message: 'Machine name?',
-      default: suggestedFieldName,
-      validate: validateFieldMachineName
-    });
+    // If not reusing, go through full creation flow
+    if (!isReuse) {
+      // Prompt for label
+      label = await input({
+        message: 'Field label?',
+        validate: (value) => {
+          if (!value || value.trim().length === 0) {
+            return 'Label is required';
+          }
+          return true;
+        }
+      });
 
-    // Prompt for description
-    const description = await input({
-      message: 'Description (optional)?'
-    });
+      // Generate and prompt for field name
+      const suggestedFieldName = generateFieldName(entityType, label);
+      fieldName = await input({
+        message: 'Machine name?',
+        default: suggestedFieldName,
+        validate: validateFieldMachineName
+      });
 
-    // Prompt for required
-    const required = await select({
-      message: 'Required?',
-      choices: [
-        { value: false, name: 'No' },
-        { value: true, name: 'Yes' }
-      ]
-    });
+      // Prompt for description
+      description = await input({
+        message: 'Description (optional)?'
+      });
 
-    // Prompt for cardinality
-    const cardinality = await select({
-      message: 'Cardinality?',
-      choices: [
-        { value: 1, name: 'Single value' },
-        { value: -1, name: 'Unlimited' }
-      ]
-    });
+      // Prompt for required
+      required = await select({
+        message: 'Required?',
+        choices: [
+          { value: false, name: 'No' },
+          { value: true, name: 'Yes' }
+        ]
+      });
 
-    // Type-specific settings
-    const settings = await getTypeSpecificSettings(fieldType, project);
+      // Prompt for cardinality
+      cardinality = await select({
+        message: 'Cardinality?',
+        choices: [
+          { value: 1, name: 'Single value' },
+          { value: -1, name: 'Unlimited' }
+        ]
+      });
+
+      // Type-specific settings
+      settings = await getTypeSpecificSettings(fieldType, project);
+    }
 
     // Create the field
     const result = await createField(project, entityType, selectedBundles, {
@@ -793,6 +866,17 @@ async function getTypeSpecificSettings(fieldType, project) {
       settings.targetBundles = targetBundles;
       break;
     }
+
+    case 'datetime':
+    case 'daterange':
+      settings.datetimeType = await select({
+        message: 'Date type?',
+        choices: [
+          { value: 'date', name: 'Date only' },
+          { value: 'datetime', name: 'Date and time' }
+        ]
+      });
+      break;
 
     case 'link':
       settings.allowExternal = await select({

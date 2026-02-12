@@ -47,6 +47,8 @@ export const FIELD_TYPES = [
   { value: 'boolean', name: 'Boolean' },
   { value: 'integer', name: 'Number (integer)' },
   { value: 'list_string', name: 'List (text)' },
+  { value: 'datetime', name: 'Date' },
+  { value: 'daterange', name: 'Date range' },
   { value: 'link', name: 'Link' },
   { value: 'image', name: 'Image' },
   { value: 'file', name: 'File' },
@@ -120,6 +122,17 @@ export function getListStringSettings(options = {}) {
       label: item.label
     })),
     allowed_values_function: ''
+  };
+}
+
+/**
+ * Get datetime field settings (storage)
+ * @param {object} options - Field options
+ * @returns {object} - Settings object
+ */
+export function getDatetimeSettings(options = {}) {
+  return {
+    datetime_type: options.datetimeType || 'date'
   };
 }
 
@@ -269,6 +282,9 @@ export function getStorageSettings(fieldType, options = {}) {
       return getStringSettings(options);
     case 'list_string':
       return getListStringSettings(options);
+    case 'datetime':
+    case 'daterange':
+      return getDatetimeSettings(options);
     case 'entity_reference':
       return getEntityReferenceSettings(options);
     case 'entity_reference_revisions':

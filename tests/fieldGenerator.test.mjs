@@ -10,6 +10,7 @@ import {
   getInstanceFilename,
   getStringSettings,
   getListStringSettings,
+  getDatetimeSettings,
   getEntityReferenceSettings,
   getEntityReferenceHandlerSettings,
   getEntityReferenceRevisionsStorageSettings,
@@ -25,7 +26,8 @@ import {
 
 import {
   validateFieldMachineName,
-  createField
+  createField,
+  getReusableFields
 } from '../src/commands/create.js';
 
 import { setProjectsDir } from '../src/io/fileSystem.js';
@@ -65,6 +67,14 @@ describe('Field Generator', () => {
 
     test('returns entity_reference_revisions for entity_reference_revisions', () => {
       expect(getModuleForFieldType('entity_reference_revisions')).toBe('entity_reference_revisions');
+    });
+
+    test('returns datetime for datetime', () => {
+      expect(getModuleForFieldType('datetime')).toBe('datetime');
+    });
+
+    test('returns datetime_range for daterange', () => {
+      expect(getModuleForFieldType('daterange')).toBe('datetime_range');
     });
 
     test('returns core for unknown type', () => {
@@ -142,6 +152,18 @@ describe('Field Generator', () => {
     test('handles empty allowed_values', () => {
       const settings = getListStringSettings();
       expect(settings.allowed_values).toEqual([]);
+    });
+  });
+
+  describe('getDatetimeSettings', () => {
+    test('includes datetime_type', () => {
+      const settings = getDatetimeSettings({ datetimeType: 'datetime' });
+      expect(settings.datetime_type).toBe('datetime');
+    });
+
+    test('defaults to date', () => {
+      const settings = getDatetimeSettings();
+      expect(settings.datetime_type).toBe('date');
     });
   });
 
@@ -364,6 +386,49 @@ describe('Field Generator', () => {
 
       const parsed = yamlLoad(result);
       expect(parsed.settings.target_type).toBe('paragraph');
+    });
+
+    test('generates datetime field storage with date type', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_n_event_date',
+        fieldType: 'datetime',
+        cardinality: 1,
+        settings: { datetimeType: 'date' }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.type).toBe('datetime');
+      expect(parsed.module).toBe('datetime');
+      expect(parsed.settings.datetime_type).toBe('date');
+    });
+
+    test('generates datetime field storage with datetime type', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_n_event_datetime',
+        fieldType: 'datetime',
+        cardinality: 1,
+        settings: { datetimeType: 'datetime' }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.settings.datetime_type).toBe('datetime');
+    });
+
+    test('generates daterange field storage', () => {
+      const result = generateFieldStorage({
+        entityType: 'paragraph',
+        fieldName: 'field_p_date_range',
+        fieldType: 'daterange',
+        cardinality: 1,
+        settings: { datetimeType: 'datetime' }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.type).toBe('daterange');
+      expect(parsed.module).toBe('datetime_range');
+      expect(parsed.settings.datetime_type).toBe('datetime');
     });
   });
 
@@ -708,6 +773,193 @@ type: article
         fieldType: 'text_long',
         label: 'Body'
       })).rejects.toThrow();
+    });
+  });
+
+  describe('getReusableFields', () => {
+    test('returns empty array for null entities', () => {
+      const project = { entities: null };
+      expect(getReusableFields(project, 'node', 'text_long', [])).toEqual([]);
+    });
+
+    test('returns empty array for missing entity type', () => {
+      const project = { entities: { media: {} } };
+      expect(getReusableFields(project, 'node', 'text_long', [])).toEqual([]);
+    });
+
+    test('returns empty array when no fields match type', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_summary: { type: 'string', label: 'Summary' }
+              }
+            }
+          }
+        }
+      };
+      expect(getReusableFields(project, 'node', 'text_long', [])).toEqual([]);
+    });
+
+    test('returns fields of matching type', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body', cardinality: 1 },
+                field_summary: { type: 'string', label: 'Summary' }
+              }
+            }
+          }
+        }
+      };
+      const result = getReusableFields(project, 'node', 'text_long', []);
+      expect(result).toHaveLength(1);
+      expect(result[0].fieldName).toBe('field_body');
+      expect(result[0].label).toBe('Body');
+      expect(result[0].usedInBundles).toEqual(['page']);
+    });
+
+    test('returns fields from multiple bundles', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            },
+            article: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' },
+                field_content: { type: 'text_long', label: 'Content' }
+              }
+            }
+          }
+        }
+      };
+      const result = getReusableFields(project, 'node', 'text_long', []);
+      expect(result).toHaveLength(2);
+      const bodyField = result.find(f => f.fieldName === 'field_body');
+      expect(bodyField.usedInBundles).toEqual(['page', 'article']);
+    });
+
+    test('excludes fields already used in selected bundles', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            },
+            article: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' },
+                field_content: { type: 'text_long', label: 'Content' }
+              }
+            }
+          }
+        }
+      };
+      // When selecting 'page', field_body is excluded (used in page)
+      // field_content is included (only in article)
+      const result = getReusableFields(project, 'node', 'text_long', ['page']);
+      expect(result).toHaveLength(1);
+      expect(result[0].fieldName).toBe('field_content');
+    });
+
+    test('excludes fields used in all selected bundles', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            },
+            article: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            }
+          }
+        }
+      };
+      // field_body is used in both page and article, so it's excluded
+      const result = getReusableFields(project, 'node', 'text_long', ['page', 'article']);
+      expect(result).toHaveLength(0);
+    });
+
+    test('includes field if not used in at least one selected bundle', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            },
+            article: {
+              fields: {}
+            },
+            landing: {
+              fields: {
+                field_body: { type: 'text_long', label: 'Body' }
+              }
+            }
+          }
+        }
+      };
+      // field_body is in page and landing, but not in article
+      // When selecting page and article, field_body can be reused for article
+      const result = getReusableFields(project, 'node', 'text_long', ['page', 'article']);
+      expect(result).toHaveLength(1);
+      expect(result[0].fieldName).toBe('field_body');
+    });
+
+    test('sorts results by label', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_z: { type: 'text_long', label: 'Zebra' },
+                field_a: { type: 'text_long', label: 'Apple' },
+                field_m: { type: 'text_long', label: 'Mango' }
+              }
+            }
+          }
+        }
+      };
+      const result = getReusableFields(project, 'node', 'text_long', []);
+      expect(result[0].label).toBe('Apple');
+      expect(result[1].label).toBe('Mango');
+      expect(result[2].label).toBe('Zebra');
+    });
+
+    test('includes cardinality and settings from field', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              fields: {
+                field_tags: {
+                  type: 'entity_reference',
+                  label: 'Tags',
+                  cardinality: -1,
+                  settings: { targetBundles: ['tags'] }
+                }
+              }
+            }
+          }
+        }
+      };
+      const result = getReusableFields(project, 'node', 'entity_reference', []);
+      expect(result[0].cardinality).toBe(-1);
+      expect(result[0].settings).toEqual({ targetBundles: ['tags'] });
     });
   });
 });

@@ -25,6 +25,63 @@ import { saveProject } from './project.js';
 import { parseConfigDirectory } from '../io/configReader.js';
 
 /**
+ * Get reusable fields for a given entity type and field type
+ * Returns fields that exist in the project but are not used by the specified bundles
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @param {string} fieldType - Field type to filter by
+ * @param {string[]} excludeBundles - Bundles to exclude (fields already used in these bundles won't be shown)
+ * @returns {object[]} - Array of {fieldName, label, type, cardinality, usedInBundles}
+ */
+export function getReusableFields(project, entityType, fieldType, excludeBundles = []) {
+  if (!project.entities || !project.entities[entityType]) {
+    return [];
+  }
+
+  const entityBundles = project.entities[entityType];
+  const fieldMap = new Map();
+
+  // Collect all fields of the given type across all bundles
+  for (const [bundleId, bundle] of Object.entries(entityBundles)) {
+    if (!bundle.fields) continue;
+
+    for (const [fieldName, fieldData] of Object.entries(bundle.fields)) {
+      if (fieldData.type !== fieldType) continue;
+
+      if (!fieldMap.has(fieldName)) {
+        fieldMap.set(fieldName, {
+          fieldName,
+          label: fieldData.label,
+          type: fieldData.type,
+          cardinality: fieldData.cardinality || 1,
+          settings: fieldData.settings || {},
+          usedInBundles: []
+        });
+      }
+
+      fieldMap.get(fieldName).usedInBundles.push(bundleId);
+    }
+  }
+
+  // Filter out fields that are already used in all selected bundles
+  const reusableFields = [];
+  for (const field of fieldMap.values()) {
+    // Check if field is used in all the selected bundles
+    // If excludeBundles is empty, include all fields
+    const usedInAllSelected = excludeBundles.length > 0 &&
+      excludeBundles.every(b => field.usedInBundles.includes(b));
+    if (!usedInAllSelected) {
+      reusableFields.push(field);
+    }
+  }
+
+  // Sort by label
+  reusableFields.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+
+  return reusableFields;
+}
+
+/**
  * Check if bundle already exists in project
  * @param {object} project - Project object
  * @param {string} entityType - Entity type

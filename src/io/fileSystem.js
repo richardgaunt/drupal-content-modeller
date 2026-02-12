@@ -188,3 +188,16 @@ export async function writeYamlFile(filePath, content) {
   }
   await writeFile(filePath, content, 'utf-8');
 }
+
+/**
+ * Write a text file
+ * @param {string} filePath - Path to write to
+ * @param {string} content - Text content
+ */
+export async function writeTextFile(filePath, content) {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+  await writeFile(filePath, content, 'utf-8');
+}

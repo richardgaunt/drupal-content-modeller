@@ -26,6 +26,8 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'list-bundle-fields', name: 'List fields of bundle' },
   { value: 'create-bundle', name: 'Create a bundle' },
   { value: 'create-field', name: 'Create a field' },
+  { value: 'report-entity', name: 'Generate report for entity type' },
+  { value: 'report-project', name: 'Generate report for project' },
   { value: 'back', name: 'Back to main menu' }
 ];
 

@@ -12,6 +12,8 @@ import {
   getListStringSettings,
   getEntityReferenceSettings,
   getEntityReferenceHandlerSettings,
+  getEntityReferenceRevisionsStorageSettings,
+  getEntityReferenceRevisionsHandlerSettings,
   getLinkSettings,
   getImageSettings,
   getFileSettings,
@@ -169,6 +171,61 @@ describe('Field Generator', () => {
     });
   });
 
+  describe('getEntityReferenceRevisionsStorageSettings', () => {
+    test('always returns paragraph as target_type', () => {
+      const settings = getEntityReferenceRevisionsStorageSettings();
+      expect(settings.target_type).toBe('paragraph');
+    });
+  });
+
+  describe('getEntityReferenceRevisionsHandlerSettings', () => {
+    test('uses default:paragraph handler', () => {
+      const settings = getEntityReferenceRevisionsHandlerSettings({
+        targetBundles: ['accordion', 'content']
+      });
+
+      expect(settings.handler).toBe('default:paragraph');
+    });
+
+    test('includes target_bundles', () => {
+      const settings = getEntityReferenceRevisionsHandlerSettings({
+        targetBundles: ['accordion', 'content']
+      });
+
+      expect(settings.handler_settings.target_bundles).toEqual({
+        accordion: 'accordion',
+        content: 'content'
+      });
+    });
+
+    test('includes negate setting', () => {
+      const settings = getEntityReferenceRevisionsHandlerSettings({
+        targetBundles: ['accordion']
+      });
+
+      expect(settings.handler_settings.negate).toBe(0);
+    });
+
+    test('includes target_bundles_drag_drop with weights', () => {
+      const settings = getEntityReferenceRevisionsHandlerSettings({
+        targetBundles: ['accordion', 'content', 'text']
+      });
+
+      expect(settings.handler_settings.target_bundles_drag_drop).toEqual({
+        accordion: { weight: 0, enabled: true },
+        content: { weight: 1, enabled: true },
+        text: { weight: 2, enabled: true }
+      });
+    });
+
+    test('handles empty target bundles', () => {
+      const settings = getEntityReferenceRevisionsHandlerSettings({});
+
+      expect(settings.handler_settings.target_bundles).toEqual({});
+      expect(settings.handler_settings.target_bundles_drag_drop).toEqual({});
+    });
+  });
+
   describe('getLinkSettings', () => {
     test('includes link_type 17 when external allowed', () => {
       const settings = getLinkSettings({ allowExternal: true });
@@ -283,6 +340,31 @@ describe('Field Generator', () => {
       expect(parsed.settings.allowed_values).toBeDefined();
       expect(parsed.settings.allowed_values).toHaveLength(2);
     });
+
+    test('includes both modules for entity_reference_revisions', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_c_n_components',
+        fieldType: 'entity_reference_revisions',
+        cardinality: -1
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.module).toContain('entity_reference_revisions');
+      expect(parsed.dependencies.module).toContain('paragraphs');
+    });
+
+    test('uses paragraph target_type for entity_reference_revisions', () => {
+      const result = generateFieldStorage({
+        entityType: 'node',
+        fieldName: 'field_c_n_components',
+        fieldType: 'entity_reference_revisions',
+        cardinality: -1
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.settings.target_type).toBe('paragraph');
+    });
   });
 
   describe('generateFieldInstance', () => {
@@ -369,6 +451,58 @@ describe('Field Generator', () => {
         tags: 'tags',
         categories: 'categories'
       });
+    });
+
+    test('uses default:paragraph handler for entity_reference_revisions', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_c_n_components',
+        fieldType: 'entity_reference_revisions',
+        label: 'Components',
+        settings: {
+          targetBundles: ['accordion', 'content']
+        }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.settings.handler).toBe('default:paragraph');
+    });
+
+    test('includes target_bundles_drag_drop for entity_reference_revisions', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_c_n_components',
+        fieldType: 'entity_reference_revisions',
+        label: 'Components',
+        settings: {
+          targetBundles: ['accordion', 'content']
+        }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.settings.handler_settings.target_bundles_drag_drop).toEqual({
+        accordion: { weight: 0, enabled: true },
+        content: { weight: 1, enabled: true }
+      });
+    });
+
+    test('includes paragraph type dependencies for entity_reference_revisions', () => {
+      const result = generateFieldInstance({
+        entityType: 'node',
+        bundle: 'page',
+        fieldName: 'field_c_n_components',
+        fieldType: 'entity_reference_revisions',
+        label: 'Components',
+        settings: {
+          targetBundles: ['accordion', 'content']
+        }
+      });
+
+      const parsed = yamlLoad(result);
+      expect(parsed.dependencies.config).toContain('paragraphs.paragraphs_type.accordion');
+      expect(parsed.dependencies.config).toContain('paragraphs.paragraphs_type.content');
     });
   });
 

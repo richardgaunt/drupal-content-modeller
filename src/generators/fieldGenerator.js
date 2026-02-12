@@ -41,19 +41,19 @@ export const ENTITY_PREFIXES = {
  * Supported field types for UI selection
  */
 export const FIELD_TYPES = [
-  { value: 'string', name: 'Text (plain)' },
-  { value: 'string_long', name: 'Text (plain, long)' },
-  { value: 'text_long', name: 'Text (formatted, long)' },
-  { value: 'boolean', name: 'Boolean' },
-  { value: 'integer', name: 'Number (integer)' },
-  { value: 'list_string', name: 'List (text)' },
-  { value: 'datetime', name: 'Date' },
-  { value: 'daterange', name: 'Date range' },
-  { value: 'link', name: 'Link' },
-  { value: 'image', name: 'Image' },
-  { value: 'file', name: 'File' },
-  { value: 'entity_reference', name: 'Entity Reference' },
-  { value: 'entity_reference_revisions', name: 'Paragraphs (Entity Reference Revisions)' }
+  { value: 'string', name: 'Text - plain (string)' },
+  { value: 'string_long', name: 'Text - plain, long (string_long)' },
+  { value: 'text_long', name: 'Text - formatted, long (text_long)' },
+  { value: 'boolean', name: 'Boolean (boolean)' },
+  { value: 'integer', name: 'Number - integer (integer)' },
+  { value: 'list_string', name: 'List - text (list_string)' },
+  { value: 'datetime', name: 'Date (datetime)' },
+  { value: 'daterange', name: 'Date range (daterange)' },
+  { value: 'link', name: 'Link (link)' },
+  { value: 'image', name: 'Image (image)' },
+  { value: 'file', name: 'File (file)' },
+  { value: 'entity_reference', name: 'Entity reference (entity_reference)' },
+  { value: 'entity_reference_revisions', name: 'Paragraphs (entity_reference_revisions)' }
 ];
 
 /**

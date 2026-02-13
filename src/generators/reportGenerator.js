@@ -104,14 +104,16 @@ export function getEntityTypeLabel(entityType) {
 }
 
 /**
- * Generate a markdown anchor from text
+ * Generate a markdown anchor from heading text (Obsidian-compatible)
+ * Obsidian auto-generates anchors by lowercasing and replacing non-alphanumeric with hyphens
  * @param {string} label - Label text
  * @param {string} entityType - Entity type
  * @returns {string} - Anchor string
  */
 export function generateAnchor(label, entityType) {
-  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return `${slug}-${entityType}`;
+  // Match Obsidian's anchor generation: full heading text, lowercased, non-alphanumeric to hyphens
+  const headingText = `${label} (${entityType})`;
+  return headingText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 /**

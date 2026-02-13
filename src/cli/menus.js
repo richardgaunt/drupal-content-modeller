@@ -185,9 +185,15 @@ async function showProjectMenu(project) {
 
   while (true) {
     try {
-      const action = await select({
+      const action = await search({
         message: menuConfig.message,
-        choices: menuConfig.choices
+        source: async (input) => {
+          const searchTerm = (input || '').toLowerCase();
+          return menuConfig.choices.filter(c =>
+            c.name.toLowerCase().includes(searchTerm) ||
+            c.value.toLowerCase().includes(searchTerm)
+          );
+        }
       });
 
       switch (action) {

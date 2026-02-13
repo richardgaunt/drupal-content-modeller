@@ -3,7 +3,7 @@
  */
 
 /**
- * Entity type to admin path mapping
+ * Entity type to admin path mapping (for fields page)
  */
 const ENTITY_PATHS = {
   node: '/admin/structure/types/manage/{bundle}/fields',
@@ -11,6 +11,46 @@ const ENTITY_PATHS = {
   taxonomy_term: '/admin/structure/taxonomy/manage/{bundle}',
   block_content: '/admin/structure/block-content/manage/{bundle}',
   media: '/admin/structure/media/manage/{bundle}'
+};
+
+/**
+ * Admin URLs for each entity type
+ */
+const ADMIN_URLS = {
+  node: [
+    { name: 'Edit Form', path: '/admin/structure/types/manage/{bundle}' },
+    { name: 'Manage Fields', path: '/admin/structure/types/manage/{bundle}/fields' },
+    { name: 'Manage Form Display', path: '/admin/structure/types/manage/{bundle}/form-display' },
+    { name: 'Manage Display', path: '/admin/structure/types/manage/{bundle}/display' },
+    { name: 'Manage Permissions', path: '/admin/structure/types/manage/{bundle}/permissions' }
+  ],
+  paragraph: [
+    { name: 'Edit Form', path: '/admin/structure/paragraphs_type/{bundle}' },
+    { name: 'Manage Fields', path: '/admin/structure/paragraphs_type/{bundle}/fields' },
+    { name: 'Manage Form Display', path: '/admin/structure/paragraphs_type/{bundle}/form-display' },
+    { name: 'Manage Display', path: '/admin/structure/paragraphs_type/{bundle}/display' }
+  ],
+  taxonomy_term: [
+    { name: 'Edit Form', path: '/admin/structure/taxonomy/manage/{bundle}' },
+    { name: 'Manage Fields', path: '/admin/structure/taxonomy/manage/{bundle}/overview/fields' },
+    { name: 'Manage Form Display', path: '/admin/structure/taxonomy/manage/{bundle}/overview/form-display' },
+    { name: 'Manage Display', path: '/admin/structure/taxonomy/manage/{bundle}/overview/display' },
+    { name: 'Manage Permissions', path: '/admin/structure/taxonomy/manage/{bundle}/overview/permissions' }
+  ],
+  block_content: [
+    { name: 'Edit Form', path: '/admin/structure/block-content/manage/{bundle}' },
+    { name: 'Manage Fields', path: '/admin/structure/block-content/manage/{bundle}/fields' },
+    { name: 'Manage Form Display', path: '/admin/structure/block-content/manage/{bundle}/form-display' },
+    { name: 'Manage Display', path: '/admin/structure/block-content/manage/{bundle}/display' },
+    { name: 'Manage Permissions', path: '/admin/structure/block-content/manage/{bundle}/permissions' }
+  ],
+  media: [
+    { name: 'Edit Form', path: '/admin/structure/media/manage/{bundle}' },
+    { name: 'Manage Fields', path: '/admin/structure/media/manage/{bundle}/fields' },
+    { name: 'Manage Form Display', path: '/admin/structure/media/manage/{bundle}/form-display' },
+    { name: 'Manage Display', path: '/admin/structure/media/manage/{bundle}/display' },
+    { name: 'Manage Permissions', path: '/admin/structure/media/manage/{bundle}/permissions' }
+  ]
 };
 
 /**
@@ -50,6 +90,20 @@ export function getEntityAdminPath(entityType, bundle) {
 export function getFieldAdminPath(entityType, bundle, fieldName) {
   const basePath = getEntityAdminPath(entityType, bundle);
   return `${basePath}/${entityType}.${bundle}.${fieldName}`;
+}
+
+/**
+ * Get all admin URLs for a bundle
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle machine name
+ * @returns {object[]} - Array of {name, path} objects
+ */
+export function getBundleAdminUrls(entityType, bundle) {
+  const urls = ADMIN_URLS[entityType] || [];
+  return urls.map(url => ({
+    name: url.name,
+    path: url.path.replace('{bundle}', bundle)
+  }));
 }
 
 /**
@@ -124,12 +178,19 @@ export function generateAnchor(label, entityType) {
  * @returns {string} - Markdown content
  */
 export function generateBundleReport(bundle, entityType, baseUrl = '') {
-  const adminPath = getEntityAdminPath(entityType, bundle.id);
-  const entityLink = baseUrl ? `${baseUrl}${adminPath}` : adminPath;
+  const adminUrls = getBundleAdminUrls(entityType, bundle.id);
 
   let md = `### ${bundle.label || bundle.id} (${entityType})\n\n`;
-  md += `**Link:** [${entityLink}](${entityLink})\n\n`;
   md += `${bundle.description || '_No description_'}\n\n`;
+
+  // Admin links
+  md += `**Admin Links:**\n`;
+  for (const url of adminUrls) {
+    const fullUrl = baseUrl ? `${baseUrl}${url.path}` : url.path;
+    md += `- [${url.name}](${fullUrl})\n`;
+  }
+  md += `\n`;
+
   md += `#### Fields\n\n`;
 
   const fields = Object.values(bundle.fields || {});

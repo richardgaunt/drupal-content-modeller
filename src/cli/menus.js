@@ -1023,7 +1023,8 @@ function getAdminUrls(entityType, bundle) {
       { name: 'Edit Form', path: `/admin/structure/media/manage/${bundle}` },
       { name: 'Manage Fields', path: `/admin/structure/media/manage/${bundle}/fields` },
       { name: 'Manage Form Display', path: `/admin/structure/media/manage/${bundle}/form-display` },
-      { name: 'Manage Display', path: `/admin/structure/media/manage/${bundle}/display` }
+      { name: 'Manage Display', path: `/admin/structure/media/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/media/manage/${bundle}/permissions` }
     ]
   };
 

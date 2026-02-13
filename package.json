@@ -5,6 +5,7 @@
   "main": "index.mjs",
   "type": "module",
   "bin": {
+    "dcm": "index.mjs",
     "drupal-content-modeller": "index.mjs"
   },
   "scripts": {

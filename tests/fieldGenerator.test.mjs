@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import { mkdtemp, rm, writeFile } from 'fs/promises';
+import { mkdtemp, rm, writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -27,7 +27,8 @@ import {
 import {
   validateFieldMachineName,
   createField,
-  getReusableFields
+  getReusableFields,
+  updateField
 } from '../src/commands/create.js';
 
 import { setProjectsDir } from '../src/io/fileSystem.js';
@@ -1046,6 +1047,148 @@ type: article
       const result = getReusableFields(project, 'node', 'entity_reference', []);
       expect(result[0].cardinality).toBe(-1);
       expect(result[0].settings).toEqual({ targetBundles: ['tags'] });
+    });
+  });
+
+  describe('updateField', () => {
+    test('updates field label', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      // Create a field first
+      await createField(project, 'node', ['page'], {
+        fieldName: 'field_n_body',
+        fieldType: 'text_long',
+        label: 'Body',
+        description: 'Original description',
+        required: false
+      });
+
+      // Update the field
+      const result = await updateField(project, 'node', 'page', 'field_n_body', {
+        label: 'Updated Body'
+      });
+
+      expect(result.fieldName).toBe('field_n_body');
+      expect(result.updatedFile).toBe('field.field.node.page.field_n_body.yml');
+
+      // Verify the file was updated
+      const content = await readFile(join(tempConfigDir, result.updatedFile), 'utf-8');
+      const parsed = yamlLoad(content);
+      expect(parsed.label).toBe('Updated Body');
+    });
+
+    test('updates field description', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      await createField(project, 'node', ['page'], {
+        fieldName: 'field_n_summary',
+        fieldType: 'string',
+        label: 'Summary',
+        description: 'Original',
+        required: false
+      });
+
+      await updateField(project, 'node', 'page', 'field_n_summary', {
+        description: 'New description'
+      });
+
+      const content = await readFile(join(tempConfigDir, 'field.field.node.page.field_n_summary.yml'), 'utf-8');
+      const parsed = yamlLoad(content);
+      expect(parsed.description).toBe('New description');
+    });
+
+    test('updates field required status', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      await createField(project, 'node', ['page'], {
+        fieldName: 'field_n_title',
+        fieldType: 'string',
+        label: 'Title',
+        required: false
+      });
+
+      await updateField(project, 'node', 'page', 'field_n_title', {
+        required: true
+      });
+
+      const content = await readFile(join(tempConfigDir, 'field.field.node.page.field_n_title.yml'), 'utf-8');
+      const parsed = yamlLoad(content);
+      expect(parsed.required).toBe(true);
+    });
+
+    test('updates entity_reference target bundles', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      // Create taxonomy vocabulary for target
+      await writeFile(join(tempConfigDir, 'taxonomy.vocabulary.tags.yml'), `
+langcode: en
+status: true
+name: Tags
+vid: tags
+`);
+      await writeFile(join(tempConfigDir, 'taxonomy.vocabulary.categories.yml'), `
+langcode: en
+status: true
+name: Categories
+vid: categories
+`);
+
+      await createField(project, 'node', ['page'], {
+        fieldName: 'field_n_tags',
+        fieldType: 'entity_reference',
+        label: 'Tags',
+        settings: {
+          targetType: 'taxonomy_term',
+          targetBundles: ['tags']
+        }
+      });
+
+      await updateField(project, 'node', 'page', 'field_n_tags', {
+        targetBundles: ['tags', 'categories']
+      });
+
+      const content = await readFile(join(tempConfigDir, 'field.field.node.page.field_n_tags.yml'), 'utf-8');
+      const parsed = yamlLoad(content);
+      expect(parsed.settings.handler_settings.target_bundles).toEqual({
+        tags: 'tags',
+        categories: 'categories'
+      });
+    });
+
+    test('throws for invalid project', async () => {
+      await expect(updateField(null, 'node', 'page', 'field_body', { label: 'New' }))
+        .rejects.toThrow('Invalid project');
+    });
+
+    test('throws for missing field file', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      await expect(updateField(project, 'node', 'page', 'field_nonexistent', { label: 'New' }))
+        .rejects.toThrow('Field instance file not found');
+    });
+
+    test('updates multiple fields at once', async () => {
+      const project = await createProject('Test Project', tempConfigDir);
+
+      await createField(project, 'node', ['page'], {
+        fieldName: 'field_n_multi',
+        fieldType: 'string',
+        label: 'Original',
+        description: 'Original desc',
+        required: false
+      });
+
+      await updateField(project, 'node', 'page', 'field_n_multi', {
+        label: 'Updated Label',
+        description: 'Updated description',
+        required: true
+      });
+
+      const content = await readFile(join(tempConfigDir, 'field.field.node.page.field_n_multi.yml'), 'utf-8');
+      const parsed = yamlLoad(content);
+      expect(parsed.label).toBe('Updated Label');
+      expect(parsed.description).toBe('Updated description');
+      expect(parsed.required).toBe(true);
     });
   });
 });

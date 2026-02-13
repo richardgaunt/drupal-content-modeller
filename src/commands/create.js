@@ -4,7 +4,8 @@
  */
 
 import { join } from 'path';
-import { writeYamlFile } from '../io/fileSystem.js';
+import yaml from 'js-yaml';
+import { writeYamlFile, readTextFile } from '../io/fileSystem.js';
 import {
   generateBundle,
   getBundleFilename,
@@ -302,5 +303,101 @@ export async function createField(project, entityType, bundles, options) {
     label: options.label,
     createdFiles,
     storageCreated: !storageExistsAlready
+  };
+}
+
+/**
+ * Update an existing field instance
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field machine name
+ * @param {object} updates - Fields to update
+ * @param {string} [updates.label] - New label
+ * @param {string} [updates.description] - New description
+ * @param {boolean} [updates.required] - New required value
+ * @param {string[]} [updates.targetBundles] - New target bundles (for entity reference fields)
+ * @returns {Promise<object>} - Result with updated file
+ */
+export async function updateField(project, entityType, bundle, fieldName, updates) {
+  if (!project || !project.configDirectory) {
+    throw new Error('Invalid project: missing configDirectory');
+  }
+
+  const configDir = project.configDirectory;
+  const instanceFilename = getInstanceFilename(entityType, bundle, fieldName);
+  const instancePath = join(configDir, instanceFilename);
+
+  // Read existing field instance
+  let content;
+  try {
+    content = await readTextFile(instancePath);
+  } catch {
+    throw new Error(`Field instance file not found: ${instanceFilename}`);
+  }
+
+  // Parse YAML
+  const config = yaml.load(content);
+
+  // Update fields
+  if (updates.label !== undefined) {
+    config.label = updates.label;
+  }
+
+  if (updates.description !== undefined) {
+    config.description = updates.description;
+  }
+
+  if (updates.required !== undefined) {
+    config.required = updates.required;
+  }
+
+  // Update target bundles for entity reference fields
+  if (updates.targetBundles !== undefined) {
+    const fieldType = config.field_type;
+    if (fieldType === 'entity_reference' || fieldType === 'entity_reference_revisions') {
+      // Build target bundles object
+      const bundleSettings = {};
+      for (const targetBundle of updates.targetBundles) {
+        bundleSettings[targetBundle] = targetBundle;
+      }
+
+      if (!config.settings) {
+        config.settings = {};
+      }
+      if (!config.settings.handler_settings) {
+        config.settings.handler_settings = {};
+      }
+      config.settings.handler_settings.target_bundles = bundleSettings;
+
+      // For entity_reference_revisions, also update drag_drop settings
+      if (fieldType === 'entity_reference_revisions') {
+        const dragDropSettings = {};
+        updates.targetBundles.forEach((targetBundle, index) => {
+          dragDropSettings[targetBundle] = {
+            weight: index,
+            enabled: true
+          };
+        });
+        config.settings.handler_settings.target_bundles_drag_drop = dragDropSettings;
+      }
+    }
+  }
+
+  // Write updated YAML
+  const updatedYaml = yaml.dump(config, { quotingType: "'", forceQuotes: false });
+  await writeYamlFile(instancePath, updatedYaml);
+
+  // Re-sync project entities
+  const entities = await parseConfigDirectory(configDir);
+  project.entities = entities;
+  project.lastSync = new Date().toISOString();
+  await saveProject(project);
+
+  return {
+    entityType,
+    bundle,
+    fieldName,
+    updatedFile: instanceFilename
   };
 }

@@ -27,7 +27,7 @@ import {
   formatEntityFieldsTable,
   formatBundleFieldsTable
 } from '../commands/list.js';
-import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields } from '../commands/create.js';
+import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../commands/create.js';
 import { createEntityReport, createProjectReport } from '../commands/report.js';
 import { getReportsDir } from '../io/fileSystem.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
@@ -212,6 +212,10 @@ async function showProjectMenu(project) {
           await handleCreateField(project);
           project = await loadProject(project.slug);
           break;
+        case 'edit-field':
+          await handleEditField(project);
+          project = await loadProject(project.slug);
+          break;
         case 'edit-project':
           project = await handleEditProject(project);
           break;
@@ -220,6 +224,9 @@ async function showProjectMenu(project) {
           break;
         case 'report-project':
           await handleProjectReport(project);
+          break;
+        case 'admin-links':
+          await handleAdminLinks(project);
           break;
         case 'back':
           return;
@@ -653,6 +660,183 @@ async function handleCreateField(project) {
 }
 
 /**
+ * Handle edit field action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleEditField(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityChoices
+    });
+
+    // Select bundle
+    const bundles = project.entities[entityType];
+    const bundleEntries = Object.entries(bundles)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([id, bundle]) => ({
+        value: id,
+        name: `${bundle.label || id} (${id})`,
+        label: bundle.label || id
+      }));
+
+    const selectedBundle = await search({
+      message: 'Select bundle (type to search):',
+      source: async (searchInput) => {
+        const searchTerm = (searchInput || '').toLowerCase();
+        return bundleEntries.filter(b =>
+          b.name.toLowerCase().includes(searchTerm) ||
+          b.value.toLowerCase().includes(searchTerm)
+        );
+      }
+    });
+
+    // Select field
+    const bundle = bundles[selectedBundle];
+    if (!bundle.fields || Object.keys(bundle.fields).length === 0) {
+      console.log(chalk.yellow('No fields found on this bundle.'));
+      return;
+    }
+
+    const fieldEntries = Object.entries(bundle.fields)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([fieldName, field]) => ({
+        value: fieldName,
+        name: `${field.label || fieldName} (${fieldName}) - ${field.type}`,
+        label: field.label || fieldName,
+        type: field.type
+      }));
+
+    const selectedField = await search({
+      message: 'Select field (type to search):',
+      source: async (searchInput) => {
+        const searchTerm = (searchInput || '').toLowerCase();
+        return fieldEntries.filter(f =>
+          f.name.toLowerCase().includes(searchTerm) ||
+          f.value.toLowerCase().includes(searchTerm)
+        );
+      }
+    });
+
+    const field = bundle.fields[selectedField];
+    const fieldType = field.type;
+
+    console.log();
+    console.log(chalk.cyan('Edit field instance'));
+    console.log(chalk.cyan('Press Enter to keep current value'));
+    console.log();
+
+    // Prompt for label
+    const label = await input({
+      message: 'Label:',
+      default: field.label || '',
+      validate: (value) => {
+        if (!value || value.trim().length === 0) {
+          return 'Label is required';
+        }
+        return true;
+      }
+    });
+
+    // Prompt for description
+    const description = await input({
+      message: 'Description:',
+      default: field.description || ''
+    });
+
+    // Prompt for required
+    const required = await select({
+      message: 'Required?',
+      choices: [
+        { value: false, name: 'No' },
+        { value: true, name: 'Yes' }
+      ],
+      default: field.required ? true : false
+    });
+
+    // For entity reference fields, prompt for target bundles
+    let targetBundles;
+    if (fieldType === 'entity_reference' || fieldType === 'entity_reference_revisions') {
+      // Get target type from settings
+      const targetType = fieldType === 'entity_reference_revisions'
+        ? 'paragraph'
+        : (field.settings?.targetType || 'node');
+
+      // Get current target bundles
+      const currentTargetBundles = field.settings?.handler_settings?.target_bundles
+        ? Object.keys(field.settings.handler_settings.target_bundles)
+        : [];
+
+      // Get available bundles from project
+      if (project.entities && project.entities[targetType]) {
+        const availableBundles = project.entities[targetType];
+        if (Object.keys(availableBundles).length > 0) {
+          const bundleOptions = Object.entries(availableBundles)
+            .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+            .map(([id, bundleData]) => ({
+              value: id,
+              name: `${bundleData.label || id} (${id})`,
+              checked: currentTargetBundles.includes(id)
+            }));
+
+          targetBundles = await checkbox({
+            message: `Select target ${targetType} bundles:`,
+            choices: bundleOptions
+          });
+        }
+      }
+    }
+
+    // Build updates object
+    const updates = {
+      label: label.trim(),
+      description: description.trim(),
+      required
+    };
+
+    if (targetBundles !== undefined) {
+      updates.targetBundles = targetBundles;
+    }
+
+    // Update the field
+    const result = await updateField(project, entityType, selectedBundle, selectedField, updates);
+
+    console.log();
+    console.log(chalk.green(`Field "${result.fieldName}" updated successfully!`));
+    console.log(chalk.cyan(`Updated file: ${result.updatedFile}`));
+    console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
  * Handle edit project action
  * @param {object} project - The current project
  * @returns {Promise<object>} - Updated project object
@@ -786,6 +970,134 @@ async function handleProjectReport(project) {
 
     await createProjectReport(project, outputPath, baseUrl);
     console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Get admin URLs for a bundle based on entity type
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle machine name
+ * @returns {object[]} - Array of {name, path} objects
+ */
+function getAdminUrls(entityType, bundle) {
+  const urls = {
+    node: [
+      { name: 'Edit Form', path: `/admin/structure/types/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/types/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/types/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/types/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/types/manage/${bundle}/permissions` }
+    ],
+    paragraph: [
+      { name: 'Edit Form', path: `/admin/structure/paragraphs_type/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/paragraphs_type/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/paragraphs_type/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/paragraphs_type/${bundle}/display` }
+    ],
+    taxonomy_term: [
+      { name: 'Edit Form', path: `/admin/structure/taxonomy/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/taxonomy/manage/${bundle}/overview/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/taxonomy/manage/${bundle}/overview/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/taxonomy/manage/${bundle}/overview/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/taxonomy/manage/${bundle}/overview/permissions` }
+    ],
+    block_content: [
+      { name: 'Edit Form', path: `/admin/structure/block-content/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/block-content/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/block-content/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/block-content/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/block-content/manage/${bundle}/permissions` }
+    ],
+    media: [
+      { name: 'Edit Form', path: `/admin/structure/media/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/media/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/media/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/media/manage/${bundle}/display` }
+    ]
+  };
+
+  return urls[entityType] || [];
+}
+
+/**
+ * Handle admin links action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleAdminLinks(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityChoices
+    });
+
+    // Select bundle
+    const bundles = project.entities[entityType];
+    const bundleEntries = Object.entries(bundles)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([id, bundle]) => ({
+        value: id,
+        name: `${bundle.label || id} (${id})`,
+        label: bundle.label || id
+      }));
+
+    const selectedBundle = await search({
+      message: 'Select bundle (type to search):',
+      source: async (searchInput) => {
+        const searchTerm = (searchInput || '').toLowerCase();
+        return bundleEntries.filter(b =>
+          b.name.toLowerCase().includes(searchTerm) ||
+          b.value.toLowerCase().includes(searchTerm)
+        );
+      }
+    });
+
+    const bundle = bundles[selectedBundle];
+    const adminUrls = getAdminUrls(entityType, selectedBundle);
+
+    if (adminUrls.length === 0) {
+      console.log(chalk.yellow(`No admin links available for ${entityType}.`));
+      return;
+    }
+
+    const baseUrl = project.baseUrl || '';
+
+    console.log();
+    console.log(chalk.cyan(`Admin links for ${entityType} > ${bundle.label || selectedBundle}`));
+    console.log();
+
+    for (const url of adminUrls) {
+      const fullUrl = baseUrl ? `${baseUrl}${url.path}` : url.path;
+      console.log(`  ${url.name}: ${chalk.blue(fullUrl)}`);
+    }
+    console.log();
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

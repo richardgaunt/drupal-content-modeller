@@ -126,9 +126,8 @@ export function generateAnchor(label, entityType) {
 export function generateBundleReport(bundle, entityType, baseUrl = '') {
   const adminPath = getEntityAdminPath(entityType, bundle.id);
   const entityLink = baseUrl ? `${baseUrl}${adminPath}` : adminPath;
-  const anchor = generateAnchor(bundle.label || bundle.id, entityType);
 
-  let md = `### ${bundle.label || bundle.id} (${entityType}) {#${anchor}}\n\n`;
+  let md = `### ${bundle.label || bundle.id} (${entityType})\n\n`;
   md += `**Link:** [${entityLink}](${entityLink})\n\n`;
   md += `${bundle.description || '_No description_'}\n\n`;
   md += `#### Fields\n\n`;

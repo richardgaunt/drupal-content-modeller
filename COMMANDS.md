@@ -1,35 +1,26 @@
-## 67 Create CLI Commands for All Functionality
+# CLI Commands Reference
 
-### Overview
+Complete reference for all `dcm` CLI commands.
 
-Enable all application functionality to be executed via CLI one-liners, allowing scripting, automation, and faster workflows for experienced users.
+## Command Structure
 
-### CLI Design Conventions
-
-Based on industry best practices from [Command Line Interface Guidelines](https://clig.dev/), [Microsoft CLI Design Guidance](https://learn.microsoft.com/en-us/dotnet/standard/commandline/design-guidance), and [Atlassian's CLI Principles](https://www.atlassian.com/blog/it-teams/10-design-principles-for-delightful-clis):
-
-**Command Structure:**
 ```
 dcm <resource> <action> [options]
 ```
 
-**Conventions:**
-- Use **verbs for actions** and **nouns for resources** (e.g., `project create`, `field list`)
-- Support both **short (`-p`)** and **long (`--project`)** flag formats
-- Use **kebab-case** for multi-word options (e.g., `--config-path`)
-- Required parameters should have clear error messages when missing
-- Optional parameters should have sensible defaults
-- Support `--help` on all commands
-- Support `--json` output format for scripting
-- Exit with code 0 on success, non-zero on failure
+## Global Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--help` | `-h` | Show help for command |
+| `--version` | `-V` | Show version number |
+| `--json` | `-j` | Output as JSON (where supported) |
 
 ---
 
-## Commands
+## Project Commands
 
-### 1. Project Commands
-
-#### `dcm project create`
+### `dcm project create`
 
 Create a new project.
 
@@ -45,6 +36,7 @@ dcm project create \
 | `--name` | `-n` | Yes | Human-readable project name |
 | `--config-path` | `-c` | Yes | Path to Drupal configuration directory |
 | `--base-url` | `-u` | No | Base URL of the Drupal site |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -53,7 +45,7 @@ dcm project create -n "My Site" -c ~/work/mysite/config -u https://mysite.com
 
 ---
 
-#### `dcm project list`
+### `dcm project list`
 
 List all projects.
 
@@ -73,7 +65,7 @@ dcm project list --json
 
 ---
 
-#### `dcm project edit`
+### `dcm project edit`
 
 Edit project settings.
 
@@ -91,6 +83,7 @@ dcm project edit \
 | `--name` | `-n` | No | New project name |
 | `--config-path` | `-c` | No | New configuration directory path |
 | `--base-url` | `-u` | No | New base URL |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -99,7 +92,7 @@ dcm project edit -p my-site --base-url https://staging.mysite.com
 
 ---
 
-#### `dcm project sync`
+### `dcm project sync`
 
 Sync project configuration from Drupal config directory.
 
@@ -110,6 +103,7 @@ dcm project sync --project "project-slug"
 | Option | Short | Required | Description |
 |--------|-------|----------|-------------|
 | `--project` | `-p` | Yes | Project slug to sync |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -118,7 +112,7 @@ dcm project sync -p my-site
 
 ---
 
-#### `dcm project delete`
+### `dcm project delete`
 
 Delete a project.
 
@@ -130,6 +124,7 @@ dcm project delete --project "project-slug" [--force]
 |--------|-------|----------|-------------|
 | `--project` | `-p` | Yes | Project slug to delete |
 | `--force` | `-f` | No | Skip confirmation prompt |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -138,9 +133,9 @@ dcm project delete -p old-project --force
 
 ---
 
-### 2. Bundle Commands
+## Bundle Commands
 
-#### `dcm bundle create`
+### `dcm bundle create`
 
 Create a new entity bundle.
 
@@ -151,7 +146,7 @@ dcm bundle create \
   --label "Bundle Label" \
   [--machine-name "bundle_name"] \
   [--description "Description text"] \
-  [--source-type "image|file|remote_video"]  # media only
+  [--source-type "image|file|remote_video"]
 ```
 
 | Option | Short | Required | Description |
@@ -162,6 +157,7 @@ dcm bundle create \
 | `--machine-name` | `-m` | No | Machine name (auto-generated from label if omitted) |
 | `--description` | `-d` | No | Bundle description |
 | `--source-type` | `-s` | No | Media source type (required for media): `image`, `file`, `remote_video` |
+| `--json` | `-j` | No | Output as JSON |
 
 **Examples:**
 ```bash
@@ -177,9 +173,9 @@ dcm bundle create -p my-site -e paragraph -l "Hero Banner" -m hero_banner
 
 ---
 
-#### `dcm bundle list`
+### `dcm bundle list`
 
-List bundles (entity types) in a project.
+List bundles in a project.
 
 ```bash
 dcm bundle list \
@@ -203,41 +199,59 @@ dcm bundle list -p my-site --json
 
 ---
 
-### 3. Field Commands
+## Field Commands
 
-#### `dcm field create`
+### `dcm field create`
 
 Create a new field on a bundle.
 
 ```bash
 dcm field create \
   --project "project-slug" \
-  --entity-type "node|media|paragraph|taxonomy_term|block_content" \
+  --entity-type "node" \
   --bundle "bundle_name" \
-  --field-type "string|text_long|boolean|..." \
+  --field-type "string" \
   --label "Field Label" \
-  [--field-name "field_x_name"] \
-  [--description "Help text"] \
-  [--required] \
-  [--cardinality 1|-1] \
-  [--reuse "existing_field_name"] \
-  [type-specific options...]
+  [options...]
 ```
 
-| Option | Short | Required | Description |
-|--------|-------|----------|-------------|
-| `--project` | `-p` | Yes | Project slug |
-| `--entity-type` | `-e` | Yes | Entity type |
-| `--bundle` | `-b` | Yes | Bundle machine name |
-| `--field-type` | `-t` | Yes | Field type (see list below) |
-| `--label` | `-l` | Yes | Human-readable field label |
-| `--field-name` | `-n` | No | Machine name (auto-generated if omitted) |
-| `--description` | `-d` | No | Field description/help text |
-| `--required` | `-r` | No | Make field required |
-| `--cardinality` | | No | Number of values: `1` (single) or `-1` (unlimited). Default: `1` |
-| `--reuse` | | No | Reuse existing field storage by name |
+#### Required Options
 
-**Field Types:**
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--project` | `-p` | Project slug |
+| `--entity-type` | `-e` | Entity type |
+| `--bundle` | `-b` | Bundle machine name |
+| `--field-type` | `-t` | Field type (see list below) |
+| `--label` | `-l` | Human-readable field label |
+
+#### Common Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--field-name` | `-n` | Machine name (auto-generated if omitted) |
+| `--description` | `-d` | Field description/help text |
+| `--required` | `-r` | Make field required |
+| `--cardinality` | | Number of values: `1` (single) or `-1` (unlimited) |
+| `--json` | `-j` | Output as JSON |
+
+#### Type-Specific Options
+
+| Option | Applies To | Description |
+|--------|------------|-------------|
+| `--max-length` | `string` | Maximum length (default: 255) |
+| `--allowed-values` | `list_string`, `list_integer` | Comma-separated `key\|label` pairs |
+| `--target-type` | `entity_reference` | Target entity type |
+| `--target-bundles` | `entity_reference`, `entity_reference_revisions` | Comma-separated bundle names |
+| `--datetime-type` | `datetime`, `daterange` | `date` or `datetime` |
+| `--link-type` | `link` | `external` or `internal` |
+| `--title-option` | `link` | `optional`, `required`, or `disabled` |
+| `--file-extensions` | `image`, `file` | Space-separated extensions |
+| `--file-directory` | `image`, `file` | Upload directory path |
+| `--alt-required` | `image` | Require alt text |
+
+#### Field Types
+
 - `string` - Plain text (single line)
 - `string_long` - Plain text (multi-line)
 - `text_long` - Formatted text
@@ -253,21 +267,6 @@ dcm field create \
 - `entity_reference` - Reference to entity
 - `entity_reference_revisions` - Paragraph reference
 - `webform` - Webform reference
-
-**Type-Specific Options:**
-
-| Option | Applies To | Description |
-|--------|------------|-------------|
-| `--max-length` | `string` | Maximum length (default: 255) |
-| `--allowed-values` | `list_string`, `list_integer` | Comma-separated `key\|label` pairs |
-| `--target-type` | `entity_reference` | Target entity type |
-| `--target-bundles` | `entity_reference`, `entity_reference_revisions` | Comma-separated bundle names |
-| `--datetime-type` | `datetime`, `daterange` | `date` or `datetime` |
-| `--link-type` | `link` | `external` or `internal` |
-| `--title-option` | `link` | `optional`, `required`, or `disabled` |
-| `--file-extensions` | `image`, `file` | Space-separated extensions |
-| `--file-directory` | `image`, `file` | Upload directory path |
-| `--alt-required` | `image` | Require alt text |
 
 **Examples:**
 ```bash
@@ -288,22 +287,18 @@ dcm field create -p my-site -e node -b article -t entity_reference_revisions \
 # Image field
 dcm field create -p my-site -e node -b article -t image -l "Featured Image" \
   --file-extensions "png jpg jpeg webp" --alt-required
-
-# Reuse existing field
-dcm field create -p my-site -e node -b page -t string -l "Subtitle" \
-  --reuse field_n_subtitle
 ```
 
 ---
 
-#### `dcm field list`
+### `dcm field list`
 
 List fields on a bundle or entity type.
 
 ```bash
 dcm field list \
   --project "project-slug" \
-  --entity-type "node|media|paragraph|taxonomy_term|block_content" \
+  --entity-type "node" \
   [--bundle "bundle_name"] \
   [--json]
 ```
@@ -329,20 +324,19 @@ dcm field list -p my-site -e node -b article --json
 
 ---
 
-#### `dcm field edit`
+### `dcm field edit`
 
 Edit a field instance.
 
 ```bash
 dcm field edit \
   --project "project-slug" \
-  --entity-type "node|media|paragraph|taxonomy_term|block_content" \
+  --entity-type "node" \
   --bundle "bundle_name" \
   --field-name "field_name" \
   [--label "New Label"] \
   [--description "New description"] \
-  [--required|--not-required] \
-  [--target-bundles "bundle1,bundle2"]  # entity_reference only
+  [--required|--not-required]
 ```
 
 | Option | Short | Required | Description |
@@ -356,6 +350,7 @@ dcm field edit \
 | `--required` | `-r` | No | Make field required |
 | `--not-required` | | No | Make field optional |
 | `--target-bundles` | | No | Update target bundles (entity_reference fields) |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -365,16 +360,16 @@ dcm field edit -p my-site -e node -b article -n field_n_subtitle \
 
 ---
 
-### 4. Report Commands
+## Report Commands
 
-#### `dcm report entity`
+### `dcm report entity`
 
 Generate a report for an entity type.
 
 ```bash
 dcm report entity \
   --project "project-slug" \
-  --entity-type "node|media|paragraph|taxonomy_term|block_content" \
+  --entity-type "node" \
   [--output "/path/to/output.md"] \
   [--base-url "https://example.com"]
 ```
@@ -385,6 +380,7 @@ dcm report entity \
 | `--entity-type` | `-e` | Yes | Entity type to report on |
 | `--output` | `-o` | No | Output file path (default: project reports dir) |
 | `--base-url` | `-u` | No | Base URL for admin links (default: project base URL) |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -393,7 +389,7 @@ dcm report entity -p my-site -e node -o ~/reports/content-types.md
 
 ---
 
-#### `dcm report project`
+### `dcm report project`
 
 Generate a full project report.
 
@@ -409,6 +405,7 @@ dcm report project \
 | `--project` | `-p` | Yes | Project slug |
 | `--output` | `-o` | No | Output file path (default: project reports dir) |
 | `--base-url` | `-u` | No | Base URL for admin links |
+| `--json` | `-j` | No | Output as JSON |
 
 **Example:**
 ```bash
@@ -418,16 +415,16 @@ dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysi
 
 ---
 
-### 5. Admin Commands
+## Admin Commands
 
-#### `dcm admin links`
+### `dcm admin links`
 
 Display admin links for a bundle.
 
 ```bash
 dcm admin links \
   --project "project-slug" \
-  --entity-type "node|media|paragraph|taxonomy_term|block_content" \
+  --entity-type "node" \
   --bundle "bundle_name" \
   [--json]
 ```
@@ -448,66 +445,30 @@ dcm admin links -p my-site -e node -b article
 ```
 Admin links for node > Article
 
-  Edit Form:           https://mysite.com/admin/structure/types/manage/article
-  Manage Fields:       https://mysite.com/admin/structure/types/manage/article/fields
-  Manage Form Display: https://mysite.com/admin/structure/types/manage/article/form-display
-  Manage Display:      https://mysite.com/admin/structure/types/manage/article/display
-  Manage Permissions:  https://mysite.com/admin/structure/types/manage/article/permissions
+  Edit Form            https://mysite.com/admin/structure/types/manage/article
+  Manage Fields        https://mysite.com/admin/structure/types/manage/article/fields
+  Manage Form Display  https://mysite.com/admin/structure/types/manage/article/form-display
+  Manage Display       https://mysite.com/admin/structure/types/manage/article/display
+  Manage Permissions   https://mysite.com/admin/structure/types/manage/article/permissions
 ```
 
 ---
 
-### 6. Global Options
+## Interactive Mode
 
-These options are available on all commands:
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--help` | `-h` | Show help for command |
-| `--version` | `-v` | Show version number |
-| `--verbose` | | Verbose output |
-| `--quiet` | `-q` | Suppress non-essential output |
-
----
-
-### 7. Interactive Mode
-
-Running `dcm` without arguments launches interactive mode (current behavior):
+Running `dcm` without arguments launches interactive mode:
 
 ```bash
 dcm
 ```
 
-Running `dcm` with `--project` but no command opens the project menu:
-
-```bash
-dcm --project my-site
-```
+This provides a menu-driven interface for all operations.
 
 ---
 
-## Implementation Notes
+## Exit Codes
 
-1. **Argument Parser**: We have commander installed so use this.
-2. **Validation**: Reuse existing validation functions from `src/cli/prompts.js`
-3. **Commands**: Reuse existing command functions from `src/commands/`
-4. **Backward Compatibility**: Ensure `dcm` without arguments still launches interactive mode
-5. **Exit Codes**: 0 = success, 1 = general error, 2 = invalid arguments
-
----
-
-## Acceptance Criteria
-
-- [ ] All commands listed above are implemented
-- [ ] `--help` works on all commands
-- [ ] `--json` output works where specified
-- [ ] Error messages are clear and actionable
-- [ ] Exit codes are correct
-- [ ] Interactive mode still works
-- [ ] Documentation/README updated with CLI usage
-
----
-
-## Dependencies
-
-- Argument parsing library (e.g., `commander`)
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Error |

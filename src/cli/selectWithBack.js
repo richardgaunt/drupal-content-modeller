@@ -1,6 +1,6 @@
 /**
- * Custom select prompt with backspace-to-go-back functionality.
- * Based on @inquirer/select but adds backspace handling when the search line is empty.
+ * Custom select prompt with Ctrl+C to go back functionality.
+ * Based on @inquirer/select but adds Ctrl+C handling to return to parent menu.
  */
 
 import {
@@ -12,7 +12,6 @@ import {
   useRef,
   useMemo,
   useEffect,
-  isBackspaceKey,
   isEnterKey,
   isUpKey,
   isDownKey,
@@ -26,7 +25,7 @@ import colors from 'yoctocolors-cjs';
 import figures from '@inquirer/figures';
 
 /**
- * Symbol returned when user presses backspace to go back
+ * Symbol returned when user presses Ctrl+C to go back
  */
 export const BACK = Symbol('back');
 
@@ -74,8 +73,8 @@ function normalizeChoices(choices) {
 }
 
 /**
- * Select prompt with backspace-to-go-back functionality.
- * When the user presses backspace with an empty search line, returns the BACK symbol.
+ * Select prompt with Ctrl+C to go back functionality.
+ * When the user presses Ctrl+C, returns the BACK symbol instead of exiting.
  */
 export const selectWithBack = createPrompt((config, done) => {
   const { loop = true, pageSize = 7 } = config;
@@ -144,16 +143,10 @@ export const selectWithBack = createPrompt((config, done) => {
         rl.clearLine(0);
         searchLineRef.current = '';
       }, 700);
-    } else if (isBackspaceKey(key)) {
-      // If search line is empty, go back
-      if (searchLineRef.current === '' || rl.line === '') {
-        setStatus('done');
-        done(BACK);
-      } else {
-        // Otherwise, clear the search
-        rl.clearLine(0);
-        searchLineRef.current = '';
-      }
+    } else if (key.name === 'c' && key.ctrl) {
+      // Ctrl+C goes back instead of exiting
+      setStatus('done');
+      done(BACK);
     } else if (searchEnabled) {
       const searchTerm = rl.line.toLowerCase();
       searchLineRef.current = rl.line;
@@ -182,7 +175,7 @@ export const selectWithBack = createPrompt((config, done) => {
     helpLine = theme.style.keysHelpTip([
       ['↑↓', 'navigate'],
       ['⏎', 'select'],
-      ['⌫', 'back'],
+      ['^C', 'back'],
     ]);
   }
 

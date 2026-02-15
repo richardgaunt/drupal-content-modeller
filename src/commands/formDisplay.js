@@ -3,7 +3,14 @@
  * Combines I/O with pure functions for form display operations.
  */
 
-import { readFormDisplay, formDisplayExists, getFormDisplayPath } from '../io/configReader.js';
+import {
+  readFormDisplay,
+  formDisplayExists,
+  getFormDisplayPath,
+  readFieldInstance,
+  getFormDisplayPathWithMode,
+  listFormDisplayModes
+} from '../io/configReader.js';
 import { writeYamlFile } from '../io/fileSystem.js';
 import {
   generateFormDisplay,
@@ -19,6 +26,11 @@ import {
   getFieldChoices,
   generateGroupName
 } from '../parsers/formDisplayParser.js';
+import {
+  getDefaultWidget,
+  getWidgetsForFieldType,
+  getWidgetByType
+} from '../constants/fieldWidgets.js';
 
 /**
  * Load form display for a bundle
@@ -77,8 +89,8 @@ export function getFormDisplayTree(formDisplay) {
 
 /**
  * Reorder children within a group
- * - Field groups are ordered by weight
- * - Fields within a group are ordered by position in children array
+ * - Both fields and groups use weights for ordering
+ * - The children array in a group lists members but weight determines order
  * @param {object} formDisplay - Form display data
  * @param {string} groupName - Group name ('' for root level)
  * @param {string[]} newOrder - New order of child names
@@ -87,25 +99,19 @@ export function getFormDisplayTree(formDisplay) {
 export function reorderGroupChildren(formDisplay, groupName, newOrder) {
   const { groups, fields } = formDisplay;
 
-  // Build a set of group names for quick lookup
-  const groupNames = new Set(groups.map(g => g.name));
-
-  // Calculate weights for groups (0, 1, 2, 3...)
+  // Build weight map for all items in the new order
   const weightMap = new Map();
   newOrder.forEach((name, index) => {
-    if (groupNames.has(name)) {
-      weightMap.set(name, index);
-    }
+    weightMap.set(name, index);
   });
 
   if (groupName === '') {
     // Reordering at root level
     // - Update weights for root-level groups
-    // - Update weights for ungrouped fields (they also use weight at root)
+    // - Update weights for ungrouped fields
     const updatedFields = fields.map(field => {
-      const orderIndex = newOrder.indexOf(field.name);
-      if (orderIndex !== -1) {
-        return { ...field, weight: orderIndex };
+      if (weightMap.has(field.name)) {
+        return { ...field, weight: weightMap.get(field.name) };
       }
       return field;
     });
@@ -125,8 +131,15 @@ export function reorderGroupChildren(formDisplay, groupName, newOrder) {
   }
 
   // Reordering within a group:
-  // - Nested groups: update their weights
-  // - Fields: update the children array order (fields use array position, not weight)
+  // - Update children array to reflect new order
+  // - Update weights for all items (both fields and nested groups)
+  const updatedFields = fields.map(field => {
+    if (weightMap.has(field.name)) {
+      return { ...field, weight: weightMap.get(field.name) };
+    }
+    return field;
+  });
+
   const updatedGroups = groups.map(group => {
     if (group.name === groupName) {
       // Update children array to reflect new order
@@ -141,6 +154,7 @@ export function reorderGroupChildren(formDisplay, groupName, newOrder) {
 
   return {
     ...formDisplay,
+    fields: updatedFields,
     groups: updatedGroups
   };
 }
@@ -480,4 +494,362 @@ export function addFieldsToGroup(formDisplay, groupName, fieldNames) {
   }
 
   return updated;
+}
+
+/**
+ * Get the next available weight for a field
+ * @param {object[]} fields - Existing fields
+ * @returns {number} - Next weight value
+ */
+export function getNextWeight(fields) {
+  if (!fields || fields.length === 0) {
+    return 0;
+  }
+  const maxWeight = Math.max(...fields.map(f => f.weight || 0));
+  return maxWeight + 1;
+}
+
+/**
+ * Show a hidden field with correct widget configuration
+ * Reads field type from field instance config and uses default widget
+ * @param {object} project - Project object with configDirectory
+ * @param {object} formDisplay - Form display data
+ * @param {string} fieldName - Field name to show
+ * @returns {Promise<object>} - Updated form display
+ */
+export async function showHiddenField(project, formDisplay, fieldName) {
+  const { entityType, bundle, hidden, fields } = formDisplay;
+
+  // Check if field is actually hidden
+  if (!hidden.includes(fieldName)) {
+    throw new Error(`Field is not hidden: ${fieldName}`);
+  }
+
+  // Read field instance to get field type
+  const fieldInstance = await readFieldInstance(
+    project.configDirectory,
+    entityType,
+    bundle,
+    fieldName
+  );
+
+  if (!fieldInstance) {
+    throw new Error(`Field instance not found: ${fieldName}`);
+  }
+
+  // Get default widget for field type
+  const defaultWidget = getDefaultWidget(fieldInstance.type);
+  if (!defaultWidget) {
+    throw new Error(`No widget found for field type: ${fieldInstance.type}`);
+  }
+
+  // Create new field entry with default widget
+  const newField = {
+    name: fieldName,
+    type: defaultWidget.type,
+    weight: getNextWeight(fields),
+    region: 'content',
+    settings: { ...defaultWidget.settings },
+    thirdPartySettings: {}
+  };
+
+  return {
+    ...formDisplay,
+    fields: [...fields, newField],
+    hidden: hidden.filter(f => f !== fieldName)
+  };
+}
+
+/**
+ * Update a field's widget type
+ * @param {object} project - Project object with configDirectory
+ * @param {object} formDisplay - Form display data
+ * @param {string} fieldName - Field name to update
+ * @param {string} newWidgetType - New widget type
+ * @returns {Promise<object>} - Updated form display
+ */
+export async function updateFieldWidget(project, formDisplay, fieldName, newWidgetType) {
+  const { entityType, bundle, fields } = formDisplay;
+
+  // Find the field
+  const fieldIndex = fields.findIndex(f => f.name === fieldName);
+  if (fieldIndex === -1) {
+    throw new Error(`Field not found: ${fieldName}`);
+  }
+
+  // Read field instance to get field type
+  const fieldInstance = await readFieldInstance(
+    project.configDirectory,
+    entityType,
+    bundle,
+    fieldName
+  );
+
+  if (!fieldInstance) {
+    throw new Error(`Field instance not found: ${fieldName}`);
+  }
+
+  // Get the new widget configuration
+  const newWidget = getWidgetByType(fieldInstance.type, newWidgetType);
+  if (!newWidget) {
+    throw new Error(`Widget ${newWidgetType} not available for field type: ${fieldInstance.type}`);
+  }
+
+  // Update the field with new widget
+  const updatedFields = [...fields];
+  updatedFields[fieldIndex] = {
+    ...fields[fieldIndex],
+    type: newWidgetType,
+    settings: { ...newWidget.settings }
+  };
+
+  return {
+    ...formDisplay,
+    fields: updatedFields
+  };
+}
+
+/**
+ * Update a field's widget settings
+ * @param {object} formDisplay - Form display data
+ * @param {string} fieldName - Field name to update
+ * @param {object} newSettings - New settings to merge
+ * @returns {object} - Updated form display
+ */
+export function updateFieldSettings(formDisplay, fieldName, newSettings) {
+  const { fields } = formDisplay;
+
+  // Find the field
+  const fieldIndex = fields.findIndex(f => f.name === fieldName);
+  if (fieldIndex === -1) {
+    throw new Error(`Field not found: ${fieldName}`);
+  }
+
+  // Update the field settings
+  const updatedFields = [...fields];
+  updatedFields[fieldIndex] = {
+    ...fields[fieldIndex],
+    settings: {
+      ...fields[fieldIndex].settings,
+      ...newSettings
+    }
+  };
+
+  return {
+    ...formDisplay,
+    fields: updatedFields
+  };
+}
+
+/**
+ * Get available widgets for a field
+ * @param {object} project - Project object with configDirectory
+ * @param {object} formDisplay - Form display data
+ * @param {string} fieldName - Field name
+ * @returns {Promise<object[]>} - Available widgets
+ */
+export async function getAvailableWidgetsForField(project, formDisplay, fieldName) {
+  const { entityType, bundle } = formDisplay;
+
+  const fieldInstance = await readFieldInstance(
+    project.configDirectory,
+    entityType,
+    bundle,
+    fieldName
+  );
+
+  if (!fieldInstance) {
+    return [];
+  }
+
+  return getWidgetsForFieldType(fieldInstance.type);
+}
+
+/**
+ * Create a new form display for a bundle
+ * @param {object} project - Project object with configDirectory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} mode - Form mode (default: 'default')
+ * @param {object} options - Creation options
+ * @param {string} options.copyFrom - Mode to copy from
+ * @param {boolean} options.includeAllFields - Include all bundle fields
+ * @returns {Promise<object>} - New form display
+ */
+export async function createNewFormDisplay(project, entityType, bundle, mode = 'default', options = {}) {
+  const { copyFrom, includeAllFields } = options;
+  const configPath = project.configDirectory;
+
+  if (copyFrom) {
+    // Copy from existing form display
+    const existing = await readFormDisplay(configPath, entityType, bundle);
+    if (!existing) {
+      throw new Error(`Source form display not found: ${copyFrom}`);
+    }
+    return {
+      ...existing,
+      mode,
+      id: `${entityType}.${bundle}.${mode}`
+    };
+  }
+
+  if (includeAllFields) {
+    // Get all field instances for the bundle
+    const { parseFieldInstances } = await import('../io/configReader.js');
+    const fieldInstances = await parseFieldInstances(configPath, entityType, bundle);
+
+    const formFields = [];
+    for (const instance of fieldInstances) {
+      const widget = getDefaultWidget(instance.type);
+      formFields.push({
+        name: instance.name,
+        type: widget?.type || 'string_textfield',
+        weight: formFields.length,
+        region: 'content',
+        settings: widget?.settings ? { ...widget.settings } : {},
+        thirdPartySettings: {}
+      });
+    }
+
+    return {
+      entityType,
+      bundle,
+      mode,
+      id: `${entityType}.${bundle}.${mode}`,
+      groups: [],
+      fields: formFields,
+      hidden: []
+    };
+  }
+
+  // Empty form display
+  return {
+    entityType,
+    bundle,
+    mode,
+    id: `${entityType}.${bundle}.${mode}`,
+    groups: [],
+    fields: [],
+    hidden: []
+  };
+}
+
+/**
+ * Reset form display to default widget configuration
+ * Regenerates all fields with their default widgets
+ * @param {object} project - Project object with configDirectory
+ * @param {object} formDisplay - Form display data
+ * @param {object} options - Reset options
+ * @param {boolean} options.keepFieldOrder - Preserve existing field order
+ * @param {boolean} options.clearGroups - Remove all field groups
+ * @returns {Promise<object>} - Reset form display
+ */
+export async function resetFormDisplay(project, formDisplay, options = {}) {
+  const { keepFieldOrder = true, clearGroups = false } = options;
+  const { entityType, bundle, fields, hidden, groups } = formDisplay;
+  const configPath = project.configDirectory;
+
+  // Get all current field names (visible and hidden)
+  const allFieldNames = [...fields.map(f => f.name), ...hidden];
+
+  // Regenerate fields with default widgets
+  const newFields = [];
+
+  for (let i = 0; i < allFieldNames.length; i++) {
+    const fieldName = allFieldNames[i];
+    const fieldInstance = await readFieldInstance(
+      configPath,
+      entityType,
+      bundle,
+      fieldName
+    );
+
+    if (fieldInstance) {
+      const widget = getDefaultWidget(fieldInstance.type);
+      const existingField = fields.find(f => f.name === fieldName);
+
+      newFields.push({
+        name: fieldName,
+        type: widget?.type || 'string_textfield',
+        weight: keepFieldOrder && existingField ? existingField.weight : i,
+        region: 'content',
+        settings: widget?.settings ? { ...widget.settings } : {},
+        thirdPartySettings: {}
+      });
+    }
+  }
+
+  return {
+    ...formDisplay,
+    fields: newFields,
+    hidden: [],
+    groups: clearGroups ? [] : groups
+  };
+}
+
+/**
+ * Clear all field groups from form display
+ * Moves all grouped fields to root level
+ * @param {object} formDisplay - Form display data
+ * @returns {object} - Updated form display
+ */
+export function clearFieldGroups(formDisplay) {
+  return {
+    ...formDisplay,
+    groups: []
+  };
+}
+
+/**
+ * List available form display modes for a bundle
+ * @param {object} project - Project object with configDirectory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<string[]>} - Available modes
+ */
+export async function getFormDisplayModes(project, entityType, bundle) {
+  return listFormDisplayModes(project.configDirectory, entityType, bundle);
+}
+
+/**
+ * Load form display for a specific mode
+ * @param {object} project - Project object with configDirectory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} mode - Form mode
+ * @returns {Promise<object|null>} - Form display data or null
+ */
+export async function loadFormDisplayWithMode(project, entityType, bundle, mode) {
+  const filePath = getFormDisplayPathWithMode(project.configDirectory, entityType, bundle, mode);
+  const { existsSync } = await import('fs');
+  const { readTextFile } = await import('../io/fileSystem.js');
+  const { parseYaml } = await import('../parsers/configParser.js');
+  const { parseFormDisplay } = await import('../parsers/formDisplayParser.js');
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    return parseFormDisplay(config);
+  } catch (error) {
+    console.warn(`Warning: Could not parse form display: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Save form display with a specific mode
+ * @param {object} project - Project object with configDirectory
+ * @param {object} formDisplay - Form display data
+ * @param {string} mode - Form mode (default: 'default')
+ * @returns {Promise<void>}
+ */
+export async function saveFormDisplayWithMode(project, formDisplay, mode = 'default') {
+  const { entityType, bundle } = formDisplay;
+  const filePath = getFormDisplayPathWithMode(project.configDirectory, entityType, bundle, mode);
+  const yamlContent = generateFormDisplay({ ...formDisplay, mode });
+  await writeYamlFile(filePath, yamlContent);
 }

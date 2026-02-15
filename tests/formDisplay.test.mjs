@@ -43,8 +43,19 @@ import {
   toggleFieldVisibility,
   getAvailableGroups,
   getVisibleFields,
-  getHiddenFields
+  getHiddenFields,
+  getNextWeight,
+  updateFieldSettings,
+  clearFieldGroups
 } from '../src/commands/formDisplay';
+
+// Import field widgets functions
+import {
+  FIELD_WIDGETS,
+  getDefaultWidget,
+  getWidgetsForFieldType,
+  getWidgetByType
+} from '../src/constants/fieldWidgets';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -432,11 +443,16 @@ describe('Form Display Commands', () => {
   };
 
   describe('reorderGroupChildren', () => {
-    test('updates children array order for fields within a group', () => {
+    test('updates children array and field weights within a group', () => {
       const result = reorderGroupChildren(mockFormDisplay, 'group_main', ['body', 'title']);
       const group = result.groups.find(g => g.name === 'group_main');
       // Children array should be updated to new order
       expect(group.children).toEqual(['body', 'title']);
+      // Field weights should also be updated
+      const bodyField = result.fields.find(f => f.name === 'body');
+      const titleField = result.fields.find(f => f.name === 'title');
+      expect(bodyField.weight).toBe(0);
+      expect(titleField.weight).toBe(1);
     });
 
     test('updates weights at root level', () => {
@@ -464,6 +480,37 @@ describe('Form Display Commands', () => {
       // group_b should now have lower weight since it's first
       expect(groupB.weight).toBe(0);
       expect(groupA.weight).toBe(1);
+    });
+
+    test('updates weights for mixed fields and groups within a group', () => {
+      const formDisplayMixed = {
+        entityType: 'node',
+        bundle: 'article',
+        mode: 'default',
+        groups: [
+          { name: 'group_parent', children: ['title', 'group_nested', 'body'], parentName: '', formatType: 'tabs', label: 'Parent', weight: 0 },
+          { name: 'group_nested', children: [], parentName: 'group_parent', formatType: 'details', label: 'Nested', weight: 5 }
+        ],
+        fields: [
+          { name: 'title', type: 'string_textfield', weight: 0 },
+          { name: 'body', type: 'text_textarea', weight: 10 }
+        ],
+        hidden: []
+      };
+      // Reorder: body first, then nested group, then title
+      const result = reorderGroupChildren(formDisplayMixed, 'group_parent', ['body', 'group_nested', 'title']);
+
+      const parentGroup = result.groups.find(g => g.name === 'group_parent');
+      const nestedGroup = result.groups.find(g => g.name === 'group_nested');
+      const bodyField = result.fields.find(f => f.name === 'body');
+      const titleField = result.fields.find(f => f.name === 'title');
+
+      // Children array should reflect new order
+      expect(parentGroup.children).toEqual(['body', 'group_nested', 'title']);
+      // All items should have sequential weights
+      expect(bodyField.weight).toBe(0);
+      expect(nestedGroup.weight).toBe(1);
+      expect(titleField.weight).toBe(2);
     });
   });
 
@@ -607,6 +654,130 @@ describe('Form Display Commands', () => {
       const choices = getHiddenFields(mockFormDisplay);
       expect(choices).toHaveLength(1);
       expect(choices[0].value).toBe('created');
+    });
+  });
+
+  describe('getNextWeight', () => {
+    test('returns 0 for empty array', () => {
+      expect(getNextWeight([])).toBe(0);
+      expect(getNextWeight(null)).toBe(0);
+    });
+
+    test('returns max weight plus 1', () => {
+      const fields = [
+        { name: 'a', weight: 5 },
+        { name: 'b', weight: 3 },
+        { name: 'c', weight: 10 }
+      ];
+      expect(getNextWeight(fields)).toBe(11);
+    });
+  });
+
+  describe('updateFieldSettings', () => {
+    test('updates field settings', () => {
+      const result = updateFieldSettings(mockFormDisplay, 'title', { size: 100 });
+      const field = result.fields.find(f => f.name === 'title');
+      expect(field.settings.size).toBe(100);
+    });
+
+    test('merges settings with existing', () => {
+      const formDisplayWithSettings = {
+        ...mockFormDisplay,
+        fields: [
+          { name: 'title', type: 'string_textfield', weight: 0, settings: { size: 60, placeholder: '' } }
+        ]
+      };
+      const result = updateFieldSettings(formDisplayWithSettings, 'title', { placeholder: 'Enter title' });
+      const field = result.fields.find(f => f.name === 'title');
+      expect(field.settings.size).toBe(60);
+      expect(field.settings.placeholder).toBe('Enter title');
+    });
+
+    test('throws for non-existent field', () => {
+      expect(() => updateFieldSettings(mockFormDisplay, 'nonexistent', {})).toThrow('Field not found');
+    });
+  });
+
+  describe('clearFieldGroups', () => {
+    test('removes all groups', () => {
+      const result = clearFieldGroups(mockFormDisplay);
+      expect(result.groups).toEqual([]);
+      expect(result.fields).toHaveLength(mockFormDisplay.fields.length);
+    });
+  });
+});
+
+describe('Field Widgets - Constants', () => {
+  describe('FIELD_WIDGETS', () => {
+    test('contains expected field types', () => {
+      expect(FIELD_WIDGETS).toHaveProperty('string');
+      expect(FIELD_WIDGETS).toHaveProperty('boolean');
+      expect(FIELD_WIDGETS).toHaveProperty('entity_reference');
+      expect(FIELD_WIDGETS).toHaveProperty('image');
+      expect(FIELD_WIDGETS).toHaveProperty('text_with_summary');
+    });
+
+    test('each field type has at least one widget', () => {
+      for (const [_fieldType, widgets] of Object.entries(FIELD_WIDGETS)) {
+        expect(widgets.length).toBeGreaterThan(0);
+        expect(widgets[0]).toHaveProperty('type');
+        expect(widgets[0]).toHaveProperty('label');
+        expect(widgets[0]).toHaveProperty('settings');
+      }
+    });
+  });
+
+  describe('getDefaultWidget', () => {
+    test('returns first widget for known field type', () => {
+      const widget = getDefaultWidget('boolean');
+      expect(widget.type).toBe('boolean_checkbox');
+      expect(widget.settings).toHaveProperty('display_label');
+    });
+
+    test('returns null for unknown field type', () => {
+      expect(getDefaultWidget('unknown_type')).toBeNull();
+    });
+
+    test('returns a copy (not the original)', () => {
+      const widget1 = getDefaultWidget('string');
+      const widget2 = getDefaultWidget('string');
+      widget1.settings.size = 999;
+      expect(widget2.settings.size).not.toBe(999);
+    });
+  });
+
+  describe('getWidgetsForFieldType', () => {
+    test('returns array of widgets for known type', () => {
+      const widgets = getWidgetsForFieldType('entity_reference');
+      expect(widgets.length).toBeGreaterThan(1);
+      expect(widgets[0].type).toBe('entity_reference_autocomplete');
+    });
+
+    test('returns empty array for unknown type', () => {
+      expect(getWidgetsForFieldType('unknown_type')).toEqual([]);
+    });
+  });
+
+  describe('getWidgetByType', () => {
+    test('returns specific widget by type', () => {
+      const widget = getWidgetByType('entity_reference', 'options_select');
+      expect(widget.type).toBe('options_select');
+      expect(widget.label).toBe('Select list');
+    });
+
+    test('returns null for unknown widget type', () => {
+      expect(getWidgetByType('entity_reference', 'nonexistent')).toBeNull();
+    });
+
+    test('returns null for unknown field type', () => {
+      expect(getWidgetByType('unknown_type', 'some_widget')).toBeNull();
+    });
+
+    test('returns a copy (not the original)', () => {
+      const widget1 = getWidgetByType('string', 'string_textfield');
+      const widget2 = getWidgetByType('string', 'string_textfield');
+      widget1.settings.size = 999;
+      expect(widget2.settings.size).not.toBe(999);
     });
   });
 });

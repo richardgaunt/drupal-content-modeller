@@ -45,7 +45,13 @@ import {
   toggleFieldVisibility,
   getAvailableGroups,
   getVisibleFields,
-  getHiddenFields
+  getHiddenFields,
+  showHiddenField,
+  updateFieldWidget,
+  updateFieldSettings,
+  getAvailableWidgetsForField,
+  resetFormDisplay,
+  clearFieldGroups
 } from '../commands/formDisplay.js';
 import { FIELD_GROUP_FORMATS, getDefaultFormatSettings } from '../generators/formDisplayGenerator.js';
 import { generateGroupName, validateGroupName } from '../parsers/formDisplayParser.js';
@@ -431,10 +437,12 @@ const FORM_DISPLAY_MENU_CHOICES = [
   { value: 'view', name: 'View form layout' },
   { value: 'reorder', name: 'Reorder items in group' },
   { value: 'move', name: 'Move field or group' },
+  { value: 'configure-field', name: 'Configure field widget' },
   { value: 'create-group', name: 'Create field group' },
   { value: 'edit-group', name: 'Edit field group' },
   { value: 'delete-group', name: 'Delete field group' },
   { value: 'visibility', name: 'Hide/show fields' },
+  { value: 'reset', name: 'Reset form display' },
   { value: 'back', name: 'Back' }
 ];
 
@@ -565,6 +573,16 @@ async function showFormDisplayMenu(project, formDisplay) {
           break;
         }
 
+        case 'configure-field': {
+          const result = await handleConfigureField(project, currentFormDisplay);
+          if (result) {
+            currentFormDisplay = result;
+            await saveFormDisplay(project, currentFormDisplay);
+            console.log(chalk.green('Changes saved.'));
+          }
+          break;
+        }
+
         case 'create-group': {
           const result = await handleCreateGroup(currentFormDisplay);
           if (result) {
@@ -596,7 +614,17 @@ async function showFormDisplayMenu(project, formDisplay) {
         }
 
         case 'visibility': {
-          const result = await handleToggleVisibility(currentFormDisplay);
+          const result = await handleToggleVisibility(project, currentFormDisplay);
+          if (result) {
+            currentFormDisplay = result;
+            await saveFormDisplay(project, currentFormDisplay);
+            console.log(chalk.green('Changes saved.'));
+          }
+          break;
+        }
+
+        case 'reset': {
+          const result = await handleResetFormDisplay(project, currentFormDisplay);
           if (result) {
             currentFormDisplay = result;
             await saveFormDisplay(project, currentFormDisplay);
@@ -988,10 +1016,11 @@ async function handleDeleteGroup(formDisplay) {
 
 /**
  * Handle hiding/showing fields
+ * @param {object} project - Project object
  * @param {object} formDisplay - Form display data
  * @returns {Promise<object|null>} - Updated form display or null
  */
-async function handleToggleVisibility(formDisplay) {
+async function handleToggleVisibility(project, formDisplay) {
   try {
     const action = await selectWithBack({
       message: 'What would you like to do?',
@@ -1051,11 +1080,279 @@ async function handleToggleVisibility(formDisplay) {
         return null;
       }
 
+      // Use showHiddenField to properly restore widget configuration
       let updated = formDisplay;
       for (const fieldName of fieldsToShow) {
-        updated = toggleFieldVisibility(updated, fieldName);
+        try {
+          updated = await showHiddenField(project, updated, fieldName);
+        } catch (err) {
+          console.log(chalk.yellow(`Warning: Could not get widget for ${fieldName}: ${err.message}`));
+          // Fallback to simple toggle if widget lookup fails
+          updated = toggleFieldVisibility(updated, fieldName);
+        }
       }
       console.log(chalk.green(`Shown ${fieldsToShow.length} field(s).`));
+      return updated;
+    }
+
+    return null;
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handle configuring a field's widget
+ * @param {object} project - Project object
+ * @param {object} formDisplay - Form display data
+ * @returns {Promise<object|null>} - Updated form display or null
+ */
+async function handleConfigureField(project, formDisplay) {
+  try {
+    const visibleFields = getVisibleFields(formDisplay);
+    if (visibleFields.length === 0) {
+      console.log(chalk.yellow('No visible fields to configure.'));
+      return null;
+    }
+
+    // Add current widget type to field choices
+    const fieldChoices = visibleFields.map(f => {
+      const field = formDisplay.fields.find(fd => fd.name === f.value);
+      const widgetType = field?.type || 'unknown';
+      return {
+        value: f.value,
+        name: `${f.name} (${widgetType})`
+      };
+    });
+
+    const selectedField = await selectWithBack({
+      message: 'Select field to configure:',
+      choices: fieldChoices
+    });
+
+    if (selectedField === BACK) {
+      return null;
+    }
+
+    const field = formDisplay.fields.find(f => f.name === selectedField);
+    const availableWidgets = await getAvailableWidgetsForField(project, formDisplay, selectedField);
+
+    if (availableWidgets.length === 0) {
+      console.log(chalk.yellow('No widgets available for this field type.'));
+      return null;
+    }
+
+    const configAction = await selectWithBack({
+      message: `Current widget: ${field.type}`,
+      choices: [
+        { value: 'change-widget', name: 'Change widget type' },
+        { value: 'edit-settings', name: 'Edit widget settings' }
+      ]
+    });
+
+    if (configAction === BACK) {
+      return null;
+    }
+
+    if (configAction === 'change-widget') {
+      const widgetChoices = availableWidgets.map(w => ({
+        value: w.type,
+        name: `${w.label} (${w.type})${w.type === field.type ? ' - current' : ''}`
+      }));
+
+      const newWidgetType = await selectWithBack({
+        message: 'Select widget:',
+        choices: widgetChoices
+      });
+
+      if (newWidgetType === BACK) {
+        return null;
+      }
+
+      if (newWidgetType === field.type) {
+        console.log(chalk.yellow('Widget unchanged.'));
+        return null;
+      }
+
+      const updated = await updateFieldWidget(project, formDisplay, selectedField, newWidgetType);
+      console.log(chalk.green(`Widget changed to ${newWidgetType}.`));
+      return updated;
+    }
+
+    if (configAction === 'edit-settings') {
+      const currentSettings = field.settings || {};
+      const widget = availableWidgets.find(w => w.type === field.type);
+      const widgetDefaults = widget?.settings || {};
+
+      // Merge defaults with current settings
+      const allSettings = { ...widgetDefaults, ...currentSettings };
+
+      if (Object.keys(allSettings).length === 0) {
+        console.log(chalk.yellow('This widget has no configurable settings.'));
+        return null;
+      }
+
+      console.log();
+      console.log(chalk.cyan('Edit widget settings'));
+      console.log(chalk.cyan('Press Enter to keep current value'));
+      console.log();
+
+      const newSettings = {};
+
+      for (const [key, defaultValue] of Object.entries(allSettings)) {
+        const currentValue = currentSettings[key] ?? defaultValue;
+
+        if (typeof currentValue === 'boolean') {
+          newSettings[key] = await select({
+            message: `${key}:`,
+            choices: [
+              { value: true, name: 'Yes' },
+              { value: false, name: 'No' }
+            ],
+            default: currentValue
+          });
+        } else if (typeof currentValue === 'number') {
+          const numValue = await input({
+            message: `${key}:`,
+            default: String(currentValue),
+            validate: (value) => {
+              if (value === '') return true;
+              const num = parseInt(value, 10);
+              if (isNaN(num)) return 'Must be a number';
+              return true;
+            }
+          });
+          newSettings[key] = numValue === '' ? currentValue : parseInt(numValue, 10);
+        } else if (Array.isArray(currentValue)) {
+          const arrValue = await input({
+            message: `${key} (comma-separated):`,
+            default: currentValue.join(', ')
+          });
+          newSettings[key] = arrValue ? arrValue.split(',').map(v => v.trim()).filter(v => v) : [];
+        } else {
+          newSettings[key] = await input({
+            message: `${key}:`,
+            default: String(currentValue || '')
+          });
+        }
+      }
+
+      const updated = updateFieldSettings(formDisplay, selectedField, newSettings);
+      console.log(chalk.green('Widget settings updated.'));
+      return updated;
+    }
+
+    return null;
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handle resetting form display
+ * @param {object} project - Project object
+ * @param {object} formDisplay - Form display data
+ * @returns {Promise<object|null>} - Updated form display or null
+ */
+async function handleResetFormDisplay(project, formDisplay) {
+  try {
+    const action = await selectWithBack({
+      message: 'Reset form display:',
+      choices: [
+        { value: 'regenerate', name: 'Regenerate with default widgets' },
+        { value: 'clear-groups', name: 'Clear all field groups' },
+        { value: 'show-all', name: 'Show all hidden fields' }
+      ]
+    });
+
+    if (action === BACK) {
+      return null;
+    }
+
+    if (action === 'regenerate') {
+      const confirm = await selectWithBack({
+        message: 'This will reset all fields to their default widgets. Continue?',
+        choices: [
+          { value: false, name: 'No, cancel' },
+          { value: true, name: 'Yes, regenerate' }
+        ]
+      });
+
+      if (confirm === BACK || !confirm) {
+        return null;
+      }
+
+      const keepGroups = await selectWithBack({
+        message: 'Keep field groups?',
+        choices: [
+          { value: true, name: 'Yes, keep groups' },
+          { value: false, name: 'No, clear groups' }
+        ]
+      });
+
+      if (keepGroups === BACK) {
+        return null;
+      }
+
+      const updated = await resetFormDisplay(project, formDisplay, {
+        keepFieldOrder: true,
+        clearGroups: !keepGroups
+      });
+      console.log(chalk.green('Form display regenerated with default widgets.'));
+      return updated;
+    }
+
+    if (action === 'clear-groups') {
+      const confirm = await selectWithBack({
+        message: 'This will remove all field groups. Fields will remain. Continue?',
+        choices: [
+          { value: false, name: 'No, cancel' },
+          { value: true, name: 'Yes, clear groups' }
+        ]
+      });
+
+      if (confirm === BACK || !confirm) {
+        return null;
+      }
+
+      const updated = clearFieldGroups(formDisplay);
+      console.log(chalk.green('Field groups cleared.'));
+      return updated;
+    }
+
+    if (action === 'show-all') {
+      if (formDisplay.hidden.length === 0) {
+        console.log(chalk.yellow('No hidden fields to show.'));
+        return null;
+      }
+
+      const confirm = await selectWithBack({
+        message: `Show all ${formDisplay.hidden.length} hidden field(s)?`,
+        choices: [
+          { value: false, name: 'No, cancel' },
+          { value: true, name: 'Yes, show all' }
+        ]
+      });
+
+      if (confirm === BACK || !confirm) {
+        return null;
+      }
+
+      let updated = formDisplay;
+      for (const fieldName of [...formDisplay.hidden]) {
+        try {
+          updated = await showHiddenField(project, updated, fieldName);
+        } catch (err) {
+          console.log(chalk.yellow(`Warning: Could not show ${fieldName}: ${err.message}`));
+        }
+      }
+      console.log(chalk.green('All hidden fields shown.'));
       return updated;
     }
 

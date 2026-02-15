@@ -23,10 +23,13 @@ import {
  * @param {string} name - Human-readable project name
  * @param {string} configDir - Path to Drupal config directory
  * @param {string} baseUrl - Base URL of the Drupal site (optional)
+ * @param {object} options - Additional options
+ * @param {string} options.drupalRoot - Root directory of Drupal installation
+ * @param {string} options.drushCommand - Command to run drush
  * @returns {Promise<object>} - Created project object
  * @throws {Error} - If validation fails
  */
-export async function createProject(name, configDir, baseUrl = '') {
+export async function createProject(name, configDir, baseUrl = '', options = {}) {
   // Validate project name
   if (!isValidProjectName(name)) {
     throw new Error('Project name cannot be empty');
@@ -59,7 +62,7 @@ export async function createProject(name, configDir, baseUrl = '') {
   await ensureProjectsDir();
 
   // Create project object
-  const project = createProjectObject(name, slug, configDir, baseUrl);
+  const project = createProjectObject(name, slug, configDir, baseUrl, options);
 
   // Save project
   const projectJsonPath = getProjectJsonPath(slug);
@@ -129,7 +132,7 @@ export async function deleteProject(slug) {
 /**
  * Update a project's settings
  * @param {object} project - Current project object
- * @param {object} updates - Object with updated values (name, configDirectory, baseUrl)
+ * @param {object} updates - Object with updated values (name, configDirectory, baseUrl, drupalRoot, drushCommand)
  * @returns {Promise<object>} - Updated project object
  * @throws {Error} - If validation fails
  */
@@ -166,7 +169,9 @@ export async function updateProject(project, updates) {
     ...project,
     name: updates.name.trim(),
     configDirectory: updates.configDirectory.trim(),
-    baseUrl: (updates.baseUrl || '').trim()
+    baseUrl: (updates.baseUrl || '').trim(),
+    drupalRoot: (updates.drupalRoot || '').trim(),
+    drushCommand: (updates.drushCommand || 'drush').trim()
   };
 
   // Handle slug change: rename directory

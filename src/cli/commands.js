@@ -54,6 +54,11 @@ import {
   getPermissionsForBundle,
   groupPermissionsByBundle
 } from '../constants/permissions.js';
+import {
+  checkDrushAvailable,
+  syncWithDrupal,
+  getSyncStatus
+} from '../commands/drush.js';
 
 /**
  * Valid entity types
@@ -114,6 +119,41 @@ function output(data, json = false) {
 function handleError(error) {
   console.error(chalk.red(`Error: ${error.message}`));
   process.exit(1);
+}
+
+/**
+ * Run drush sync if --sync flag is passed
+ * @param {object} project - Project object
+ * @param {object} options - Command options
+ * @returns {Promise<void>}
+ */
+async function runSyncIfRequested(project, options) {
+  if (!options.sync) {
+    return;
+  }
+
+  const status = getSyncStatus(project);
+  if (!status.configured) {
+    console.log(chalk.yellow('\nSync skipped: ' + status.message));
+    return;
+  }
+
+  const drushCheck = await checkDrushAvailable(project);
+  if (!drushCheck.available) {
+    console.log(chalk.yellow('\nSync skipped: ' + drushCheck.message));
+    return;
+  }
+
+  console.log(chalk.cyan('\nSyncing with Drupal...'));
+  const result = await syncWithDrupal(project, {
+    onProgress: (msg) => console.log(chalk.gray('  ' + msg))
+  });
+
+  if (result.success) {
+    console.log(chalk.green('Sync complete!'));
+  } else {
+    console.log(chalk.red('Sync failed: ' + result.message));
+  }
 }
 
 // ============================================
@@ -304,6 +344,8 @@ export async function cmdBundleCreate(options) {
         console.log(`  - ${file}`);
       }
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -488,6 +530,8 @@ export async function cmdFieldCreate(options) {
         console.log(`  - ${file}`);
       }
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -601,6 +645,8 @@ export async function cmdFieldEdit(options) {
       console.log(chalk.green(`Field "${result.fieldName}" updated successfully!`));
       console.log(chalk.cyan(`Updated file: ${result.updatedFile}`));
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -1479,6 +1525,8 @@ export async function cmdRoleCreate(options) {
     } else {
       console.log(chalk.green(`Role "${role.label}" created with ID: ${role.id}`));
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -1652,6 +1700,8 @@ export async function cmdRoleAddPermission(options) {
         console.log(`  + ${perm}`);
       }
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -1687,6 +1737,8 @@ export async function cmdRoleRemovePermission(options) {
         console.log(`  - ${perm}`);
       }
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -1744,6 +1796,8 @@ export async function cmdRoleSetPermissions(options) {
         }
       }
     }
+
+    await runSyncIfRequested(project, options);
   } catch (error) {
     handleError(error);
   }
@@ -1773,6 +1827,103 @@ export async function cmdRoleListPermissions(options) {
       for (const perm of permissions) {
         console.log(`  ${perm.short} - ${perm.label}`);
         console.log(`    Key: ${perm.key}`);
+      }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Drush Commands
+// ============================================
+
+/**
+ * Sync configuration with Drupal (drush cim && drush cex)
+ */
+export async function cmdDrushSync(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+
+    const status = getSyncStatus(project);
+    if (!status.configured) {
+      throw new Error(status.message);
+    }
+
+    const drushCheck = await checkDrushAvailable(project);
+    if (!drushCheck.available) {
+      throw new Error(drushCheck.message);
+    }
+
+    console.log(chalk.cyan('Syncing with Drupal...'));
+    const result = await syncWithDrupal(project, {
+      onProgress: (msg) => console.log(chalk.gray('  ' + msg))
+    });
+
+    if (options.json) {
+      output(result, true);
+    } else {
+      if (result.success) {
+        console.log(chalk.green('Sync complete!'));
+      } else {
+        console.log(chalk.red('Sync failed: ' + result.message));
+      }
+
+      // Show drush output
+      if (result.details.import?.output) {
+        console.log();
+        console.log(chalk.cyan('Import output:'));
+        console.log(result.details.import.output.trim());
+      }
+      if (result.details.export?.output) {
+        console.log();
+        console.log(chalk.cyan('Export output:'));
+        console.log(result.details.export.output.trim());
+      }
+
+      if (!result.success) {
+        process.exit(1);
+      }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Check drush sync configuration status
+ */
+export async function cmdDrushStatus(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    const status = getSyncStatus(project);
+
+    if (options.json) {
+      output(status, true);
+    } else {
+      console.log(chalk.bold('Drush Sync Status:'));
+      console.log(`  Configured: ${status.configured ? chalk.green('Yes') : chalk.yellow('No')}`);
+      console.log(`  Drupal Root: ${status.drupalRoot}`);
+      console.log(`  Drush Command: ${status.drushCommand}`);
+      console.log();
+      console.log(status.configured ? chalk.green(status.message) : chalk.yellow(status.message));
+
+      if (status.configured) {
+        console.log(chalk.cyan('\nChecking drush availability...'));
+        const drushCheck = await checkDrushAvailable(project);
+        if (drushCheck.available) {
+          console.log(chalk.green('Drush is available and working.'));
+        } else {
+          console.log(chalk.yellow('Drush check failed: ' + drushCheck.message));
+        }
       }
     }
   } catch (error) {

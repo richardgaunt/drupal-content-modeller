@@ -95,6 +95,8 @@ describe('Project Utilities (Pure)', () => {
         slug: 'my-project',
         configDirectory: '/path/to/config',
         baseUrl: '',
+        drupalRoot: '',
+        drushCommand: 'drush',
         lastSync: null,
         entities: {
           node: {},

@@ -8,14 +8,21 @@
  * @param {string} slug - Directory-safe slug
  * @param {string} configDirectory - Path to Drupal config directory
  * @param {string} baseUrl - Base URL of the Drupal site (optional)
+ * @param {object} options - Additional options
+ * @param {string} options.drupalRoot - Root directory of Drupal installation
+ * @param {string} options.drushCommand - Command to run drush (default: 'drush')
  * @returns {object} - Project object
  */
-export function createProjectObject(name, slug, configDirectory, baseUrl = '') {
+export function createProjectObject(name, slug, configDirectory, baseUrl = '', options = {}) {
+  const { drupalRoot = '', drushCommand = 'drush' } = options;
+
   return {
     name,
     slug,
     configDirectory,
     baseUrl,
+    drupalRoot,
+    drushCommand,
     lastSync: null,
     entities: {
       node: {},

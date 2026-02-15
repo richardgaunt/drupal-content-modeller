@@ -73,6 +73,7 @@ import {
   getRoleSummary
 } from '../parsers/roleParser.js';
 import { getPermissionsForBundle } from '../constants/permissions.js';
+import { syncWithDrupal, getSyncStatus } from '../commands/drush.js';
 import { FIELD_GROUP_FORMATS, getDefaultFormatSettings } from '../generators/formDisplayGenerator.js';
 import { generateGroupName, validateGroupName } from '../parsers/formDisplayParser.js';
 import { generateMachineName } from '../generators/bundleGenerator.js';
@@ -173,7 +174,24 @@ async function handleCreateProject() {
       validate: validateBaseUrl
     });
 
-    const project = await createProject(name, configDir, baseUrl);
+    // Drupal sync configuration
+    const drupalRoot = await input({
+      message: 'Drupal root directory (optional, for drush sync)?',
+      default: ''
+    });
+
+    let drushCommand = 'drush';
+    if (drupalRoot) {
+      drushCommand = await input({
+        message: 'Drush command (e.g., drush, ahoy drush, ddev drush)?',
+        default: 'drush'
+      });
+    }
+
+    const project = await createProject(name, configDir, baseUrl, {
+      drupalRoot: drupalRoot.trim(),
+      drushCommand: drushCommand.trim() || 'drush'
+    });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
     console.log();
@@ -290,6 +308,9 @@ async function showProjectMenu(project) {
           break;
         case 'manage-roles':
           await handleManageRoles(project);
+          break;
+        case 'drush-sync':
+          await handleDrushSync(project);
           break;
         case 'back':
           return;
@@ -2002,10 +2023,22 @@ async function handleEditProject(project) {
       validate: validateBaseUrl
     });
 
+    const drupalRoot = await input({
+      message: 'Drupal root directory (for drush sync):',
+      default: project.drupalRoot || ''
+    });
+
+    const drushCommand = await input({
+      message: 'Drush command (e.g., drush, ahoy drush, ddev drush):',
+      default: project.drushCommand || 'drush'
+    });
+
     const updates = {
       name: name.trim(),
       configDirectory: configDirectory.trim(),
-      baseUrl: baseUrl.trim()
+      baseUrl: baseUrl.trim(),
+      drupalRoot: drupalRoot.trim(),
+      drushCommand: drushCommand.trim() || 'drush'
     };
 
     const updatedProject = await updateProject(project, updates);
@@ -3084,6 +3117,86 @@ async function handleDeleteRole(project) {
 
     await deleteRole(project, roleId);
     console.log(chalk.green(`Role "${role.label}" deleted.`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle drush sync action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleDrushSync(project) {
+  try {
+    const status = getSyncStatus(project);
+
+    console.log();
+    console.log(chalk.cyan('Drupal Configuration Sync'));
+    console.log();
+
+    if (!status.configured) {
+      console.log(chalk.yellow(status.message));
+      console.log();
+
+      const configure = await select({
+        message: 'Would you like to configure drush sync now?',
+        choices: [
+          { value: true, name: 'Yes, edit project settings' },
+          { value: false, name: 'No, go back' }
+        ]
+      });
+
+      if (configure) {
+        console.log(chalk.cyan('Use "Edit project" to set the Drupal root directory.'));
+      }
+      return;
+    }
+
+    console.log(`  Drupal root: ${chalk.cyan(status.drupalRoot)}`);
+    console.log(`  Drush command: ${chalk.cyan(status.drushCommand)}`);
+    console.log();
+
+    const confirm = await select({
+      message: 'Run drush config import then export?',
+      choices: [
+        { value: true, name: 'Yes, sync now' },
+        { value: false, name: 'No, cancel' }
+      ]
+    });
+
+    if (!confirm) {
+      return;
+    }
+
+    console.log();
+
+    const result = await syncWithDrupal(project, {
+      onProgress: (msg) => console.log(chalk.cyan(msg))
+    });
+
+    console.log();
+    if (result.success) {
+      console.log(chalk.green(result.message));
+    } else {
+      console.log(chalk.red(result.message));
+    }
+
+    // Show drush output
+    if (result.details.import?.output) {
+      console.log();
+      console.log(chalk.cyan('Import output:'));
+      console.log(result.details.import.output.trim());
+    }
+    if (result.details.export?.output) {
+      console.log();
+      console.log(chalk.cyan('Export output:'));
+      console.log(result.details.export.output.trim());
+    }
+    console.log();
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

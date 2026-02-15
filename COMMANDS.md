@@ -1159,6 +1159,98 @@ Available permissions for node > article:
 
 ---
 
+## Drush Commands
+
+These commands integrate with Drupal's drush tool to sync configuration between files and the database.
+
+**Prerequisites:**
+- Project must have `drupalRoot` configured (path to Drupal installation)
+- Drush must be available (configured via `drushCommand` in project settings, default: `drush`)
+
+### `dcm drush sync`
+
+Sync configuration with Drupal by running `drush cim` (import) followed by `drush cex` (export).
+
+```bash
+dcm drush sync --project "project-slug"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm drush sync -p my-site
+```
+
+This is useful after creating configuration files to:
+1. Import the new configuration into Drupal
+2. Export it back to capture any UUIDs or third-party settings Drupal adds
+
+---
+
+### `dcm drush status`
+
+Check drush sync configuration status for a project.
+
+```bash
+dcm drush status --project "project-slug"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm drush status -p my-site
+```
+
+**Output:**
+```
+Drush Sync Status:
+  Configured: Yes
+  Drupal Root: /var/www/mysite
+  Drush Command: drush
+
+Ready to sync using "drush" in /var/www/mysite
+
+Checking drush availability...
+Drush is available and working.
+```
+
+---
+
+## Automatic Sync (--sync flag)
+
+Many commands support the `--sync` flag to automatically sync with Drupal after making changes. This runs `drush cim && drush cex` after the operation completes.
+
+**Commands supporting --sync:**
+- `dcm bundle create --sync`
+- `dcm field create --sync`
+- `dcm field edit --sync`
+- `dcm role create --sync`
+- `dcm role add-permission --sync`
+- `dcm role remove-permission --sync`
+- `dcm role set-permissions --sync`
+
+**Example:**
+```bash
+# Create a field and sync immediately
+dcm field create -p my-site -e node -b article -t string -l "Subtitle" --sync
+
+# Add permissions and sync
+dcm role add-permission -p my-site -r content_editor -e node -b article \
+  --permissions "create,edit_own" --sync
+```
+
+**Note:** If `drupalRoot` is not configured or drush is not available, the sync will be skipped with a warning message.
+
+---
+
 ## Interactive Mode
 
 Running `dcm` without arguments launches interactive mode:

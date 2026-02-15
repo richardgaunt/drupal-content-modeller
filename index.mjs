@@ -38,7 +38,9 @@ import {
   cmdRoleAddPermission,
   cmdRoleRemovePermission,
   cmdRoleSetPermissions,
-  cmdRoleListPermissions
+  cmdRoleListPermissions,
+  cmdDrushSync,
+  cmdDrushStatus
 } from './src/cli/commands.js';
 
 const program = new Command();
@@ -113,6 +115,7 @@ bundleCmd
   .option('-m, --machine-name <name>', 'Machine name (auto-generated if omitted)')
   .option('-d, --description <desc>', 'Bundle description')
   .option('-s, --source-type <type>', 'Media source type (image, file, remote_video) - required for media')
+  .option('--sync', 'Sync with Drupal after creation (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdBundleCreate);
 
@@ -154,6 +157,7 @@ fieldCmd
   .option('--file-extensions <exts>', 'Allowed file extensions (space-separated)')
   .option('--file-directory <dir>', 'Upload directory path')
   .option('--alt-required', 'Require alt text (for image fields)')
+  .option('--sync', 'Sync with Drupal after creation (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldCreate);
 
@@ -178,6 +182,7 @@ fieldCmd
   .option('-r, --required', 'Make field required')
   .option('--not-required', 'Make field optional')
   .option('--target-bundles <bundles>', 'Update target bundles, comma-separated')
+  .option('--sync', 'Sync with Drupal after edit (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldEdit);
 
@@ -412,6 +417,7 @@ roleCmd
   .requiredOption('-l, --label <label>', 'Role label')
   .option('-n, --name <name>', 'Machine name (auto-generated if omitted)')
   .option('--is-admin', 'Make this an admin role')
+  .option('--sync', 'Sync with Drupal after creation (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdRoleCreate);
 
@@ -447,6 +453,7 @@ roleCmd
   .requiredOption('-e, --entity-type <type>', 'Entity type')
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .requiredOption('--permissions <list>', 'Comma-separated permission short names or "all"')
+  .option('--sync', 'Sync with Drupal after edit (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdRoleAddPermission);
 
@@ -456,6 +463,7 @@ roleCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .requiredOption('-r, --role <id>', 'Role machine name')
   .requiredOption('--permissions <list>', 'Comma-separated full permission keys')
+  .option('--sync', 'Sync with Drupal after edit (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdRoleRemovePermission);
 
@@ -467,6 +475,7 @@ roleCmd
   .requiredOption('-e, --entity-type <type>', 'Entity type')
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .requiredOption('--permissions <list>', 'Comma-separated permission short names, "all", or "none"')
+  .option('--sync', 'Sync with Drupal after edit (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdRoleSetPermissions);
 
@@ -477,6 +486,28 @@ roleCmd
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .option('-j, --json', 'Output as JSON')
   .action(cmdRoleListPermissions);
+
+// ============================================
+// Drush Commands
+// ============================================
+
+const drushCmd = program
+  .command('drush')
+  .description('Drush integration commands');
+
+drushCmd
+  .command('sync')
+  .description('Sync configuration with Drupal (runs drush cim && drush cex)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdDrushSync);
+
+drushCmd
+  .command('status')
+  .description('Check drush sync configuration status')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdDrushStatus);
 
 // ============================================
 // Interactive Mode

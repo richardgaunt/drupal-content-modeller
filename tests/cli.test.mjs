@@ -49,7 +49,7 @@ describe('CLI Prompts', () => {
       const result = getProjectMenuChoices('My Test Project');
 
       expect(result.choices).toEqual(PROJECT_MENU_CHOICES);
-      expect(result.choices.length).toBe(15);
+      expect(result.choices.length).toBe(16);
 
       const values = result.choices.map(c => c.value);
       expect(values).toContain('sync');
@@ -66,6 +66,7 @@ describe('CLI Prompts', () => {
       expect(values).toContain('report-entity');
       expect(values).toContain('report-project');
       expect(values).toContain('manage-roles');
+      expect(values).toContain('drush-sync');
       expect(values).toContain('back');
     });
 

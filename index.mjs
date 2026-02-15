@@ -15,7 +15,22 @@ import {
   cmdFieldEdit,
   cmdReportEntity,
   cmdReportProject,
-  cmdAdminLinks
+  cmdAdminLinks,
+  cmdFormDisplayView,
+  cmdFormDisplayListModes,
+  cmdFormDisplayHide,
+  cmdFormDisplayShow,
+  cmdFormDisplaySetWidget,
+  cmdFormDisplaySetWidgetSetting,
+  cmdFormDisplayListWidgets,
+  cmdFormDisplayGroupCreate,
+  cmdFormDisplayGroupEdit,
+  cmdFormDisplayGroupDelete,
+  cmdFormDisplayGroupList,
+  cmdFormDisplayMove,
+  cmdFormDisplayReorder,
+  cmdFormDisplaySetWeight,
+  cmdFormDisplayReset
 } from './src/cli/commands.js';
 
 const program = new Command();
@@ -201,6 +216,178 @@ adminCmd
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .option('-j, --json', 'Output as JSON')
   .action(cmdAdminLinks);
+
+// ============================================
+// Form Display Commands
+// ============================================
+
+const formDisplayCmd = program
+  .command('form-display')
+  .description('Form display management commands');
+
+formDisplayCmd
+  .command('view')
+  .description('View form display layout as a tree')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-m, --mode <mode>', 'Form mode', 'default')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayView);
+
+formDisplayCmd
+  .command('list-modes')
+  .description('List available form display modes for a bundle')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayListModes);
+
+formDisplayCmd
+  .command('hide')
+  .description('Hide one or more fields from the form display')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-f, --fields <fields>', 'Comma-separated field names to hide')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayHide);
+
+formDisplayCmd
+  .command('show')
+  .description('Show one or more hidden fields')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-f, --fields <fields>', 'Comma-separated field names to show')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayShow);
+
+formDisplayCmd
+  .command('set-widget')
+  .description('Change the widget type for a field')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-f, --field <field>', 'Field name')
+  .requiredOption('-w, --widget <widget>', 'Widget type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplaySetWidget);
+
+formDisplayCmd
+  .command('set-widget-setting')
+  .description('Update a specific widget setting for a field')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-f, --field <field>', 'Field name')
+  .requiredOption('-s, --setting <setting>', 'Setting name')
+  .requiredOption('-v, --value <value>', 'Setting value')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplaySetWidgetSetting);
+
+formDisplayCmd
+  .command('list-widgets')
+  .description('List available widgets for a field type')
+  .requiredOption('-t, --field-type <type>', 'Field type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayListWidgets);
+
+// Form Display Group subcommands
+const formDisplayGroupCmd = formDisplayCmd
+  .command('group')
+  .description('Field group management commands');
+
+formDisplayGroupCmd
+  .command('create')
+  .description('Create a new field group')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-l, --label <label>', 'Group label')
+  .option('-n, --name <name>', 'Machine name (auto-generated if omitted)')
+  .option('-f, --format <format>', 'Format type: tabs, tab, details, fieldset', 'details')
+  .option('--parent <parent>', 'Parent group name (if nesting)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayGroupCreate);
+
+formDisplayGroupCmd
+  .command('edit')
+  .description('Edit a field group\'s properties')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-n, --name <name>', 'Group machine name')
+  .option('-l, --label <label>', 'New group label')
+  .option('-f, --format <format>', 'New format type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayGroupEdit);
+
+formDisplayGroupCmd
+  .command('delete')
+  .description('Delete a field group')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-n, --name <name>', 'Group machine name to delete')
+  .option('--move-children-to <target>', 'Where to move children: parent (default) or root', 'parent')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayGroupDelete);
+
+formDisplayGroupCmd
+  .command('list')
+  .description('List all field groups in a form display')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayGroupList);
+
+// Form Display Movement commands
+formDisplayCmd
+  .command('move')
+  .description('Move a field or group to a different parent')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-i, --item <item>', 'Field or group name to move')
+  .requiredOption('-t, --to <target>', 'Target group name, or "root" for root level')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayMove);
+
+formDisplayCmd
+  .command('reorder')
+  .description('Reorder items within a group (or at root level)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-o, --order <order>', 'Comma-separated list of items in desired order')
+  .option('-g, --group <group>', 'Group to reorder within (omit for root level)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayReorder);
+
+formDisplayCmd
+  .command('set-weight')
+  .description('Set the weight of a specific field or group')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-i, --item <item>', 'Field or group name')
+  .requiredOption('-w, --weight <weight>', 'Weight value (lower = higher position)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplaySetWeight);
+
+formDisplayCmd
+  .command('reset')
+  .description('Reset form display to defaults')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('--keep-groups', 'Keep field groups (only reset field widgets)')
+  .option('-f, --force', 'Skip confirmation')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayReset);
 
 // ============================================
 // Interactive Mode

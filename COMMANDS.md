@@ -415,6 +415,465 @@ dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysi
 
 ---
 
+## Form Display Commands
+
+### `dcm form-display view`
+
+View form display layout as a tree.
+
+```bash
+dcm form-display view \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  [--mode "default"] \
+  [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--mode` | `-m` | No | Form mode (default: "default") |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display view -p my-site -e node -b article
+```
+
+---
+
+### `dcm form-display list-modes`
+
+List available form display modes for a bundle.
+
+```bash
+dcm form-display list-modes \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display list-modes -p my-site -e node -b article
+```
+
+---
+
+### `dcm form-display hide`
+
+Hide one or more fields from the form display.
+
+```bash
+dcm form-display hide \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --fields "field1,field2,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--fields` | `-f` | Yes | Comma-separated field names to hide |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display hide -p my-site -e node -b article -f "created,status,promote"
+```
+
+---
+
+### `dcm form-display show`
+
+Show one or more hidden fields (adds them back with default widget).
+
+```bash
+dcm form-display show \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --fields "field1,field2,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--fields` | `-f` | Yes | Comma-separated field names to show |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display show -p my-site -e node -b article -f "status"
+```
+
+---
+
+### `dcm form-display set-widget`
+
+Change the widget type for a field.
+
+```bash
+dcm form-display set-widget \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --field "field_name" \
+  --widget "widget_type"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--field` | `-f` | Yes | Field name |
+| `--widget` | `-w` | Yes | Widget type |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Change entity reference to use select list
+dcm form-display set-widget -p my-site -e node -b article -f field_n_category -w options_select
+
+# Change to media library widget
+dcm form-display set-widget -p my-site -e node -b article -f field_n_image -w media_library_widget
+```
+
+---
+
+### `dcm form-display set-widget-setting`
+
+Update a specific widget setting for a field.
+
+```bash
+dcm form-display set-widget-setting \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --field "field_name" \
+  --setting "setting_name" \
+  --value "setting_value"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--field` | `-f` | Yes | Field name |
+| `--setting` | `-s` | Yes | Setting name (e.g., `size`, `placeholder`, `rows`) |
+| `--value` | `-v` | Yes | Setting value |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Set textarea rows
+dcm form-display set-widget-setting -p my-site -e node -b article -f field_n_body -s rows -v 15
+
+# Set placeholder text
+dcm form-display set-widget-setting -p my-site -e node -b article -f field_n_title -s placeholder -v "Enter title here"
+```
+
+---
+
+### `dcm form-display list-widgets`
+
+List available widgets for a field type.
+
+```bash
+dcm form-display list-widgets \
+  --field-type "string|entity_reference|..." \
+  [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--field-type` | `-t` | Yes | Field type |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display list-widgets -t entity_reference
+dcm form-display list-widgets -t string --json
+```
+
+---
+
+### `dcm form-display group create`
+
+Create a new field group.
+
+```bash
+dcm form-display group create \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --label "Group Label" \
+  [--name "group_machine_name"] \
+  [--format "tabs|tab|details|fieldset"] \
+  [--parent "parent_group_name"]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--label` | `-l` | Yes | Human-readable group label |
+| `--name` | `-n` | No | Machine name (auto-generated from label if omitted) |
+| `--format` | `-f` | No | Format type: `tabs`, `tab`, `details`, `fieldset` (default: `details`) |
+| `--parent` | | No | Parent group name (if nesting) |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Create a tabs container
+dcm form-display group create -p my-site -e node -b article -l "Main Tabs" -f tabs
+
+# Create a tab inside the tabs container
+dcm form-display group create -p my-site -e node -b article -l "Content" -f tab --parent group_main_tabs
+
+# Create a details group
+dcm form-display group create -p my-site -e node -b article -l "Advanced Settings" -f details
+```
+
+---
+
+### `dcm form-display group edit`
+
+Edit a field group's properties.
+
+```bash
+dcm form-display group edit \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --name "group_name" \
+  [--label "New Label"] \
+  [--format "tabs|tab|details|fieldset"]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--name` | `-n` | Yes | Group machine name |
+| `--label` | `-l` | No | New group label |
+| `--format` | `-f` | No | New format type |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display group edit -p my-site -e node -b article -n group_advanced -l "Advanced Options"
+```
+
+---
+
+### `dcm form-display group delete`
+
+Delete a field group.
+
+```bash
+dcm form-display group delete \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --name "group_name" \
+  [--move-children-to "parent|root"]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--name` | `-n` | Yes | Group machine name to delete |
+| `--move-children-to` | | No | Where to move children: `parent` (default) or `root` |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display group delete -p my-site -e node -b article -n group_old_settings
+dcm form-display group delete -p my-site -e node -b article -n group_old_settings --move-children-to root
+```
+
+---
+
+### `dcm form-display group list`
+
+List all field groups in a form display.
+
+```bash
+dcm form-display group list \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display group list -p my-site -e node -b article
+```
+
+---
+
+### `dcm form-display move`
+
+Move a field or group to a different parent.
+
+```bash
+dcm form-display move \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --item "field_name|group_name" \
+  --to "target_group|root"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--item` | `-i` | Yes | Field or group name to move |
+| `--to` | `-t` | Yes | Target group name, or `root` for root level |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Move field to a group
+dcm form-display move -p my-site -e node -b article -i field_n_subtitle -t group_content
+
+# Move field to root level
+dcm form-display move -p my-site -e node -b article -i field_n_tags -t root
+
+# Move a nested group
+dcm form-display move -p my-site -e node -b article -i group_meta -t group_sidebar
+```
+
+---
+
+### `dcm form-display reorder`
+
+Reorder items within a group (or at root level).
+
+```bash
+dcm form-display reorder \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  [--group "group_name"] \
+  --order "item1,item2,item3,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--group` | `-g` | No | Group to reorder within (omit for root level) |
+| `--order` | `-o` | Yes | Comma-separated list of items in desired order |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Reorder fields within a group
+dcm form-display reorder -p my-site -e node -b article -g group_content \
+  -o "field_n_title,field_n_subtitle,field_n_body"
+
+# Reorder at root level
+dcm form-display reorder -p my-site -e node -b article \
+  -o "group_main_tabs,field_n_status,group_sidebar"
+```
+
+---
+
+### `dcm form-display set-weight`
+
+Set the weight of a specific field or group.
+
+```bash
+dcm form-display set-weight \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  --item "field_name|group_name" \
+  --weight <number>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--item` | `-i` | Yes | Field or group name |
+| `--weight` | `-w` | Yes | Weight value (lower = higher position) |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display set-weight -p my-site -e node -b article -i field_n_title -w 0
+dcm form-display set-weight -p my-site -e node -b article -i group_sidebar -w 100
+```
+
+---
+
+### `dcm form-display reset`
+
+Reset form display to defaults.
+
+```bash
+dcm form-display reset \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name" \
+  [--keep-groups] \
+  [--force]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--keep-groups` | | No | Keep field groups (only reset field widgets) |
+| `--force` | `-f` | No | Skip confirmation |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm form-display reset -p my-site -e node -b article --force
+dcm form-display reset -p my-site -e node -b article --keep-groups
+```
+
+---
+
 ## Admin Commands
 
 ### `dcm admin links`

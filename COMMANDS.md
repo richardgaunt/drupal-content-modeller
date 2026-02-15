@@ -913,6 +913,252 @@ Admin links for node > Article
 
 ---
 
+## Role Commands
+
+### `dcm role create`
+
+Create a new role.
+
+```bash
+dcm role create \
+  --project "project-slug" \
+  --label "Role Label" \
+  [--name "machine_name"] \
+  [--is-admin]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--label` | `-l` | Yes | Human-readable role label |
+| `--name` | `-n` | No | Machine name (auto-generated from label if omitted) |
+| `--is-admin` | | No | Make this an admin role (has all permissions) |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role create -p my-site -l "Content Editor"
+dcm role create -p my-site -l "Site Admin" -n site_admin --is-admin
+```
+
+---
+
+### `dcm role list`
+
+List all roles in a project.
+
+```bash
+dcm role list --project "project-slug" [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role list -p my-site
+dcm role list -p my-site --json
+```
+
+---
+
+### `dcm role view`
+
+View role details and permissions.
+
+```bash
+dcm role view \
+  --project "project-slug" \
+  --role "role_id"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--role` | `-r` | Yes | Role machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role view -p my-site -r content_editor
+```
+
+---
+
+### `dcm role delete`
+
+Delete a role.
+
+```bash
+dcm role delete \
+  --project "project-slug" \
+  --role "role_id" \
+  [--force]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--role` | `-r` | Yes | Role machine name |
+| `--force` | `-f` | No | Skip confirmation prompt |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role delete -p my-site -r old_role --force
+```
+
+---
+
+### `dcm role add-permission`
+
+Add permissions for a bundle to a role.
+
+```bash
+dcm role add-permission \
+  --project "project-slug" \
+  --role "role_id" \
+  --entity-type "node|media|taxonomy_term|block_content" \
+  --bundle "bundle_name" \
+  --permissions "create,edit_own,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--role` | `-r` | Yes | Role machine name |
+| `--entity-type` | `-e` | Yes | Entity type: `node`, `media`, `taxonomy_term`, `block_content` |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--permissions` | | Yes | Comma-separated permission short names or `all` |
+| `--json` | `-j` | No | Output as JSON |
+
+**Permission Short Names:**
+
+| Short Name | Description |
+|------------|-------------|
+| `create` | Create new content |
+| `edit_own` | Edit own content |
+| `edit_any` | Edit any content |
+| `delete_own` | Delete own content |
+| `delete_any` | Delete any content |
+| `view_revisions` | View revisions |
+| `revert_revisions` | Revert revisions |
+| `delete_revisions` | Delete revisions |
+
+**Examples:**
+```bash
+# Add create and edit_own permissions
+dcm role add-permission -p my-site -r content_editor -e node -b article \
+  --permissions "create,edit_own"
+
+# Add all permissions for a bundle
+dcm role add-permission -p my-site -r content_editor -e node -b article \
+  --permissions "all"
+```
+
+---
+
+### `dcm role remove-permission`
+
+Remove specific permissions from a role.
+
+```bash
+dcm role remove-permission \
+  --project "project-slug" \
+  --role "role_id" \
+  --permissions "permission1,permission2,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--role` | `-r` | Yes | Role machine name |
+| `--permissions` | | Yes | Comma-separated full permission keys |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role remove-permission -p my-site -r content_editor \
+  --permissions "delete any article content,delete own article content"
+```
+
+---
+
+### `dcm role set-permissions`
+
+Set permissions for a bundle (replaces any existing permissions for that bundle).
+
+```bash
+dcm role set-permissions \
+  --project "project-slug" \
+  --role "role_id" \
+  --entity-type "node|media|taxonomy_term|block_content" \
+  --bundle "bundle_name" \
+  --permissions "create,edit_own,..."
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--role` | `-r` | Yes | Role machine name |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--permissions` | | Yes | Comma-separated permission short names, `all`, or `none` |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Set specific permissions (replaces existing)
+dcm role set-permissions -p my-site -r content_editor -e node -b article \
+  --permissions "create,edit_own,edit_any"
+
+# Remove all permissions for a bundle
+dcm role set-permissions -p my-site -r content_editor -e node -b article \
+  --permissions "none"
+```
+
+---
+
+### `dcm role list-permissions`
+
+List available permissions for a bundle.
+
+```bash
+dcm role list-permissions \
+  --entity-type "node|media|taxonomy_term|block_content" \
+  --bundle "bundle_name"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm role list-permissions -e node -b article
+```
+
+**Output:**
+```
+Available permissions for node > article:
+
+  Short Name         Permission Key                    Label
+  create             create article content            Create new content
+  edit_own           edit own article content          Edit own content
+  edit_any           edit any article content          Edit any content
+  delete_own         delete own article content        Delete own content
+  delete_any         delete any article content        Delete any content
+  view_revisions     view article revisions            View revisions
+  revert_revisions   revert article revisions          Revert revisions
+  delete_revisions   delete article revisions          Delete revisions
+```
+
+---
+
 ## Interactive Mode
 
 Running `dcm` without arguments launches interactive mode:

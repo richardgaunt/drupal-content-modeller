@@ -57,6 +57,13 @@ import {
   getWidgetByType
 } from '../src/constants/fieldWidgets';
 
+// Import base fields functions
+import {
+  isBaseField,
+  getBaseFieldConfig,
+  getBaseFieldNames
+} from '../src/constants/baseFields';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('Form Display Parser - Pure Functions', () => {
@@ -778,6 +785,132 @@ describe('Field Widgets - Constants', () => {
       const widget2 = getWidgetByType('string', 'string_textfield');
       widget1.settings.size = 999;
       expect(widget2.settings.size).not.toBe(999);
+    });
+  });
+});
+
+describe('Base Fields Integration', () => {
+  describe('isBaseField', () => {
+    test('identifies node base fields', () => {
+      expect(isBaseField('node', 'title')).toBe(true);
+      expect(isBaseField('node', 'status')).toBe(true);
+      expect(isBaseField('node', 'uid')).toBe(true);
+      expect(isBaseField('node', 'promote')).toBe(true);
+      expect(isBaseField('node', 'sticky')).toBe(true);
+      expect(isBaseField('node', 'moderation_state')).toBe(true);
+      expect(isBaseField('node', 'path')).toBe(true);
+    });
+
+    test('identifies custom fields as not base fields', () => {
+      expect(isBaseField('node', 'field_n_summary')).toBe(false);
+      expect(isBaseField('node', 'field_n_body')).toBe(false);
+    });
+
+    test('identifies taxonomy_term base fields', () => {
+      expect(isBaseField('taxonomy_term', 'name')).toBe(true);
+      expect(isBaseField('taxonomy_term', 'description')).toBe(true);
+      expect(isBaseField('taxonomy_term', 'weight')).toBe(true);
+    });
+
+    test('identifies media base fields', () => {
+      expect(isBaseField('media', 'name')).toBe(true);
+      expect(isBaseField('media', 'uid')).toBe(true);
+    });
+
+    test('identifies block_content base fields', () => {
+      expect(isBaseField('block_content', 'info')).toBe(true);
+      expect(isBaseField('block_content', 'reusable')).toBe(true);
+    });
+
+    test('identifies paragraph base fields', () => {
+      expect(isBaseField('paragraph', 'status')).toBe(true);
+    });
+  });
+
+  describe('getBaseFieldConfig', () => {
+    test('returns config for node title', () => {
+      const config = getBaseFieldConfig('node', 'title');
+      expect(config.type).toBe('string');
+      expect(config.label).toBe('Title');
+      expect(config.widget).toBe('string_textfield');
+      expect(config.settings.size).toBe(60);
+    });
+
+    test('returns config for node status', () => {
+      const config = getBaseFieldConfig('node', 'status');
+      expect(config.type).toBe('boolean');
+      expect(config.widget).toBe('boolean_checkbox');
+      expect(config.settings.display_label).toBe(true);
+    });
+
+    test('returns config for node moderation_state', () => {
+      const config = getBaseFieldConfig('node', 'moderation_state');
+      expect(config.widget).toBe('moderation_state_default');
+    });
+
+    test('returns null for custom field', () => {
+      const config = getBaseFieldConfig('node', 'field_n_body');
+      expect(config).toBeNull();
+    });
+  });
+
+  describe('getBaseFieldNames', () => {
+    test('returns all node base field names', () => {
+      const names = getBaseFieldNames('node');
+      expect(names).toContain('title');
+      expect(names).toContain('status');
+      expect(names).toContain('uid');
+      expect(names).toContain('promote');
+      expect(names).toContain('sticky');
+      expect(names).toContain('moderation_state');
+      expect(names).toContain('path');
+      expect(names.length).toBe(7);
+    });
+
+    test('returns all taxonomy_term base field names', () => {
+      const names = getBaseFieldNames('taxonomy_term');
+      expect(names).toContain('name');
+      expect(names).toContain('description');
+      expect(names).toContain('status');
+      expect(names).toContain('weight');
+      expect(names).toContain('parent');
+      expect(names).toContain('path');
+      expect(names.length).toBe(6);
+    });
+
+    test('returns empty array for unknown entity type', () => {
+      const names = getBaseFieldNames('unknown');
+      expect(names).toEqual([]);
+    });
+  });
+
+  describe('Base field widget mapping', () => {
+    test('node title uses string_textfield widget', () => {
+      const config = getBaseFieldConfig('node', 'title');
+      const widget = getWidgetByType(config.type, config.widget);
+      expect(widget).not.toBeNull();
+      expect(widget.type).toBe('string_textfield');
+    });
+
+    test('node status uses boolean_checkbox widget', () => {
+      const config = getBaseFieldConfig('node', 'status');
+      const widget = getWidgetByType(config.type, config.widget);
+      expect(widget).not.toBeNull();
+      expect(widget.type).toBe('boolean_checkbox');
+    });
+
+    test('node uid uses entity_reference_autocomplete widget', () => {
+      const config = getBaseFieldConfig('node', 'uid');
+      const widget = getWidgetByType(config.type, config.widget);
+      expect(widget).not.toBeNull();
+      expect(widget.type).toBe('entity_reference_autocomplete');
+    });
+
+    test('taxonomy_term description uses text_textarea widget', () => {
+      const config = getBaseFieldConfig('taxonomy_term', 'description');
+      const widget = getWidgetByType(config.type, config.widget);
+      expect(widget).not.toBeNull();
+      expect(widget.type).toBe('text_textarea');
     });
   });
 });

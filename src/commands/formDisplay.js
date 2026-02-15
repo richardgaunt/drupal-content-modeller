@@ -31,6 +31,10 @@ import {
   getWidgetsForFieldType,
   getWidgetByType
 } from '../constants/fieldWidgets.js';
+import {
+  isBaseField,
+  getBaseFieldConfig
+} from '../constants/baseFields.js';
 
 /**
  * Load form display for a bundle
@@ -511,7 +515,7 @@ export function getNextWeight(fields) {
 
 /**
  * Show a hidden field with correct widget configuration
- * Reads field type from field instance config and uses default widget
+ * Checks for base fields first, then reads field instance config
  * @param {object} project - Project object with configDirectory
  * @param {object} formDisplay - Form display data
  * @param {string} fieldName - Field name to show
@@ -525,31 +529,44 @@ export async function showHiddenField(project, formDisplay, fieldName) {
     throw new Error(`Field is not hidden: ${fieldName}`);
   }
 
-  // Read field instance to get field type
-  const fieldInstance = await readFieldInstance(
-    project.configDirectory,
-    entityType,
-    bundle,
-    fieldName
-  );
+  let widgetType;
+  let widgetSettings;
 
-  if (!fieldInstance) {
-    throw new Error(`Field instance not found: ${fieldName}`);
+  // Check if it's a base field first
+  if (isBaseField(entityType, fieldName)) {
+    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
+    widgetType = baseFieldConfig.widget;
+    widgetSettings = baseFieldConfig.settings;
+  } else {
+    // Read field instance to get field type
+    const fieldInstance = await readFieldInstance(
+      project.configDirectory,
+      entityType,
+      bundle,
+      fieldName
+    );
+
+    if (!fieldInstance) {
+      throw new Error(`Field instance not found: ${fieldName}`);
+    }
+
+    // Get default widget for field type
+    const defaultWidget = getDefaultWidget(fieldInstance.type);
+    if (!defaultWidget) {
+      throw new Error(`No widget found for field type: ${fieldInstance.type}`);
+    }
+
+    widgetType = defaultWidget.type;
+    widgetSettings = defaultWidget.settings;
   }
 
-  // Get default widget for field type
-  const defaultWidget = getDefaultWidget(fieldInstance.type);
-  if (!defaultWidget) {
-    throw new Error(`No widget found for field type: ${fieldInstance.type}`);
-  }
-
-  // Create new field entry with default widget
+  // Create new field entry with widget
   const newField = {
     name: fieldName,
-    type: defaultWidget.type,
+    type: widgetType,
     weight: getNextWeight(fields),
     region: 'content',
-    settings: { ...defaultWidget.settings },
+    settings: { ...widgetSettings },
     thirdPartySettings: {}
   };
 
@@ -577,22 +594,32 @@ export async function updateFieldWidget(project, formDisplay, fieldName, newWidg
     throw new Error(`Field not found: ${fieldName}`);
   }
 
-  // Read field instance to get field type
-  const fieldInstance = await readFieldInstance(
-    project.configDirectory,
-    entityType,
-    bundle,
-    fieldName
-  );
+  let fieldType;
 
-  if (!fieldInstance) {
-    throw new Error(`Field instance not found: ${fieldName}`);
+  // Check if it's a base field first
+  if (isBaseField(entityType, fieldName)) {
+    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
+    fieldType = baseFieldConfig.type;
+  } else {
+    // Read field instance to get field type
+    const fieldInstance = await readFieldInstance(
+      project.configDirectory,
+      entityType,
+      bundle,
+      fieldName
+    );
+
+    if (!fieldInstance) {
+      throw new Error(`Field instance not found: ${fieldName}`);
+    }
+
+    fieldType = fieldInstance.type;
   }
 
   // Get the new widget configuration
-  const newWidget = getWidgetByType(fieldInstance.type, newWidgetType);
+  const newWidget = getWidgetByType(fieldType, newWidgetType);
   if (!newWidget) {
-    throw new Error(`Widget ${newWidgetType} not available for field type: ${fieldInstance.type}`);
+    throw new Error(`Widget ${newWidgetType} not available for field type: ${fieldType}`);
   }
 
   // Update the field with new widget
@@ -650,6 +677,12 @@ export function updateFieldSettings(formDisplay, fieldName, newSettings) {
  */
 export async function getAvailableWidgetsForField(project, formDisplay, fieldName) {
   const { entityType, bundle } = formDisplay;
+
+  // Check if it's a base field first
+  if (isBaseField(entityType, fieldName)) {
+    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
+    return getWidgetsForFieldType(baseFieldConfig.type);
+  }
 
   const fieldInstance = await readFieldInstance(
     project.configDirectory,
@@ -757,25 +790,39 @@ export async function resetFormDisplay(project, formDisplay, options = {}) {
 
   for (let i = 0; i < allFieldNames.length; i++) {
     const fieldName = allFieldNames[i];
-    const fieldInstance = await readFieldInstance(
-      configPath,
-      entityType,
-      bundle,
-      fieldName
-    );
+    const existingField = fields.find(f => f.name === fieldName);
 
-    if (fieldInstance) {
-      const widget = getDefaultWidget(fieldInstance.type);
-      const existingField = fields.find(f => f.name === fieldName);
-
+    // Check if it's a base field first
+    if (isBaseField(entityType, fieldName)) {
+      const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
       newFields.push({
         name: fieldName,
-        type: widget?.type || 'string_textfield',
+        type: baseFieldConfig.widget,
         weight: keepFieldOrder && existingField ? existingField.weight : i,
         region: 'content',
-        settings: widget?.settings ? { ...widget.settings } : {},
+        settings: { ...baseFieldConfig.settings },
         thirdPartySettings: {}
       });
+    } else {
+      const fieldInstance = await readFieldInstance(
+        configPath,
+        entityType,
+        bundle,
+        fieldName
+      );
+
+      if (fieldInstance) {
+        const widget = getDefaultWidget(fieldInstance.type);
+
+        newFields.push({
+          name: fieldName,
+          type: widget?.type || 'string_textfield',
+          weight: keepFieldOrder && existingField ? existingField.weight : i,
+          region: 'content',
+          settings: widget?.settings ? { ...widget.settings } : {},
+          thirdPartySettings: {}
+        });
+      }
     }
   }
 

@@ -1283,6 +1283,80 @@ dcm role add-permission -p my-site -r content_editor -e node -b article \
 
 ---
 
+## Story Commands
+
+Stories are ticket/spec documents for content type creation that can be shared with stakeholders for approval.
+
+### Story Management (Interactive Only)
+
+Stories are managed through the interactive menu:
+
+```bash
+dcm
+# Select project > Manage stories
+```
+
+**Story Menu Options:**
+- Create new story
+- Edit existing story
+- Export story to markdown
+
+### Story Data Structure
+
+Stories are saved as JSON files in `<project-dir>/stories/<bundle>.json` and can be edited incrementally:
+
+- **Bundle info**: Entity type, label, machine name, description
+- **Purpose**: The "So that I can..." part of the user story
+- **Fields**: Ordered list of fields with type, cardinality, required, settings
+- **Permissions**: Role-based permission matrix
+
+### Story Export
+
+When exported, stories generate markdown files to `<project-dir>/stories/create-<bundle>-<entity_type>.md` with:
+
+- User story (As a Site Owner, I want..., So that I can...)
+- AC 1: Bundle exists
+- AC 2: Fields table
+- AC 3: Permissions table
+
+**Example Output:**
+
+```markdown
+# Create News content type
+
+## User Story
+
+As a Site Owner
+I want a content type called `News` on my new site
+So that I can manage job listings
+
+---
+
+## Acceptance Criteria
+
+**AC 1 - News content type exists**
+
+GIVEN I am a site administrator
+WHEN I go to Admin > Structure > Content types
+THEN I see `News`
+
+**AC 2 - News has the following fields**
+
+| Field Name | Machine Name | Field Type | Description | Cardinality | Required | Other |
+|------------|--------------|------------|-------------|-------------|----------|-------|
+| Subtitle | `field_n_subtitle` | string | - | 1 | No | Max: 255 |
+
+**AC 3 - Permissions**
+
+| Permission | **Editor** | **Admin** |
+|------------|----------|----------|
+| **Create new content** | Yes | Yes |
+| **Edit own content** | Yes | Yes |
+| **Edit any content** | No | Yes |
+```
+
+---
+
 ## Interactive Mode
 
 Running `dcm` without arguments launches interactive mode:

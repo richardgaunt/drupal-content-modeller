@@ -4,40 +4,42 @@ Use the `dcm` command to generate the editorial content below. Read @COMMANDS.md
 
 Generate project report after completing the content type.
 
-Use the `--sync` for each command so you know that the generated configuration is accepted by Drupal.
-
 Below are the ACs for generating a content type, read the below and create the necessary fields, form display, and edit existing roles to add the configured permissions below.
+
+You will need to create the form display using DCM command after creating the disply
+
+Recommend using `--sync` after a batch of work ie adding all permissions to all roles, adding fields to entity etc. You decide how to do that.
 
 
 **AC 1 - Content type exists**  
 GIVEN I’m a Content Author  
 WHEN I go to Admin > Content  
-THEN there is a content type called `Employment opportunity`
+THEN there is a content type called `News`
 
 **AC 2 - Workflow**  
 GIVEN I’m a Content Author  
-WHEN I create a new content of the type `Employment opportunity`  
+WHEN I create a new content of the type `News`  
 THEN the CivicTheme editorial workflow is enabled
 
 **AC 3 - Permissions**  
 GIVEN I’m an Administrator  
-WHEN I review permissions for content of the type `Employment opportunity`  
+WHEN I review permissions for content of the type `News`  
 THEN the CivicTheme OOTB default permissions are applied
 
-|   |   |   |   |   |
-|---|---|---|---|---|
-|**Permission**|**Administrator**|**Site Administrator**|**Content Approver**|**Content Author**|
-|**Create new content**|Yes|Yes|No|Yes|
-|**Delete any content**|Yes|Yes|No|Yes|
-|**Delete own content**|Yes|Yes|No|Yes|
-|**Edit any content**|Yes|Yes|No|Yes|
-|**Edit own content**|Yes|Yes|No|Yes|
-|**Publish any content**|Yes|Yes|Yes|Yes|
-|**Publish own content**|Yes|Yes|N/A|Yes|
+|                         |                   |                        |                      |                    |
+| ----------------------- | ----------------- | ---------------------- | -------------------- | ------------------ |
+| **Permission**          | **Administrator** | **Site Administrator** | **Content Approver** | **Content Author** |
+| **Create new content**  | Yes               | Yes                    | No                   | Yes                |
+| **Delete any content**  | Yes               | Yes                    | No                   | Yes                |
+| **Delete own content**  | Yes               | Yes                    | No                   | Yes                |
+| **Edit any content**    | Yes               | Yes                    | No                   | Yes                |
+| **Edit own content**    | Yes               | Yes                    | No                   | Yes                |
+| **Publish any content** | Yes               | Yes                    | Yes                  | Yes                |
+| **Publish own content** | Yes               | Yes                    | N/A                  | Yes                |
 
 **AC 4 - Available fields**  
 GIVEN I’m a Content Author  
-WHEN I create a new content of the type `Employment opportunity`  
+WHEN I create a new content of the type `News`  
 THEN the following fields are available  
 AND they are in the following order
 

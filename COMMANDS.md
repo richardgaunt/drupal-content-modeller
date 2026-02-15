@@ -417,6 +417,38 @@ dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysi
 
 ## Form Display Commands
 
+### `dcm form-display create`
+
+Create a new form display with default widgets based on the bundle's fields.
+
+```bash
+dcm form-display create \
+  --project "project-slug" \
+  --entity-type "node" \
+  --bundle "bundle_name"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+# Create form display for a content type
+dcm form-display create -p my-site -e node -b article
+
+# Then customize with other commands:
+dcm form-display reorder -p my-site -e node -b article -o "title,field_n_body,field_n_image"
+dcm form-display set-widget -p my-site -e node -b article -f field_n_category -w options_select
+```
+
+**Note:** The project must be synced first so the bundle's fields are known. The form display file must not already exist.
+
+---
+
 ### `dcm form-display view`
 
 View form display layout as a tree.

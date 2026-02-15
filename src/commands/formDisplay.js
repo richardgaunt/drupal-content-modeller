@@ -78,6 +78,98 @@ export async function saveFormDisplay(project, formDisplay) {
 }
 
 /**
+ * Create a new form display for a bundle
+ * Uses default widgets based on field types
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<object>} - Created form display data
+ */
+export async function createFormDisplay(project, entityType, bundle) {
+  // Check if form display already exists
+  if (formDisplayExists(project.configDirectory, entityType, bundle)) {
+    throw new Error(`Form display already exists for ${entityType} > ${bundle}`);
+  }
+
+  // Get bundle fields from project
+  const bundleData = project.entities?.[entityType]?.[bundle];
+  if (!bundleData) {
+    throw new Error(`Bundle ${bundle} not found in project. Run sync first.`);
+  }
+
+  const fields = [];
+  let weight = 0;
+
+  // Add title field first (for nodes)
+  if (entityType === 'node') {
+    fields.push({
+      name: 'title',
+      type: 'string_textfield',
+      weight: weight++,
+      region: 'content',
+      settings: { size: 60, placeholder: '' },
+      thirdPartySettings: {}
+    });
+  }
+
+  // Add custom fields with default widgets
+  const bundleFields = bundleData.fields || {};
+  for (const [fieldName, fieldData] of Object.entries(bundleFields)) {
+    const widgetInfo = getDefaultWidget(fieldData.type);
+    fields.push({
+      name: fieldName,
+      type: widgetInfo?.type || 'string_textfield',
+      weight: weight++,
+      region: 'content',
+      settings: widgetInfo?.settings || {},
+      thirdPartySettings: {}
+    });
+  }
+
+  // Add standard base fields at the end
+  const baseFields = [
+    { name: 'created', type: 'datetime_timestamp', settings: {} },
+    { name: 'uid', type: 'entity_reference_autocomplete', settings: { match_operator: 'CONTAINS', match_limit: 10, size: 60, placeholder: '' } },
+    { name: 'path', type: 'path', settings: {} }
+  ];
+
+  for (const baseField of baseFields) {
+    fields.push({
+      name: baseField.name,
+      type: baseField.type,
+      weight: weight++,
+      region: 'content',
+      settings: baseField.settings,
+      thirdPartySettings: {}
+    });
+  }
+
+  // Add moderation_state if workflow is enabled
+  fields.push({
+    name: 'moderation_state',
+    type: 'moderation_state_default',
+    weight: 100,
+    region: 'content',
+    settings: {},
+    thirdPartySettings: {}
+  });
+
+  const formDisplay = {
+    entityType,
+    bundle,
+    mode: 'default',
+    groups: [],
+    fields,
+    hidden: ['promote', 'status', 'sticky']
+  };
+
+  // Save the form display
+  await saveFormDisplay(project, formDisplay);
+
+  return formDisplay;
+}
+
+/**
  * Get display tree for console output
  * @param {object} formDisplay - Form display data
  * @returns {string} - Formatted tree string

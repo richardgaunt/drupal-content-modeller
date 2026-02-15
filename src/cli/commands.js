@@ -33,7 +33,8 @@ import {
   updateFieldWidget,
   updateFieldSettings,
   resetFormDisplay,
-  getFormDisplayModes
+  getFormDisplayModes,
+  createFormDisplay
 } from '../commands/formDisplay.js';
 import {
   getWidgetsForFieldType,
@@ -122,25 +123,42 @@ function handleError(error) {
 }
 
 /**
- * Run drush sync if --sync flag is passed
+ * Sync project configuration (updates project.json with config directory contents)
+ * @param {object} project - Project object
+ * @returns {Promise<void>}
+ */
+async function autoSyncProject(project) {
+  try {
+    await syncProject(project);
+  } catch {
+    // Silent fail for auto-sync - don't interrupt the main operation
+  }
+}
+
+/**
+ * Run drush sync if --sync flag is passed, then sync project
  * @param {object} project - Project object
  * @param {object} options - Command options
  * @returns {Promise<void>}
  */
 async function runSyncIfRequested(project, options) {
   if (!options.sync) {
+    // Still sync project.json even without --sync flag
+    await autoSyncProject(project);
     return;
   }
 
   const status = getSyncStatus(project);
   if (!status.configured) {
     console.log(chalk.yellow('\nSync skipped: ' + status.message));
+    await autoSyncProject(project);
     return;
   }
 
   const drushCheck = await checkDrushAvailable(project);
   if (!drushCheck.available) {
     console.log(chalk.yellow('\nSync skipped: ' + drushCheck.message));
+    await autoSyncProject(project);
     return;
   }
 
@@ -154,6 +172,9 @@ async function runSyncIfRequested(project, options) {
   } else {
     console.log(chalk.red('Sync failed: ' + result.message));
   }
+
+  // Sync project.json after drush sync
+  await autoSyncProject(project);
 }
 
 // ============================================
@@ -794,6 +815,41 @@ export async function cmdAdminLinks(options) {
 const VALID_GROUP_FORMATS = ['tabs', 'tab', 'details', 'fieldset'];
 
 /**
+ * Create a new form display
+ */
+export async function cmdFormDisplayCreate(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+    if (!options.entityType) {
+      throw new Error('--entity-type is required');
+    }
+    if (!isValidEntityType(options.entityType)) {
+      throw new Error(`Invalid entity type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
+    }
+    if (!options.bundle) {
+      throw new Error('--bundle is required');
+    }
+
+    const project = await loadProject(options.project);
+    const formDisplay = await createFormDisplay(project, options.entityType, options.bundle);
+    await autoSyncProject(project);
+
+    if (options.json) {
+      output(formDisplay, true);
+    } else {
+      console.log(chalk.green(`Form display created for ${options.entityType} > ${options.bundle}`));
+      console.log();
+      console.log(getFormDisplayTree(formDisplay));
+      console.log();
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
  * View form display layout
  */
 export async function cmdFormDisplayView(options) {
@@ -905,6 +961,7 @@ export async function cmdFormDisplayHide(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ hidden: fieldsToHide }, true);
@@ -957,6 +1014,7 @@ export async function cmdFormDisplayShow(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ shown }, true);
@@ -1001,6 +1059,7 @@ export async function cmdFormDisplaySetWidget(options) {
 
     formDisplay = await updateFieldWidget(project, formDisplay, options.field, options.widget);
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ field: options.field, widget: options.widget }, true);
@@ -1055,6 +1114,7 @@ export async function cmdFormDisplaySetWidgetSetting(options) {
     const settings = { [options.setting]: parsedValue };
     formDisplay = updateFieldSettings(formDisplay, options.field, settings);
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ field: options.field, setting: options.setting, value: parsedValue }, true);
@@ -1140,6 +1200,7 @@ export async function cmdFormDisplayGroupCreate(options) {
     });
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ name: groupName, label: options.label, format, parent: options.parent || null }, true);
@@ -1193,6 +1254,7 @@ export async function cmdFormDisplayGroupEdit(options) {
 
     formDisplay = updateFieldGroup(formDisplay, options.name, updates);
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ name: options.name, updates }, true);
@@ -1235,6 +1297,7 @@ export async function cmdFormDisplayGroupDelete(options) {
     const moveToParent = options.moveChildrenTo !== 'root';
     formDisplay = deleteFieldGroup(formDisplay, options.name, moveToParent);
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ deleted: options.name, childrenMovedTo: moveToParent ? 'parent' : 'root' }, true);
@@ -1337,6 +1400,7 @@ export async function cmdFormDisplayMove(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ item: options.item, movedTo: options.to, isGroup }, true);
@@ -1382,6 +1446,7 @@ export async function cmdFormDisplayReorder(options) {
 
     formDisplay = reorderGroupChildren(formDisplay, groupName, newOrder);
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ group: groupName || 'root', order: newOrder }, true);
@@ -1443,6 +1508,7 @@ export async function cmdFormDisplaySetWeight(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ item: options.item, weight }, true);
@@ -1485,6 +1551,7 @@ export async function cmdFormDisplayReset(options) {
     });
 
     await saveFormDisplay(project, formDisplay);
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ reset: true, keepGroups: !!options.keepGroups }, true);
@@ -1645,6 +1712,8 @@ export async function cmdRoleDelete(options) {
     if (!deleted) {
       throw new Error(`Role not found: ${options.role}`);
     }
+
+    await autoSyncProject(project);
 
     if (options.json) {
       output({ deleted: true, role: options.role }, true);
@@ -1863,6 +1932,9 @@ export async function cmdDrushSync(options) {
     const result = await syncWithDrupal(project, {
       onProgress: (msg) => console.log(chalk.gray('  ' + msg))
     });
+
+    // Sync project.json after drush sync
+    await autoSyncProject(project);
 
     if (options.json) {
       output(result, true);

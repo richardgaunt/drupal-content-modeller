@@ -16,6 +16,7 @@ import {
   cmdReportEntity,
   cmdReportProject,
   cmdAdminLinks,
+  cmdFormDisplayCreate,
   cmdFormDisplayView,
   cmdFormDisplayListModes,
   cmdFormDisplayHide,
@@ -237,6 +238,15 @@ adminCmd
 const formDisplayCmd = program
   .command('form-display')
   .description('Form display management commands');
+
+formDisplayCmd
+  .command('create')
+  .description('Create a new form display with default widgets')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFormDisplayCreate);
 
 formDisplayCmd
   .command('view')

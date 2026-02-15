@@ -27,6 +27,7 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'create-bundle', name: 'Create a bundle' },
   { value: 'create-field', name: 'Create a field' },
   { value: 'edit-field', name: 'Edit field instance' },
+  { value: 'edit-form-display', name: 'Edit form display' },
   { value: 'edit-project', name: 'Edit project' },
   { value: 'enable-modules', name: 'Enable required modules' },
   { value: 'admin-links', name: 'Admin links for bundle' },

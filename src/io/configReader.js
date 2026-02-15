@@ -18,6 +18,10 @@ import {
   getMissingRecommendedModules,
   generateUpdatedExtensionConfig
 } from '../parsers/configParser.js';
+import {
+  parseFormDisplay,
+  getFormDisplayFilename
+} from '../parsers/formDisplayParser.js';
 
 /**
  * Parse bundle configs from a config directory
@@ -256,4 +260,50 @@ export async function parseConfigDirectory(configPath) {
   }
 
   return result;
+}
+
+/**
+ * Get the path to form display file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {string} - Path to form display file
+ */
+export function getFormDisplayPath(configPath, entityType, bundle) {
+  return join(configPath, getFormDisplayFilename(entityType, bundle));
+}
+
+/**
+ * Check if form display exists for a bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {boolean} - True if exists
+ */
+export function formDisplayExists(configPath, entityType, bundle) {
+  return existsSync(getFormDisplayPath(configPath, entityType, bundle));
+}
+
+/**
+ * Read and parse form display for a bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<object|null>} - Parsed form display or null
+ */
+export async function readFormDisplay(configPath, entityType, bundle) {
+  const filePath = getFormDisplayPath(configPath, entityType, bundle);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    return parseFormDisplay(config);
+  } catch (error) {
+    console.warn(`Warning: Could not parse form display: ${error.message}`);
+    return null;
+  }
 }

@@ -5,7 +5,14 @@ export default {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
-  collectCoverageFrom: ['*.mjs', 'src/**/*.mjs', '!jest.setup.mjs', '!jest.config.mjs', '!eslint.config.mjs'],
+  collectCoverageFrom: [
+    '*.mjs',
+    'src/**/*.mjs',
+    'src/**/*.js',
+    '!jest.setup.mjs',
+    '!jest.config.mjs',
+    '!eslint.config.mjs'
+  ],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },

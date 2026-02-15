@@ -16,7 +16,8 @@ export const RECOMMENDED_MODULES = [
   'taxonomy',
   'block_content',
   'paragraphs',
-  'content_moderation'
+  'content_moderation',
+  'field_group'
 ];
 
 /**

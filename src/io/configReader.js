@@ -18,6 +18,10 @@ import {
   getMissingRecommendedModules,
   generateUpdatedExtensionConfig
 } from '../parsers/configParser.js';
+import {
+  parseFormDisplay,
+  getFormDisplayFilename
+} from '../parsers/formDisplayParser.js';
 
 /**
  * Parse bundle configs from a config directory
@@ -256,4 +260,142 @@ export async function parseConfigDirectory(configPath) {
   }
 
   return result;
+}
+
+/**
+ * Get the path to form display file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {string} - Path to form display file
+ */
+export function getFormDisplayPath(configPath, entityType, bundle) {
+  return join(configPath, getFormDisplayFilename(entityType, bundle));
+}
+
+/**
+ * Check if form display exists for a bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {boolean} - True if exists
+ */
+export function formDisplayExists(configPath, entityType, bundle) {
+  return existsSync(getFormDisplayPath(configPath, entityType, bundle));
+}
+
+/**
+ * Read and parse form display for a bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<object|null>} - Parsed form display or null
+ */
+export async function readFormDisplay(configPath, entityType, bundle) {
+  const filePath = getFormDisplayPath(configPath, entityType, bundle);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    return parseFormDisplay(config);
+  } catch (error) {
+    console.warn(`Warning: Could not parse form display: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Get the path to a field instance config file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field name
+ * @returns {string} - Path to field instance file
+ */
+export function getFieldInstancePath(configPath, entityType, bundle, fieldName) {
+  return join(configPath, `field.field.${entityType}.${bundle}.${fieldName}.yml`);
+}
+
+/**
+ * Check if field instance config exists
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field name
+ * @returns {boolean} - True if exists
+ */
+export function fieldInstanceExists(configPath, entityType, bundle, fieldName) {
+  return existsSync(getFieldInstancePath(configPath, entityType, bundle, fieldName));
+}
+
+/**
+ * Read and parse a single field instance config
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field name
+ * @returns {Promise<object|null>} - Parsed field instance or null
+ */
+export async function readFieldInstance(configPath, entityType, bundle, fieldName) {
+  const filePath = getFieldInstancePath(configPath, entityType, bundle, fieldName);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    return parseFieldInstance(config);
+  } catch (error) {
+    console.warn(`Warning: Could not parse field instance: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Get form display path for a specific mode
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} mode - Form mode (default: 'default')
+ * @returns {string} - Path to form display file
+ */
+export function getFormDisplayPathWithMode(configPath, entityType, bundle, mode = 'default') {
+  return join(configPath, `core.entity_form_display.${entityType}.${bundle}.${mode}.yml`);
+}
+
+/**
+ * Check if form display exists for a specific mode
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} mode - Form mode
+ * @returns {boolean} - True if exists
+ */
+export function formDisplayExistsWithMode(configPath, entityType, bundle, mode) {
+  return existsSync(getFormDisplayPathWithMode(configPath, entityType, bundle, mode));
+}
+
+/**
+ * List all form display modes for a bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<string[]>} - Array of form mode names
+ */
+export async function listFormDisplayModes(configPath, entityType, bundle) {
+  const files = await listFiles(configPath);
+  const prefix = `core.entity_form_display.${entityType}.${bundle}.`;
+  const suffix = '.yml';
+
+  const modes = files
+    .filter(f => f.startsWith(prefix) && f.endsWith(suffix))
+    .map(f => f.slice(prefix.length, -suffix.length));
+
+  return modes;
 }

@@ -49,7 +49,7 @@ describe('CLI Prompts', () => {
       const result = getProjectMenuChoices('My Test Project');
 
       expect(result.choices).toEqual(PROJECT_MENU_CHOICES);
-      expect(result.choices.length).toBe(13);
+      expect(result.choices.length).toBe(14);
 
       const values = result.choices.map(c => c.value);
       expect(values).toContain('sync');
@@ -59,6 +59,7 @@ describe('CLI Prompts', () => {
       expect(values).toContain('create-bundle');
       expect(values).toContain('create-field');
       expect(values).toContain('edit-field');
+      expect(values).toContain('edit-form-display');
       expect(values).toContain('edit-project');
       expect(values).toContain('enable-modules');
       expect(values).toContain('admin-links');

@@ -30,7 +30,15 @@ import {
   cmdFormDisplayMove,
   cmdFormDisplayReorder,
   cmdFormDisplaySetWeight,
-  cmdFormDisplayReset
+  cmdFormDisplayReset,
+  cmdRoleCreate,
+  cmdRoleList,
+  cmdRoleView,
+  cmdRoleDelete,
+  cmdRoleAddPermission,
+  cmdRoleRemovePermission,
+  cmdRoleSetPermissions,
+  cmdRoleListPermissions
 } from './src/cli/commands.js';
 
 const program = new Command();
@@ -388,6 +396,87 @@ formDisplayCmd
   .option('-f, --force', 'Skip confirmation')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFormDisplayReset);
+
+// ============================================
+// Role Commands
+// ============================================
+
+const roleCmd = program
+  .command('role')
+  .description('Role and permission management commands');
+
+roleCmd
+  .command('create')
+  .description('Create a new role')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-l, --label <label>', 'Role label')
+  .option('-n, --name <name>', 'Machine name (auto-generated if omitted)')
+  .option('--is-admin', 'Make this an admin role')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleCreate);
+
+roleCmd
+  .command('list')
+  .description('List all roles')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleList);
+
+roleCmd
+  .command('view')
+  .description('View role details and permissions')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --role <id>', 'Role machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleView);
+
+roleCmd
+  .command('delete')
+  .description('Delete a role')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --role <id>', 'Role machine name')
+  .option('-f, --force', 'Skip confirmation')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleDelete);
+
+roleCmd
+  .command('add-permission')
+  .description('Add permissions to a role')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --role <id>', 'Role machine name')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('--permissions <list>', 'Comma-separated permission short names or "all"')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleAddPermission);
+
+roleCmd
+  .command('remove-permission')
+  .description('Remove permissions from a role')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --role <id>', 'Role machine name')
+  .requiredOption('--permissions <list>', 'Comma-separated full permission keys')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleRemovePermission);
+
+roleCmd
+  .command('set-permissions')
+  .description('Set permissions for a bundle (replaces existing)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --role <id>', 'Role machine name')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('--permissions <list>', 'Comma-separated permission short names, "all", or "none"')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleSetPermissions);
+
+roleCmd
+  .command('list-permissions')
+  .description('List available permissions for a bundle')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdRoleListPermissions);
 
 // ============================================
 // Interactive Mode

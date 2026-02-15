@@ -22,6 +22,12 @@ import {
   parseFormDisplay,
   getFormDisplayFilename
 } from '../parsers/formDisplayParser.js';
+import {
+  parseRole,
+  getRoleFilename,
+  isRoleFile,
+  extractRoleIdFromFilename
+} from '../parsers/roleParser.js';
 
 /**
  * Parse bundle configs from a config directory
@@ -398,4 +404,117 @@ export async function listFormDisplayModes(configPath, entityType, bundle) {
     .map(f => f.slice(prefix.length, -suffix.length));
 
   return modes;
+}
+
+// ============================================
+// Role Functions
+// ============================================
+
+/**
+ * Get the file path for a role
+ * @param {string} configPath - Path to config directory
+ * @param {string} roleId - Role machine name
+ * @returns {string} - Full file path
+ */
+export function getRolePath(configPath, roleId) {
+  return join(configPath, getRoleFilename(roleId));
+}
+
+/**
+ * Check if a role exists
+ * @param {string} configPath - Path to config directory
+ * @param {string} roleId - Role machine name
+ * @returns {boolean}
+ */
+export function roleExists(configPath, roleId) {
+  return existsSync(getRolePath(configPath, roleId));
+}
+
+/**
+ * Read and parse a role file
+ * @param {string} configPath - Path to config directory
+ * @param {string} roleId - Role machine name
+ * @returns {Promise<object|null>} - Parsed role or null
+ */
+export async function readRole(configPath, roleId) {
+  const filePath = getRolePath(configPath, roleId);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    return parseRole(config);
+  } catch (error) {
+    console.warn(`Warning: Could not parse role ${roleId}: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * List all roles in config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<string[]>} - Array of role IDs
+ */
+export async function listRoleFiles(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  return files
+    .filter(f => isRoleFile(f))
+    .map(f => extractRoleIdFromFilename(f))
+    .filter(Boolean);
+}
+
+/**
+ * Read all roles from config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed roles
+ */
+export async function readAllRoles(configPath) {
+  const roleIds = await listRoleFiles(configPath);
+  const roles = [];
+
+  for (const roleId of roleIds) {
+    const role = await readRole(configPath, roleId);
+    if (role) {
+      roles.push(role);
+    }
+  }
+
+  return roles.sort((a, b) => a.weight - b.weight);
+}
+
+/**
+ * Write role to config file
+ * @param {string} configPath - Path to config directory
+ * @param {string} roleId - Role machine name
+ * @param {string} yamlContent - YAML content
+ * @returns {Promise<void>}
+ */
+export async function writeRole(configPath, roleId, yamlContent) {
+  const filePath = getRolePath(configPath, roleId);
+  await writeYamlFile(filePath, yamlContent);
+}
+
+/**
+ * Delete role file
+ * @param {string} configPath - Path to config directory
+ * @param {string} roleId - Role machine name
+ * @returns {Promise<boolean>} - True if deleted
+ */
+export async function deleteRoleFile(configPath, roleId) {
+  const filePath = getRolePath(configPath, roleId);
+
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  const { unlink } = await import('fs/promises');
+  await unlink(filePath);
+  return true;
 }

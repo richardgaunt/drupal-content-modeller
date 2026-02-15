@@ -33,6 +33,7 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'admin-links', name: 'Admin links for bundle' },
   { value: 'report-entity', name: 'Generate report for entity type' },
   { value: 'report-project', name: 'Generate report for project' },
+  { value: 'manage-roles', name: 'Manage roles' },
   { value: 'back', name: 'Back to main menu' }
 ];
 

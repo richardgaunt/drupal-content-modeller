@@ -8,6 +8,7 @@ A CLI tool for managing Drupal content models. Analyze existing Drupal configura
 - **Create Bundles**: Generate configuration for content types, media types, paragraphs, vocabularies, and block types
 - **Create Fields**: Add fields to bundles with full support for all common field types
 - **Generate Reports**: Export content model documentation as Markdown
+- **Generate Tickets**: Create user story tickets for stakeholder approval before implementation
 - **Admin Links**: Quick access to Drupal admin paths for any bundle
 - **Dual Interface**: Interactive menu system or CLI one-liners for scripting
 
@@ -50,6 +51,48 @@ dcm field create -p my-site -e node -b blog_post -t string -l "Subtitle"
 
 # Generate a report
 dcm report project -p my-site -o content-model.md
+```
+
+## Ticket Generation
+
+Create user story tickets for content types before implementation. Tickets can be shared with stakeholders for approval.
+
+```bash
+dcm
+# Select project > Manage stories > Create new story
+```
+
+Stories are saved as JSON and can be edited incrementally:
+- Define bundle info (entity type, label, description)
+- Add fields with types, cardinality, and settings
+- Configure role-based permissions
+- Export to markdown for review
+
+**Example output:**
+
+```markdown
+# Create News content type
+
+## User Story
+
+As a Site Owner
+I want a content type called `News` on my new site
+So that I can publish company announcements
+
+## Acceptance Criteria
+
+**AC 1 - News content type exists**
+...
+
+**AC 2 - News has the following fields**
+| Field Name | Machine Name | Field Type | Required |
+|------------|--------------|------------|----------|
+| Subtitle   | field_n_subtitle | string | No |
+
+**AC 3 - Permissions**
+| Permission | Editor | Admin |
+|------------|--------|-------|
+| Create     | Yes    | Yes   |
 ```
 
 ## Supported Entity Types

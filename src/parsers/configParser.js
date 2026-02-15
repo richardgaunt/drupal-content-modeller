@@ -7,6 +7,19 @@
 import yaml from 'js-yaml';
 
 /**
+ * Recommended modules for content modelling
+ * These modules provide essential functionality for creating and managing content types
+ */
+export const RECOMMENDED_MODULES = [
+  'node',
+  'media',
+  'taxonomy',
+  'block_content',
+  'paragraphs',
+  'content_moderation'
+];
+
+/**
  * Entity type configuration patterns
  */
 export const ENTITY_TYPE_PATTERNS = {
@@ -283,4 +296,63 @@ export function filterFieldInstanceFiles(filenames, entityType, bundle) {
 
   const prefix = `${pattern.fieldInstancePrefix}${bundle}.`;
   return filenames.filter(f => f.startsWith(prefix) && f.endsWith('.yml'));
+}
+
+/**
+ * Parse core.extension.yml to get list of enabled modules
+ * @param {object} config - Parsed YAML config
+ * @returns {string[]} - Array of enabled module names
+ */
+export function parseEnabledModules(config) {
+  if (!config || !config.module) {
+    return [];
+  }
+  return Object.keys(config.module);
+}
+
+/**
+ * Check which recommended modules are missing
+ * @param {string[]} enabledModules - List of enabled modules
+ * @returns {string[]} - List of missing recommended modules
+ */
+export function getMissingRecommendedModules(enabledModules) {
+  return RECOMMENDED_MODULES.filter(mod => !enabledModules.includes(mod));
+}
+
+/**
+ * Generate updated core.extension.yml content with new modules enabled
+ * @param {object} config - Parsed core.extension.yml config
+ * @param {string[]} modulesToEnable - Module names to enable
+ * @returns {string} - YAML string with updated modules
+ */
+export function generateUpdatedExtensionConfig(config, modulesToEnable) {
+  if (!config) {
+    config = { module: {}, theme: {}, profile: '' };
+  }
+
+  const updatedConfig = { ...config };
+  if (!updatedConfig.module) {
+    updatedConfig.module = {};
+  }
+
+  // Add each module with weight 0
+  for (const moduleName of modulesToEnable) {
+    if (!(moduleName in updatedConfig.module)) {
+      updatedConfig.module[moduleName] = 0;
+    }
+  }
+
+  // Sort modules alphabetically
+  const sortedModules = {};
+  for (const key of Object.keys(updatedConfig.module).sort()) {
+    sortedModules[key] = updatedConfig.module[key];
+  }
+  updatedConfig.module = sortedModules;
+
+  return yaml.dump(updatedConfig, {
+    lineWidth: -1,
+    noRefs: true,
+    quotingType: "'",
+    forceQuotes: false
+  });
 }

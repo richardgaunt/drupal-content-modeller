@@ -3,8 +3,9 @@
  * Analyzes the config directory and updates the project's entity/field index.
  */
 
-import { parseConfigDirectory } from '../io/configReader.js';
+import { parseConfigDirectory, checkRecommendedModules, enableModules } from '../io/configReader.js';
 import { saveProject } from './project.js';
+import { RECOMMENDED_MODULES } from '../parsers/configParser.js';
 
 /**
  * Sync a project's configuration
@@ -46,6 +47,51 @@ export async function syncProject(project) {
     bundlesFound,
     fieldsFound
   };
+}
+
+/**
+ * Check recommended modules in a project
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Object with enabledModules and missingModules arrays
+ */
+export async function checkProjectModules(project) {
+  if (!project || !project.configDirectory) {
+    throw new Error('Invalid project: missing configDirectory');
+  }
+
+  return checkRecommendedModules(project.configDirectory);
+}
+
+/**
+ * Enable modules in a project's config
+ * @param {object} project - Project object
+ * @param {string[]} modulesToEnable - Module names to enable
+ * @returns {Promise<void>}
+ */
+export async function enableProjectModules(project, modulesToEnable) {
+  if (!project || !project.configDirectory) {
+    throw new Error('Invalid project: missing configDirectory');
+  }
+
+  await enableModules(project.configDirectory, modulesToEnable);
+}
+
+/**
+ * Check if all recommended modules are enabled
+ * @param {object} project - Project object
+ * @returns {Promise<boolean>} - True if all recommended modules are enabled
+ */
+export async function allRecommendedModulesEnabled(project) {
+  const { missingModules } = await checkProjectModules(project);
+  return missingModules.length === 0;
+}
+
+/**
+ * Get list of recommended modules
+ * @returns {string[]} - Array of recommended module names
+ */
+export function getRecommendedModules() {
+  return RECOMMENDED_MODULES;
 }
 
 /**

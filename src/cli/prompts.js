@@ -28,6 +28,7 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'create-field', name: 'Create a field' },
   { value: 'edit-field', name: 'Edit field instance' },
   { value: 'edit-project', name: 'Edit project' },
+  { value: 'enable-modules', name: 'Enable required modules' },
   { value: 'admin-links', name: 'Admin links for bundle' },
   { value: 'report-entity', name: 'Generate report for entity type' },
   { value: 'report-project', name: 'Generate report for project' },

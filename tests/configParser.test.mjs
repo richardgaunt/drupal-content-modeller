@@ -20,7 +20,11 @@ import {
   parseFieldInstance,
   filterBundleFiles,
   filterFieldStorageFiles,
-  filterFieldInstanceFiles
+  filterFieldInstanceFiles,
+  RECOMMENDED_MODULES,
+  parseEnabledModules,
+  getMissingRecommendedModules,
+  generateUpdatedExtensionConfig
 } from '../src/parsers/configParser';
 
 // Import I/O functions
@@ -28,7 +32,12 @@ import {
   parseBundleConfigs,
   parseFieldStorages,
   parseFieldInstances,
-  parseConfigDirectory
+  parseConfigDirectory,
+  coreExtensionExists,
+  readCoreExtension,
+  getEnabledModules,
+  checkRecommendedModules,
+  enableModules
 } from '../src/io/configReader';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -531,6 +540,210 @@ describe('Config Reader - I/O Functions', () => {
       } finally {
         await rm(tempDir, { recursive: true, force: true });
       }
+    });
+  });
+});
+
+describe('Module Configuration - Pure Functions', () => {
+  describe('RECOMMENDED_MODULES', () => {
+    test('contains expected modules', () => {
+      expect(RECOMMENDED_MODULES).toContain('node');
+      expect(RECOMMENDED_MODULES).toContain('media');
+      expect(RECOMMENDED_MODULES).toContain('taxonomy');
+      expect(RECOMMENDED_MODULES).toContain('block_content');
+      expect(RECOMMENDED_MODULES).toContain('paragraphs');
+      expect(RECOMMENDED_MODULES).toContain('content_moderation');
+    });
+  });
+
+  describe('parseEnabledModules', () => {
+    test('returns module names from config', () => {
+      const config = {
+        module: {
+          node: 0,
+          field: 0,
+          media: 0
+        },
+        theme: {
+          bartik: 0
+        }
+      };
+      const result = parseEnabledModules(config);
+      expect(result).toEqual(['node', 'field', 'media']);
+    });
+
+    test('returns empty array for null config', () => {
+      expect(parseEnabledModules(null)).toEqual([]);
+    });
+
+    test('returns empty array for config without module key', () => {
+      expect(parseEnabledModules({ theme: {} })).toEqual([]);
+    });
+  });
+
+  describe('getMissingRecommendedModules', () => {
+    test('returns missing modules', () => {
+      const enabled = ['node', 'field'];
+      const missing = getMissingRecommendedModules(enabled);
+      expect(missing).toContain('media');
+      expect(missing).toContain('taxonomy');
+      expect(missing).toContain('paragraphs');
+      expect(missing).toContain('content_moderation');
+      expect(missing).not.toContain('node');
+    });
+
+    test('returns empty when all recommended are enabled', () => {
+      const enabled = [...RECOMMENDED_MODULES, 'field', 'views'];
+      const missing = getMissingRecommendedModules(enabled);
+      expect(missing).toEqual([]);
+    });
+
+    test('returns all recommended for empty enabled list', () => {
+      const missing = getMissingRecommendedModules([]);
+      expect(missing).toEqual(RECOMMENDED_MODULES);
+    });
+  });
+
+  describe('generateUpdatedExtensionConfig', () => {
+    test('adds new modules to config', () => {
+      const config = {
+        module: { node: 0, field: 0 },
+        theme: { bartik: 0 },
+        profile: 'standard'
+      };
+      const yaml = generateUpdatedExtensionConfig(config, ['media', 'taxonomy']);
+      expect(yaml).toContain('media: 0');
+      expect(yaml).toContain('taxonomy: 0');
+      expect(yaml).toContain('node: 0');
+    });
+
+    test('does not duplicate existing modules', () => {
+      const config = {
+        module: { node: 0, media: 0 }
+      };
+      const yaml = generateUpdatedExtensionConfig(config, ['node', 'media']);
+      const nodeMatches = (yaml.match(/node:/g) || []).length;
+      expect(nodeMatches).toBe(1);
+    });
+
+    test('sorts modules alphabetically', () => {
+      const config = {
+        module: { zebra: 0, apple: 0 }
+      };
+      const yaml = generateUpdatedExtensionConfig(config, ['mango']);
+      const lines = yaml.split('\n');
+      const moduleLines = lines.filter(l => l.match(/^\s+\w+: 0$/));
+      expect(moduleLines[0]).toContain('apple');
+      expect(moduleLines[1]).toContain('mango');
+      expect(moduleLines[2]).toContain('zebra');
+    });
+
+    test('handles null config', () => {
+      const yaml = generateUpdatedExtensionConfig(null, ['node', 'media']);
+      expect(yaml).toContain('media: 0');
+      expect(yaml).toContain('node: 0');
+    });
+  });
+});
+
+describe('Module Configuration - I/O Functions', () => {
+  let tempDir;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'dcm-module-test-'));
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  describe('coreExtensionExists', () => {
+    test('returns false when file does not exist', () => {
+      expect(coreExtensionExists(tempDir)).toBe(false);
+    });
+
+    test('returns true when file exists', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0');
+      expect(coreExtensionExists(tempDir)).toBe(true);
+    });
+  });
+
+  describe('readCoreExtension', () => {
+    test('returns null when file does not exist', async () => {
+      const result = await readCoreExtension(tempDir);
+      expect(result).toBeNull();
+    });
+
+    test('returns parsed config when file exists', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0\n  media: 0');
+      const result = await readCoreExtension(tempDir);
+      expect(result.module).toEqual({ node: 0, media: 0 });
+    });
+  });
+
+  describe('getEnabledModules', () => {
+    test('returns empty array when file does not exist', async () => {
+      const result = await getEnabledModules(tempDir);
+      expect(result).toEqual([]);
+    });
+
+    test('returns list of enabled modules', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0\n  media: 0\n  field: 0');
+      const result = await getEnabledModules(tempDir);
+      expect(result).toContain('node');
+      expect(result).toContain('media');
+      expect(result).toContain('field');
+    });
+  });
+
+  describe('checkRecommendedModules', () => {
+    test('returns all recommended as missing when file does not exist', async () => {
+      const result = await checkRecommendedModules(tempDir);
+      expect(result.enabledModules).toEqual([]);
+      expect(result.missingModules).toEqual(RECOMMENDED_MODULES);
+    });
+
+    test('identifies missing recommended modules', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0\n  media: 0');
+      const result = await checkRecommendedModules(tempDir);
+      expect(result.enabledModules).toContain('node');
+      expect(result.enabledModules).toContain('media');
+      expect(result.missingModules).toContain('taxonomy');
+      expect(result.missingModules).toContain('paragraphs');
+      expect(result.missingModules).not.toContain('node');
+    });
+
+    test('returns empty missing when all are enabled', async () => {
+      const yamlContent = 'module:\n' + RECOMMENDED_MODULES.map(m => `  ${m}: 0`).join('\n');
+      await writeFile(join(tempDir, 'core.extension.yml'), yamlContent);
+      const result = await checkRecommendedModules(tempDir);
+      expect(result.missingModules).toEqual([]);
+    });
+  });
+
+  describe('enableModules', () => {
+    test('creates file with enabled modules when file does not exist', async () => {
+      await enableModules(tempDir, ['node', 'media']);
+      const result = await getEnabledModules(tempDir);
+      expect(result).toContain('node');
+      expect(result).toContain('media');
+    });
+
+    test('adds modules to existing file', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0\ntheme:\n  bartik: 0\nprofile: standard');
+      await enableModules(tempDir, ['media', 'taxonomy']);
+      const result = await getEnabledModules(tempDir);
+      expect(result).toContain('node');
+      expect(result).toContain('media');
+      expect(result).toContain('taxonomy');
+    });
+
+    test('does not duplicate existing modules', async () => {
+      await writeFile(join(tempDir, 'core.extension.yml'), 'module:\n  node: 0');
+      await enableModules(tempDir, ['node', 'media']);
+      const config = await readCoreExtension(tempDir);
+      const nodeCount = Object.keys(config.module).filter(k => k === 'node').length;
+      expect(nodeCount).toBe(1);
     });
   });
 });

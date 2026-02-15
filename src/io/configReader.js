@@ -4,7 +4,8 @@
  */
 
 import { join } from 'path';
-import { listFiles, readTextFile, directoryExists } from './fileSystem.js';
+import { existsSync } from 'fs';
+import { listFiles, readTextFile, directoryExists, writeYamlFile } from './fileSystem.js';
 import {
   parseYaml,
   parseBundleConfig,
@@ -12,7 +13,10 @@ import {
   parseFieldInstance,
   filterBundleFiles,
   filterFieldStorageFiles,
-  filterFieldInstanceFiles
+  filterFieldInstanceFiles,
+  parseEnabledModules,
+  getMissingRecommendedModules,
+  generateUpdatedExtensionConfig
 } from '../parsers/configParser.js';
 
 /**
@@ -117,6 +121,82 @@ export async function parseFieldInstances(configPath, entityType, bundle) {
   }
 
   return instances;
+}
+
+/**
+ * Get the path to core.extension.yml in a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {string} - Path to core.extension.yml
+ */
+export function getCoreExtensionPath(configPath) {
+  return join(configPath, 'core.extension.yml');
+}
+
+/**
+ * Check if core.extension.yml exists in a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {boolean} - True if file exists
+ */
+export function coreExtensionExists(configPath) {
+  return existsSync(getCoreExtensionPath(configPath));
+}
+
+/**
+ * Read and parse core.extension.yml
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object|null>} - Parsed config or null if not found
+ */
+export async function readCoreExtension(configPath) {
+  const extensionPath = getCoreExtensionPath(configPath);
+  if (!existsSync(extensionPath)) {
+    return null;
+  }
+
+  const content = await readTextFile(extensionPath);
+  return parseYaml(content);
+}
+
+/**
+ * Get list of enabled modules from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<string[]>} - Array of enabled module names
+ */
+export async function getEnabledModules(configPath) {
+  const config = await readCoreExtension(configPath);
+  return parseEnabledModules(config);
+}
+
+/**
+ * Check which recommended modules are missing in a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object>} - Object with enabledModules and missingModules arrays
+ */
+export async function checkRecommendedModules(configPath) {
+  const enabledModules = await getEnabledModules(configPath);
+  const missingModules = getMissingRecommendedModules(enabledModules);
+
+  return {
+    enabledModules,
+    missingModules
+  };
+}
+
+/**
+ * Enable modules in core.extension.yml
+ * @param {string} configPath - Path to config directory
+ * @param {string[]} modulesToEnable - Module names to enable
+ * @returns {Promise<void>}
+ */
+export async function enableModules(configPath, modulesToEnable) {
+  const extensionPath = getCoreExtensionPath(configPath);
+  let config = await readCoreExtension(configPath);
+
+  if (!config) {
+    config = { module: {}, theme: {}, profile: '' };
+  }
+
+  const updatedYaml = generateUpdatedExtensionConfig(config, modulesToEnable);
+  await writeYamlFile(extensionPath, updatedYaml);
 }
 
 /**

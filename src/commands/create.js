@@ -121,6 +121,11 @@ export function validateBundleMachineName(project, entityType, machineName) {
 }
 
 /**
+ * Drupal field machine name maximum length
+ */
+export const FIELD_NAME_MAX_LENGTH = 32;
+
+/**
  * Validate field machine name for creation
  * @param {string} fieldName - Field machine name
  * @returns {boolean|string} - True if valid, error message if invalid
@@ -133,6 +138,11 @@ export function validateFieldMachineName(fieldName) {
   // Field names must start with field_ and contain only lowercase letters, numbers, underscores
   if (!/^field_[a-z][a-z0-9_]*$/.test(fieldName)) {
     return 'Field name must start with "field_" and contain only lowercase letters, numbers, and underscores';
+  }
+
+  // Drupal has a 32 character limit on field machine names
+  if (fieldName.length > FIELD_NAME_MAX_LENGTH) {
+    return `Field name must be ${FIELD_NAME_MAX_LENGTH} characters or less (currently ${fieldName.length})`;
   }
 
   return true;

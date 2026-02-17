@@ -2,6 +2,8 @@
  * Report Generator - Pure functions for generating Markdown reports
  */
 
+import { getBaseFields } from '../constants/baseFields.js';
+
 /**
  * Entity type to admin path mapping (for fields page)
  */
@@ -175,10 +177,13 @@ export function generateAnchor(label, entityType) {
  * @param {object} bundle - Bundle object
  * @param {string} entityType - Entity type
  * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options
+ * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
  * @returns {string} - Markdown content
  */
-export function generateBundleReport(bundle, entityType, baseUrl = '') {
+export function generateBundleReport(bundle, entityType, baseUrl = '', options = {}) {
   const adminUrls = getBundleAdminUrls(entityType, bundle.id);
+  const baseFieldOverrides = options.baseFieldOverrides || {};
 
   let md = `### ${bundle.label || bundle.id} (${entityType})\n\n`;
   md += `${bundle.description || '_No description_'}\n\n`;
@@ -191,6 +196,30 @@ export function generateBundleReport(bundle, entityType, baseUrl = '') {
   }
   md += `\n`;
 
+  // Base Fields section
+  const baseFieldsConfig = getBaseFields(entityType);
+  const baseFieldNames = Object.keys(baseFieldsConfig);
+
+  if (baseFieldNames.length > 0) {
+    md += `#### Base Fields\n\n`;
+    md += '| Field Name | Machine Name | Field Type | Widget |\n';
+    md += '|------------|--------------|------------|--------|\n';
+
+    for (const fieldName of baseFieldNames) {
+      const config = baseFieldsConfig[fieldName];
+      const override = baseFieldOverrides[fieldName];
+      const label = override?.label || config.label;
+
+      md += `| ${label} `;
+      md += `| \`${fieldName}\` `;
+      md += `| ${config.type} `;
+      md += `| ${config.widget} |\n`;
+    }
+
+    md += '\n';
+  }
+
+  // Custom Fields section
   md += `#### Fields\n\n`;
 
   const fields = Object.values(bundle.fields || {});

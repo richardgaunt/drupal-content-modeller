@@ -300,6 +300,67 @@ export function filterFieldInstanceFiles(filenames, entityType, bundle) {
 }
 
 /**
+ * Check if a filename is a base field override file
+ * @param {string} filename - Config filename
+ * @returns {boolean}
+ */
+export function isBaseFieldOverrideFile(filename) {
+  return filename.startsWith('core.base_field_override.') && filename.endsWith('.yml');
+}
+
+/**
+ * Extract base field override info from filename
+ * @param {string} filename - Config filename (e.g., core.base_field_override.node.article.title.yml)
+ * @returns {object|null} - {entityType, bundle, fieldName} or null if not a base field override
+ */
+export function extractBaseFieldOverrideInfo(filename) {
+  if (!isBaseFieldOverrideFile(filename)) {
+    return null;
+  }
+
+  // Remove prefix and suffix
+  const inner = filename.slice('core.base_field_override.'.length, -'.yml'.length);
+  const parts = inner.split('.');
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  return {
+    entityType: parts[0],
+    bundle: parts[1],
+    fieldName: parts[2]
+  };
+}
+
+/**
+ * Filter filenames that match base field override pattern for an entity type and bundle
+ * @param {string[]} filenames - Array of filenames
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {string[]} - Matching filenames
+ */
+export function filterBaseFieldOverrideFiles(filenames, entityType, bundle) {
+  const prefix = `core.base_field_override.${entityType}.${bundle}.`;
+  return filenames.filter(f => f.startsWith(prefix) && f.endsWith('.yml'));
+}
+
+/**
+ * Parse a base field override config
+ * @param {object} config - Parsed YAML config
+ * @returns {object} - Base field override info
+ */
+export function parseBaseFieldOverride(config) {
+  return {
+    fieldName: config.field_name || '',
+    label: config.label || '',
+    description: config.description || '',
+    required: config.required || false,
+    defaultValue: config.default_value || null
+  };
+}
+
+/**
  * Parse core.extension.yml to get list of enabled modules
  * @param {object} config - Parsed YAML config
  * @returns {string[]} - Array of enabled module names

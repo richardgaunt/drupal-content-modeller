@@ -21,6 +21,10 @@ import {
   filterBundleFiles,
   filterFieldStorageFiles,
   filterFieldInstanceFiles,
+  isBaseFieldOverrideFile,
+  extractBaseFieldOverrideInfo,
+  filterBaseFieldOverrideFiles,
+  parseBaseFieldOverride,
   RECOMMENDED_MODULES,
   parseEnabledModules,
   getMissingRecommendedModules,
@@ -32,6 +36,7 @@ import {
   parseBundleConfigs,
   parseFieldStorages,
   parseFieldInstances,
+  parseBaseFieldOverrides,
   parseConfigDirectory,
   coreExtensionExists,
   readCoreExtension,
@@ -377,6 +382,98 @@ describe('Config Parser - Pure Functions', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('isBaseFieldOverrideFile', () => {
+    test('returns true for base field override file', () => {
+      expect(isBaseFieldOverrideFile('core.base_field_override.node.article.title.yml')).toBe(true);
+    });
+
+    test('returns false for non-override file', () => {
+      expect(isBaseFieldOverrideFile('node.type.page.yml')).toBe(false);
+      expect(isBaseFieldOverrideFile('field.field.node.page.field_body.yml')).toBe(false);
+    });
+  });
+
+  describe('extractBaseFieldOverrideInfo', () => {
+    test('extracts entity type, bundle, and field name', () => {
+      const result = extractBaseFieldOverrideInfo('core.base_field_override.node.article.title.yml');
+      expect(result).toEqual({
+        entityType: 'node',
+        bundle: 'article',
+        fieldName: 'title'
+      });
+    });
+
+    test('handles taxonomy_term entity type', () => {
+      const result = extractBaseFieldOverrideInfo('core.base_field_override.taxonomy_term.tags.name.yml');
+      expect(result).toEqual({
+        entityType: 'taxonomy_term',
+        bundle: 'tags',
+        fieldName: 'name'
+      });
+    });
+
+    test('returns null for non-override file', () => {
+      expect(extractBaseFieldOverrideInfo('node.type.page.yml')).toBeNull();
+    });
+
+    test('returns null for malformed override filename', () => {
+      expect(extractBaseFieldOverrideInfo('core.base_field_override.node.yml')).toBeNull();
+    });
+  });
+
+  describe('filterBaseFieldOverrideFiles', () => {
+    const files = [
+      'core.base_field_override.node.article.title.yml',
+      'core.base_field_override.node.article.status.yml',
+      'core.base_field_override.node.page.title.yml',
+      'node.type.article.yml'
+    ];
+
+    test('filters override files for specific entity type and bundle', () => {
+      const result = filterBaseFieldOverrideFiles(files, 'node', 'article');
+      expect(result).toEqual([
+        'core.base_field_override.node.article.title.yml',
+        'core.base_field_override.node.article.status.yml'
+      ]);
+    });
+
+    test('returns empty for bundle with no overrides', () => {
+      const result = filterBaseFieldOverrideFiles(files, 'node', 'event');
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('parseBaseFieldOverride', () => {
+    test('extracts field name, label, description, required', () => {
+      const config = {
+        field_name: 'title',
+        label: 'Custom Title',
+        description: 'Enter the title',
+        required: true,
+        default_value: [{ value: '' }]
+      };
+      const result = parseBaseFieldOverride(config);
+      expect(result).toEqual({
+        fieldName: 'title',
+        label: 'Custom Title',
+        description: 'Enter the title',
+        required: true,
+        defaultValue: [{ value: '' }]
+      });
+    });
+
+    test('handles missing fields', () => {
+      const result = parseBaseFieldOverride({});
+      expect(result).toEqual({
+        fieldName: '',
+        label: '',
+        description: '',
+        required: false,
+        defaultValue: null
+      });
+    });
+  });
 });
 
 describe('Config Reader - I/O Functions', () => {
@@ -492,6 +589,36 @@ describe('Config Reader - I/O Functions', () => {
     test('returns empty for bundle with no fields', async () => {
       const instances = await parseFieldInstances(fixturesPath, 'node', 'nonexistent');
       expect(instances).toEqual([]);
+    });
+  });
+
+  describe('parseBaseFieldOverrides', () => {
+    test('returns empty object for bundle with no overrides', async () => {
+      const overrides = await parseBaseFieldOverrides(fixturesPath, 'node', 'test_page');
+      expect(overrides).toEqual({});
+    });
+
+    test('parses override files when present', async () => {
+      const tempDir = await mkdtemp(join(tmpdir(), 'dcm-test-'));
+      try {
+        // Create a base field override file
+        await writeFile(
+          join(tempDir, 'core.base_field_override.node.article.title.yml'),
+          'field_name: title\nlabel: Custom Article Title\nrequired: true'
+        );
+
+        const overrides = await parseBaseFieldOverrides(tempDir, 'node', 'article');
+        expect(overrides).toHaveProperty('title');
+        expect(overrides.title.label).toBe('Custom Article Title');
+        expect(overrides.title.required).toBe(true);
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('returns empty object for nonexistent directory', async () => {
+      const overrides = await parseBaseFieldOverrides('/nonexistent/path', 'node', 'page');
+      expect(overrides).toEqual({});
     });
   });
 

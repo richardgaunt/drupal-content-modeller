@@ -201,6 +201,34 @@ describe('Report Generator', () => {
       const result = generateBundleReport(emptyBundle, 'node');
       expect(result).toContain('_No custom fields_');
     });
+
+    test('includes base fields section for node', () => {
+      const result = generateBundleReport(bundle, 'node');
+      expect(result).toContain('#### Base Fields');
+      expect(result).toContain('| Title |');
+      expect(result).toContain('`title`');
+      expect(result).toContain('| Published |');
+      expect(result).toContain('`status`');
+    });
+
+    test('includes base fields section for taxonomy_term', () => {
+      const taxBundle = { id: 'tags', label: 'Tags', fields: {} };
+      const result = generateBundleReport(taxBundle, 'taxonomy_term');
+      expect(result).toContain('#### Base Fields');
+      expect(result).toContain('| Name |');
+      expect(result).toContain('`name`');
+      expect(result).toContain('| Description |');
+    });
+
+    test('uses base field override label when available', () => {
+      const options = {
+        baseFieldOverrides: {
+          title: { label: 'Custom Title Label', fieldName: 'title' }
+        }
+      };
+      const result = generateBundleReport(bundle, 'node', '', options);
+      expect(result).toContain('| Custom Title Label |');
+    });
   });
 
   describe('generateEntityTypeReport', () => {

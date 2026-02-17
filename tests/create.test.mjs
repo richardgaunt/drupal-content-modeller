@@ -65,7 +65,23 @@ describe('Create Commands', () => {
     test('accepts valid field name', () => {
       expect(validateFieldMachineName('field_n_title')).toBe(true);
       expect(validateFieldMachineName('field_body')).toBe(true);
-      expect(validateFieldMachineName('field_n_my_long_field_name_123')).toBe(true);
+      expect(validateFieldMachineName('field_n_my_long_field_name')).toBe(true);
+    });
+
+    test('rejects field name exceeding 32 characters', () => {
+      // 33 characters
+      const longName = 'field_n_this_name_is_way_too_long';
+      expect(longName.length).toBe(33);
+      const result = validateFieldMachineName(longName);
+      expect(result).toContain('32 characters or less');
+      expect(result).toContain('currently 33');
+    });
+
+    test('accepts field name at exactly 32 characters', () => {
+      // 32 characters exactly
+      const maxName = 'field_n_exactly_32_characters_xx';
+      expect(maxName.length).toBe(32);
+      expect(validateFieldMachineName(maxName)).toBe(true);
     });
   });
 

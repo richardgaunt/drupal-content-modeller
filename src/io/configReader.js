@@ -14,6 +14,8 @@ import {
   filterBundleFiles,
   filterFieldStorageFiles,
   filterFieldInstanceFiles,
+  filterBaseFieldOverrideFiles,
+  parseBaseFieldOverride,
   parseEnabledModules,
   getMissingRecommendedModules,
   generateUpdatedExtensionConfig
@@ -131,6 +133,41 @@ export async function parseFieldInstances(configPath, entityType, bundle) {
   }
 
   return instances;
+}
+
+/**
+ * Parse base field override configs from a config directory for a specific bundle
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @returns {Promise<object>} - Object keyed by field name with override data
+ */
+export async function parseBaseFieldOverrides(configPath, entityType, bundle) {
+  if (!directoryExists(configPath)) {
+    return {};
+  }
+
+  const files = await listFiles(configPath);
+  const overrideFiles = filterBaseFieldOverrideFiles(files, entityType, bundle);
+  const overrides = {};
+
+  for (const filename of overrideFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+
+      if (config) {
+        const override = parseBaseFieldOverride(config);
+        if (override.fieldName) {
+          overrides[override.fieldName] = override;
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return overrides;
 }
 
 /**

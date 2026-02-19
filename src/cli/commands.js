@@ -4,9 +4,10 @@
  */
 
 import chalk from 'chalk';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 import { createProject, loadProject, listProjects, updateProject, deleteProject } from '../commands/project.js';
 import { syncProject } from '../commands/sync.js';
 import { createBundle, createField, updateField } from '../commands/create.js';
@@ -2102,6 +2103,48 @@ export async function cmdDrushSync(options) {
       if (!result.success) {
         process.exit(1);
       }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Skill Commands
+// ============================================
+
+/**
+ * Install the dcm Claude Code skill to ~/.claude/skills/
+ */
+export async function cmdSkillInstall(options) {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const source = join(__dirname, '..', '..', '.claude', 'skills', 'dcm', 'SKILL.md');
+    const targetDir = join(homedir(), '.claude', 'skills', 'dcm');
+    const target = join(targetDir, 'SKILL.md');
+
+    if (!existsSync(source)) {
+      throw new Error('Source SKILL.md not found in package. The package may be corrupted.');
+    }
+
+    if (existsSync(target) && !options.force) {
+      if (options.json) {
+        output({ success: false, error: 'Skill already installed. Use --force to overwrite.' }, true);
+      } else {
+        console.error(chalk.red('Error: Skill already installed at ' + target));
+        console.error(chalk.yellow('Use --force to overwrite.'));
+      }
+      process.exit(1);
+    }
+
+    mkdirSync(targetDir, { recursive: true });
+    copyFileSync(source, target);
+
+    if (options.json) {
+      output({ success: true, path: target }, true);
+    } else {
+      console.log(chalk.green('dcm skill installed successfully!'));
+      console.log(chalk.cyan(`Installed to: ${target}`));
     }
   } catch (error) {
     handleError(error);

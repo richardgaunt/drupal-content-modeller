@@ -42,7 +42,8 @@ import {
   cmdRoleSetPermissions,
   cmdRoleListPermissions,
   cmdDrushSync,
-  cmdDrushStatus
+  cmdDrushStatus,
+  cmdSkillInstall
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -557,6 +558,21 @@ drushCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .option('-j, --json', 'Output as JSON')
   .action(cmdDrushStatus);
+
+// ============================================
+// Skill Commands
+// ============================================
+
+const skillCmd = program
+  .command('skill')
+  .description('Claude Code skill management');
+
+skillCmd
+  .command('install')
+  .description('Install the dcm Claude Code skill to ~/.claude/skills/')
+  .option('-f, --force', 'Overwrite existing skill')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSkillInstall);
 
 // ============================================
 // Help Command

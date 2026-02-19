@@ -277,4 +277,18 @@ describe('CLI Help Output', () => {
     expect(stdout).toContain('Examples:');
     expect(stdout).toContain('dcm admin links');
   });
+
+  test('dcm skill install --help shows install command', async () => {
+    const { stdout } = await runDcm('skill', 'install', '--help');
+    expect(stdout).toContain('Install the dcm Claude Code skill');
+    expect(stdout).toContain('--force');
+    expect(stdout).toContain('--json');
+  });
+
+  test('dcm help --json includes skill command', async () => {
+    const { stdout } = await runDcm('help', '--json');
+    const parsed = JSON.parse(stdout);
+    const commandNames = parsed.commands.map(c => c.name);
+    expect(commandNames).toContain('skill');
+  });
 });

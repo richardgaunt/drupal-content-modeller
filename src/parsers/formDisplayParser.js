@@ -35,7 +35,7 @@ export function parseFormDisplay(config) {
   const fields = parseFormFields(config.content);
   const hidden = parseHiddenFields(config.hidden);
 
-  return {
+  const result = {
     entityType,
     bundle,
     mode: config.mode || 'default',
@@ -44,6 +44,12 @@ export function parseFormDisplay(config) {
     fields,
     hidden
   };
+
+  if (config.uuid) {
+    result.uuid = config.uuid;
+  }
+
+  return result;
 }
 
 /**

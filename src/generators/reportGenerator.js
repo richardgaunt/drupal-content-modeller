@@ -241,7 +241,7 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     const fieldPath = getFieldAdminPath(entityType, bundle.id, field.name);
     const fieldUrl = baseUrl ? `${baseUrl}${fieldPath}` : fieldPath;
 
-    md += `| [ ] `;
+    md += `| <input type="checkbox"> `;
     md += `| ${field.label || field.name} `;
     md += `| \`${field.name}\` `;
     md += `| ${field.type} `;

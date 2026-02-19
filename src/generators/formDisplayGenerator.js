@@ -270,6 +270,10 @@ export function generateFormDisplay(formDisplay) {
     hidden: generateHiddenSection(hiddenFields)
   };
 
+  if (formDisplay.uuid) {
+    config.uuid = formDisplay.uuid;
+  }
+
   // Add third_party_settings if there are groups
   if (groups && groups.length > 0) {
     config.third_party_settings = generateThirdPartySettings(groups);

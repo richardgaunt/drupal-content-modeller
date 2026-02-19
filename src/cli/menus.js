@@ -2115,7 +2115,7 @@ async function handleBundleReport(project) {
       choices: entityTypeChoices
     });
 
-    // Select bundle
+    // Select bundles (multi-select)
     const bundles = project.entities[entityType];
     const bundleChoices = Object.values(bundles)
       .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
@@ -2129,23 +2129,30 @@ async function handleBundleReport(project) {
       return;
     }
 
-    const bundleId = await select({
-      message: 'Select bundle:',
+    const bundleIds = await checkbox({
+      message: 'Select bundles to generate reports for:',
       choices: bundleChoices
     });
+
+    if (bundleIds.length === 0) {
+      console.log(chalk.yellow('No bundles selected.'));
+      return;
+    }
 
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
-    // Generate filename in project reports directory
-    const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
-    const outputPath = join(getReportsDir(project.slug), filename);
+    // Generate reports for all selected bundles
+    for (const bundleId of bundleIds) {
+      const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
+      const outputPath = join(getReportsDir(project.slug), filename);
 
-    const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl);
-    if (result) {
-      console.log(chalk.green(`Report saved to: ${outputPath}`));
-    } else {
-      console.log(chalk.red('Bundle not found.'));
+      const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl);
+      if (result) {
+        console.log(chalk.green(`Report saved to: ${outputPath}`));
+      } else {
+        console.log(chalk.red(`Bundle "${bundleId}" not found.`));
+      }
     }
   } catch (error) {
     if (error.name === 'ExitPromptError') {

@@ -114,6 +114,33 @@ describe('Form Display Parser - Pure Functions', () => {
       expect(parseFormDisplay({})).toBeNull();
       expect(parseFormDisplay({ targetEntityType: 'node' })).toBeNull();
     });
+
+    test('preserves uuid when present', () => {
+      const config = {
+        uuid: 'abc123-def456',
+        targetEntityType: 'node',
+        bundle: 'article',
+        mode: 'default',
+        content: {},
+        hidden: {}
+      };
+
+      const result = parseFormDisplay(config);
+      expect(result.uuid).toBe('abc123-def456');
+    });
+
+    test('omits uuid when not present', () => {
+      const config = {
+        targetEntityType: 'node',
+        bundle: 'article',
+        mode: 'default',
+        content: {},
+        hidden: {}
+      };
+
+      const result = parseFormDisplay(config);
+      expect(result).not.toHaveProperty('uuid');
+    });
   });
 
   describe('parseFieldGroups', () => {
@@ -398,6 +425,35 @@ describe('Form Display Generator - Pure Functions', () => {
       expect(result).toContain('id: node.article.default');
       expect(result).toContain('targetEntityType: node');
       expect(result).toContain('bundle: article');
+    });
+
+    test('includes uuid when present', () => {
+      const formDisplay = {
+        entityType: 'node',
+        bundle: 'article',
+        mode: 'default',
+        uuid: 'abc123-def456',
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+
+      const result = generateFormDisplay(formDisplay);
+      expect(result).toContain('uuid: abc123-def456');
+    });
+
+    test('omits uuid when not present', () => {
+      const formDisplay = {
+        entityType: 'node',
+        bundle: 'article',
+        mode: 'default',
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+
+      const result = generateFormDisplay(formDisplay);
+      expect(result).not.toContain('uuid');
     });
   });
 

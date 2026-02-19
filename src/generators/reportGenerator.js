@@ -130,9 +130,17 @@ export function getFieldOtherInfo(field) {
     if (bundles) {
       const bundleList = Object.keys(bundles);
       if (bundleList.length > 0) {
-        parts.push(`References: ${bundleList.join(', ')}`);
+        const targetType = field.type === 'entity_reference_revisions'
+          ? 'paragraph'
+          : (field.settings?.target_type || field.settings?.handler?.split(':')[1] || 'node');
+        parts.push(`References: ${bundleList.map(b => `${b}(${targetType})`).join(', ')}`);
       }
     }
+  }
+
+  if (field.type === 'datetime' || field.type === 'daterange') {
+    const datetimeType = field.settings?.datetime_type;
+    parts.push(datetimeType === 'datetime' ? 'Date and time' : 'Date only');
   }
 
   if (field.type === 'list_string' || field.type === 'list_integer') {

@@ -186,11 +186,20 @@ describe('Field Generator', () => {
         targetBundles: ['page', 'article']
       });
 
-      expect(settings.handler).toBe('default');
+      expect(settings.handler).toBe('default:node');
       expect(settings.handler_settings.target_bundles).toEqual({
         page: 'page',
         article: 'article'
       });
+    });
+
+    test('includes target type in handler', () => {
+      const settings = getEntityReferenceHandlerSettings({
+        targetType: 'taxonomy_term',
+        targetBundles: ['tags']
+      });
+
+      expect(settings.handler).toBe('default:taxonomy_term');
     });
   });
 

@@ -1,7 +1,7 @@
 
 Change to a multi-select checkbox rather than selcet 1 report that will generate many bundle reports at the same time.
 
-## Implementation
+## Implementation (Done)
 
 - **File:** `src/cli/menus.js` — `handleBundleReport()`
 - Changed bundle selection from `select` (single) to `checkbox` (multi-select)

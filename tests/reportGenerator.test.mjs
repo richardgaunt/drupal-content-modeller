@@ -57,16 +57,86 @@ describe('Report Generator', () => {
   });
 
   describe('getFieldOtherInfo', () => {
-    test('returns target bundles for entity_reference', () => {
+    test('returns target bundles with entity type for entity_reference', () => {
       const field = {
         type: 'entity_reference',
         settings: {
+          handler: 'default:node',
           handler_settings: {
             target_bundles: { page: 'page', article: 'article' }
           }
         }
       };
-      expect(getFieldOtherInfo(field)).toBe('References: page, article');
+      expect(getFieldOtherInfo(field)).toBe('References: page(node), article(node)');
+    });
+
+    test('returns target bundles with taxonomy entity type', () => {
+      const field = {
+        type: 'entity_reference',
+        settings: {
+          handler: 'default:taxonomy_term',
+          handler_settings: {
+            target_bundles: { tags: 'tags' }
+          }
+        }
+      };
+      expect(getFieldOtherInfo(field)).toBe('References: tags(taxonomy_term)');
+    });
+
+    test('defaults to node when handler is missing for entity_reference', () => {
+      const field = {
+        type: 'entity_reference',
+        settings: {
+          handler_settings: {
+            target_bundles: { page: 'page' }
+          }
+        }
+      };
+      expect(getFieldOtherInfo(field)).toBe('References: page(node)');
+    });
+
+    test('returns paragraph entity type for entity_reference_revisions', () => {
+      const field = {
+        type: 'entity_reference_revisions',
+        settings: {
+          handler_settings: {
+            target_bundles: { hero: 'hero', card: 'card' }
+          }
+        }
+      };
+      expect(getFieldOtherInfo(field)).toBe('References: hero(paragraph), card(paragraph)');
+    });
+
+    test('returns "Date only" for datetime field with date type', () => {
+      const field = {
+        type: 'datetime',
+        settings: { datetime_type: 'date' }
+      };
+      expect(getFieldOtherInfo(field)).toBe('Date only');
+    });
+
+    test('returns "Date and time" for datetime field with datetime type', () => {
+      const field = {
+        type: 'datetime',
+        settings: { datetime_type: 'datetime' }
+      };
+      expect(getFieldOtherInfo(field)).toBe('Date and time');
+    });
+
+    test('returns "Date only" for daterange field with date type', () => {
+      const field = {
+        type: 'daterange',
+        settings: { datetime_type: 'date' }
+      };
+      expect(getFieldOtherInfo(field)).toBe('Date only');
+    });
+
+    test('returns "Date and time" for daterange field with datetime type', () => {
+      const field = {
+        type: 'daterange',
+        settings: { datetime_type: 'datetime' }
+      };
+      expect(getFieldOtherInfo(field)).toBe('Date and time');
     });
 
     test('returns options with key|value pairs for list_string, one per line', () => {

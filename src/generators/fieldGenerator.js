@@ -183,8 +183,9 @@ export function getEntityReferenceHandlerSettings(options = {}) {
     bundleSettings[bundle] = bundle;
   }
 
+  const targetType = options.targetType || 'node';
   return {
-    handler: 'default',
+    handler: `default:${targetType}`,
     handler_settings: {
       target_bundles: bundleSettings,
       sort: {

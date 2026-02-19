@@ -751,6 +751,24 @@ describe('Field Widgets - Constants', () => {
       widget1.settings.size = 999;
       expect(widget2.settings.size).not.toBe(999);
     });
+
+    test('entity_reference_revisions default widget has default_paragraph_type set to _none', () => {
+      const widget = getDefaultWidget('entity_reference_revisions');
+      expect(widget.type).toBe('paragraphs');
+      expect(widget.settings.default_paragraph_type).toBe('_none');
+    });
+  });
+
+  describe('entity_reference_revisions paragraph widgets', () => {
+    test('paragraphs widget has default_paragraph_type _none', () => {
+      const widget = getWidgetByType('entity_reference_revisions', 'paragraphs');
+      expect(widget.settings.default_paragraph_type).toBe('_none');
+    });
+
+    test('entity_reference_paragraphs (legacy) widget has default_paragraph_type _none', () => {
+      const widget = getWidgetByType('entity_reference_revisions', 'entity_reference_paragraphs');
+      expect(widget.settings.default_paragraph_type).toBe('_none');
+    });
   });
 
   describe('getWidgetsForFieldType', () => {

@@ -289,6 +289,34 @@ export function generateEntityTypeReport(project, entityType, baseUrl = '') {
 }
 
 /**
+ * Generate a report for a single bundle
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @param {string} bundleId - Bundle machine name
+ * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options
+ * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
+ * @returns {string|null} - Markdown content or null if bundle not found
+ */
+export function generateSingleBundleReport(project, entityType, bundleId, baseUrl = '', options = {}) {
+  const bundles = project.entities[entityType] || {};
+  const bundle = bundles[bundleId];
+
+  if (!bundle) {
+    return null;
+  }
+
+  let md = `# ${bundle.label || bundle.id} (${entityType})\n\n`;
+  md += `**Project:** ${project.name}\n`;
+  md += `**Entity Type:** ${getEntityTypeLabel(entityType)}\n\n`;
+  md += `---\n\n`;
+
+  md += generateBundleReport(bundle, entityType, baseUrl, options);
+
+  return md;
+}
+
+/**
  * Generate a full project report with table of contents
  * @param {object} project - Project object
  * @param {string} baseUrl - Base URL for links

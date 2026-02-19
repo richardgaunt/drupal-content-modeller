@@ -33,9 +33,9 @@ export const FIELD_WIDGETS = {
     { type: 'options_buttons', label: 'Check boxes/radio buttons', settings: {} }
   ],
   entity_reference_revisions: [
-    { type: 'paragraphs', label: 'Paragraphs (stable)', settings: { title: 'Paragraph', title_plural: 'Paragraphs', edit_mode: 'open', closed_mode: 'summary', autocollapse: 'none', closed_mode_threshold: 0, add_mode: 'dropdown', form_display_mode: 'default', default_paragraph_type: '', features: { duplicate: 'duplicate', collapse_edit_all: 'collapse_edit_all' } } },
+    { type: 'paragraphs', label: 'Paragraphs (stable)', settings: { title: 'Paragraph', title_plural: 'Paragraphs', edit_mode: 'open', closed_mode: 'summary', autocollapse: 'none', closed_mode_threshold: 0, add_mode: 'dropdown', form_display_mode: 'default', default_paragraph_type: '_none', features: { duplicate: 'duplicate', collapse_edit_all: 'collapse_edit_all' } } },
     { type: 'entity_reference_revisions_autocomplete', label: 'Autocomplete', settings: { match_operator: 'CONTAINS', match_limit: 10, size: 60, placeholder: '' } },
-    { type: 'entity_reference_paragraphs', label: 'Paragraphs Legacy', settings: { title: 'Paragraph', title_plural: 'Paragraphs', edit_mode: 'open', add_mode: 'dropdown', form_display_mode: 'default', default_paragraph_type: '' } },
+    { type: 'entity_reference_paragraphs', label: 'Paragraphs Legacy', settings: { title: 'Paragraph', title_plural: 'Paragraphs', edit_mode: 'open', add_mode: 'dropdown', form_display_mode: 'default', default_paragraph_type: '_none' } },
     { type: 'options_select', label: 'Select list', settings: {} },
     { type: 'options_buttons', label: 'Check boxes/radio buttons', settings: {} }
   ],

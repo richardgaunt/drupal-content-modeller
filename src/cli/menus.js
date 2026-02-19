@@ -30,7 +30,7 @@ import {
   formatBundleFieldsTable
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../commands/create.js';
-import { createEntityReport, createProjectReport } from '../commands/report.js';
+import { createEntityReport, createProjectReport, createBundleReport } from '../commands/report.js';
 import { getReportsDir } from '../io/fileSystem.js';
 import {
   loadFormDisplay,
@@ -311,6 +311,9 @@ async function showProjectMenu(project) {
           break;
         case 'enable-modules':
           await handleEnableModules(project);
+          break;
+        case 'report-bundle':
+          await handleBundleReport(project);
           break;
         case 'report-entity':
           await handleEntityReport(project);
@@ -2075,6 +2078,80 @@ async function handleEditProject(project) {
     }
     console.log(chalk.red(`Error: ${error.message}`));
     return project;
+  }
+}
+
+/**
+ * Handle single bundle report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleBundleReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityTypeChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${getEntityTypeLabel(type)} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityTypeChoices
+    });
+
+    // Select bundle
+    const bundles = project.entities[entityType];
+    const bundleChoices = Object.values(bundles)
+      .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+      .map(b => ({
+        value: b.id,
+        name: `${b.label || b.id} (${Object.keys(b.fields || {}).length} fields)`
+      }));
+
+    if (bundleChoices.length === 0) {
+      console.log(chalk.yellow('No bundles found for this entity type.'));
+      return;
+    }
+
+    const bundleId = await select({
+      message: 'Select bundle:',
+      choices: bundleChoices
+    });
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Generate filename in project reports directory
+    const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
+    const outputPath = join(getReportsDir(project.slug), filename);
+
+    const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl);
+    if (result) {
+      console.log(chalk.green(`Report saved to: ${outputPath}`));
+    } else {
+      console.log(chalk.red('Bundle not found.'));
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
   }
 }
 

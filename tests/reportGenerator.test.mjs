@@ -6,6 +6,7 @@ import {
   getEntityTypeLabel,
   generateAnchor,
   generateBundleReport,
+  generateSingleBundleReport,
   generateEntityTypeReport,
   generateProjectReport
 } from '../src/generators/reportGenerator.js';
@@ -228,6 +229,67 @@ describe('Report Generator', () => {
       };
       const result = generateBundleReport(bundle, 'node', '', options);
       expect(result).toContain('| Custom Title Label |');
+    });
+  });
+
+  describe('generateSingleBundleReport', () => {
+    const project = {
+      name: 'Test Project',
+      entities: {
+        node: {
+          page: {
+            id: 'page',
+            label: 'Page',
+            description: 'A basic page',
+            fields: {
+              field_body: {
+                name: 'field_body',
+                label: 'Body',
+                type: 'text_long',
+                required: false,
+                cardinality: 1
+              }
+            }
+          },
+          article: { id: 'article', label: 'Article', fields: {} }
+        }
+      }
+    };
+
+    test('includes project name and entity type', () => {
+      const result = generateSingleBundleReport(project, 'node', 'page');
+      expect(result).toContain('# Page (node)');
+      expect(result).toContain('**Project:** Test Project');
+      expect(result).toContain('**Entity Type:** Content Types');
+    });
+
+    test('includes bundle content', () => {
+      const result = generateSingleBundleReport(project, 'node', 'page');
+      expect(result).toContain('A basic page');
+      expect(result).toContain('| Body |');
+      expect(result).toContain('`field_body`');
+    });
+
+    test('includes base fields section', () => {
+      const result = generateSingleBundleReport(project, 'node', 'page');
+      expect(result).toContain('#### Base Fields');
+      expect(result).toContain('| Title |');
+      expect(result).toContain('`title`');
+    });
+
+    test('returns null for non-existent bundle', () => {
+      const result = generateSingleBundleReport(project, 'node', 'nonexistent');
+      expect(result).toBeNull();
+    });
+
+    test('returns null for non-existent entity type', () => {
+      const result = generateSingleBundleReport(project, 'media', 'page');
+      expect(result).toBeNull();
+    });
+
+    test('uses base URL when provided', () => {
+      const result = generateSingleBundleReport(project, 'node', 'page', 'https://example.com');
+      expect(result).toContain('https://example.com/admin/structure/types/manage/page/fields');
     });
   });
 

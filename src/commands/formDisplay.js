@@ -116,12 +116,22 @@ export async function createFormDisplay(project, entityType, bundle) {
   const bundleFields = bundleData.fields || {};
   for (const [fieldName, fieldData] of Object.entries(bundleFields)) {
     const widgetInfo = getDefaultWidget(fieldData.type);
+    const settings = widgetInfo?.settings || {};
+
+    // For required paragraph fields, set default_paragraph_type to first target bundle
+    if (fieldData.type === 'entity_reference_revisions' && fieldData.required && settings.default_paragraph_type !== undefined) {
+      const targetBundles = fieldData.settings?.handler_settings?.target_bundles;
+      if (targetBundles) {
+        settings.default_paragraph_type = Object.keys(targetBundles)[0] || '_none';
+      }
+    }
+
     fields.push({
       name: fieldName,
       type: widgetInfo?.type || 'string_textfield',
       weight: weight++,
       region: 'content',
-      settings: widgetInfo?.settings || {},
+      settings,
       thirdPartySettings: {}
     });
   }

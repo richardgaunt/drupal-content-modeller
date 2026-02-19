@@ -2,6 +2,38 @@
 
 Complete reference for all `dcm` CLI commands.
 
+## Overview
+
+`dcm` (Drupal Content Modeller) is a CLI tool for designing and generating Drupal content models as YAML configuration files. It works offline — no running Drupal instance is needed. You define your content model (bundles, fields, form displays, roles) and `dcm` generates the Drupal configuration files that can be imported later via `drush cim`.
+
+Optionally, `dcm` can sync with a live Drupal site via drush integration to import configuration and capture UUIDs/third-party settings that Drupal adds.
+
+### Key Concepts
+
+- **Project** — A workspace representing one Drupal site. Contains all bundles, fields, roles, and generated config. Identified by a slug (e.g. `my-site`).
+- **Entity type** — A Drupal content category. Supported types: `node` (content), `media`, `paragraph`, `taxonomy_term`, `block_content`.
+- **Bundle** — A specific type within an entity type (e.g. "Article" is a `node` bundle, "Hero Banner" is a `paragraph` bundle). Has a label and machine name.
+- **Field** — A data field on a bundle (e.g. a "Subtitle" string field on Article). Field names are auto-prefixed per entity type: `field_n_` (node), `field_m_` (media), `field_p_` (paragraph), `field_t_` (taxonomy_term), `field_b_` (block_content).
+- **Form display** — Controls how fields appear on the entity edit form. Supports widgets, field groups (tabs, fieldsets, details), ordering, and hiding fields.
+- **Role** — A user role with permissions for CRUD operations on bundles.
+
+### Typical Workflow
+
+1. Create a project: `dcm project create -n "My Site" -c /path/to/config`
+2. Optionally sync existing Drupal config: `dcm project sync -p my-site`
+3. Create bundles: `dcm bundle create -p my-site -e node -l "Article"`
+4. Add fields to bundles: `dcm field create -p my-site -e node -b article -t string -l "Subtitle"`
+5. Configure form displays: `dcm form-display create -p my-site -e node -b article`
+6. Set up roles and permissions: `dcm role create -p my-site -l "Editor"`
+7. Generate reports: `dcm report project -p my-site`
+8. Optionally sync to Drupal: `dcm drush sync -p my-site`
+
+### Output Format
+
+All commands support `--json` (`-j`) for machine-readable JSON output. Without `--json`, commands output human-readable formatted text.
+
+---
+
 ## Command Structure
 
 ```

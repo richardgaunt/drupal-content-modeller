@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { showMainMenu } from './src/cli/menus.js';
 import {
+  cmdHelp,
   cmdProjectCreate,
   cmdProjectList,
   cmdProjectEdit,
@@ -43,6 +44,17 @@ import {
   cmdDrushSync,
   cmdDrushStatus
 } from './src/cli/commands.js';
+import {
+  PROJECT_HELP, PROJECT_HELP_DATA,
+  BUNDLE_HELP, BUNDLE_HELP_DATA,
+  FIELD_HELP, FIELD_HELP_DATA,
+  FIELD_CREATE_HELP, FIELD_CREATE_HELP_DATA,
+  FORM_DISPLAY_HELP, FORM_DISPLAY_HELP_DATA,
+  ROLE_HELP, ROLE_HELP_DATA,
+  DRUSH_HELP, DRUSH_HELP_DATA,
+  REPORT_HELP, REPORT_HELP_DATA,
+  ADMIN_HELP, ADMIN_HELP_DATA
+} from './src/cli/help/index.js';
 
 const program = new Command();
 
@@ -58,6 +70,9 @@ program
 const projectCmd = program
   .command('project')
   .description('Project management commands');
+
+projectCmd.addHelpText('after', PROJECT_HELP);
+projectCmd._helpData = PROJECT_HELP_DATA;
 
 projectCmd
   .command('create')
@@ -107,6 +122,9 @@ const bundleCmd = program
   .command('bundle')
   .description('Bundle management commands');
 
+bundleCmd.addHelpText('after', BUNDLE_HELP);
+bundleCmd._helpData = BUNDLE_HELP_DATA;
+
 bundleCmd
   .command('create')
   .description('Create a new entity bundle')
@@ -136,7 +154,10 @@ const fieldCmd = program
   .command('field')
   .description('Field management commands');
 
-fieldCmd
+fieldCmd.addHelpText('after', FIELD_HELP);
+fieldCmd._helpData = FIELD_HELP_DATA;
+
+const fieldCreateCmd = fieldCmd
   .command('create')
   .description('Create a new field on a bundle')
   .requiredOption('-p, --project <slug>', 'Project slug')
@@ -161,6 +182,9 @@ fieldCmd
   .option('--sync', 'Sync with Drupal after creation (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldCreate);
+
+fieldCreateCmd.addHelpText('after', FIELD_CREATE_HELP);
+fieldCreateCmd._helpData = FIELD_CREATE_HELP_DATA;
 
 fieldCmd
   .command('list')
@@ -195,6 +219,9 @@ const reportCmd = program
   .command('report')
   .description('Report generation commands');
 
+reportCmd.addHelpText('after', REPORT_HELP);
+reportCmd._helpData = REPORT_HELP_DATA;
+
 reportCmd
   .command('entity')
   .description('Generate a report for an entity type')
@@ -222,6 +249,9 @@ const adminCmd = program
   .command('admin')
   .description('Admin utility commands');
 
+adminCmd.addHelpText('after', ADMIN_HELP);
+adminCmd._helpData = ADMIN_HELP_DATA;
+
 adminCmd
   .command('links')
   .description('Display admin links for a bundle')
@@ -238,6 +268,9 @@ adminCmd
 const formDisplayCmd = program
   .command('form-display')
   .description('Form display management commands');
+
+formDisplayCmd.addHelpText('after', FORM_DISPLAY_HELP);
+formDisplayCmd._helpData = FORM_DISPLAY_HELP_DATA;
 
 formDisplayCmd
   .command('create')
@@ -420,6 +453,9 @@ const roleCmd = program
   .command('role')
   .description('Role and permission management commands');
 
+roleCmd.addHelpText('after', ROLE_HELP);
+roleCmd._helpData = ROLE_HELP_DATA;
+
 roleCmd
   .command('create')
   .description('Create a new role')
@@ -505,6 +541,9 @@ const drushCmd = program
   .command('drush')
   .description('Drush integration commands');
 
+drushCmd.addHelpText('after', DRUSH_HELP);
+drushCmd._helpData = DRUSH_HELP_DATA;
+
 drushCmd
   .command('sync')
   .description('Sync configuration with Drupal (runs drush cim && drush cex)')
@@ -518,6 +557,17 @@ drushCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .option('-j, --json', 'Output as JSON')
   .action(cmdDrushStatus);
+
+// ============================================
+// Help Command
+// ============================================
+
+program
+  .command('help')
+  .description('Show full CLI reference documentation')
+  .argument('[command]', 'Command group to show help for (e.g., project, bundle, field)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdHelp);
 
 // ============================================
 // Interactive Mode

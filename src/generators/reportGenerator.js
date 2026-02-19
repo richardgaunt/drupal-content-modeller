@@ -229,8 +229,8 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     return md;
   }
 
-  md += '| Field Name | Machine Name | Field Type | Description | Cardinality | Required | Other | URL |\n';
-  md += '|------------|--------------|------------|-------------|-------------|----------|-------|-----|\n';
+  md += '| Check | Field Name | Machine Name | Field Type | Description | Cardinality | Required | Other | URL |\n';
+  md += '|-------|------------|--------------|------------|-------------|-------------|----------|-------|-----|\n';
 
   // Sort fields by label
   const sortedFields = [...fields].sort((a, b) =>
@@ -241,6 +241,7 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     const fieldPath = getFieldAdminPath(entityType, bundle.id, field.name);
     const fieldUrl = baseUrl ? `${baseUrl}${fieldPath}` : fieldPath;
 
+    md += `| [ ] `;
     md += `| ${field.label || field.name} `;
     md += `| \`${field.name}\` `;
     md += `| ${field.type} `;

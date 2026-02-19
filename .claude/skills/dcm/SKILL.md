@@ -42,6 +42,10 @@ Read the provided text and determine what needs to be created:
 - **Form displays** (field groups, tab layouts, widget configuration)
 - **Roles and permissions** (if mentioned)
 
+**Widget selection:** If the ticket mentions "select", "dropdown", or "options" for an entity reference field, plan to use the `options_select` widget. Otherwise use the default autocomplete widget. Use `dcm form-display list-widgets -t <field_type>` to check available widgets when unsure.
+
+**Field ordering:** Fields in the form display should appear in the same order as they are listed in the ticket.
+
 ## Step 4: Check existing configuration
 
 Run `dcm bundle list -p <project> --json` and `dcm field list -p <project> -e <type> --json` as needed to understand what already exists, so you don't duplicate bundles or fields.
@@ -85,3 +89,5 @@ After all commands complete, run `dcm field list` and/or `dcm form-display view`
 - Run commands sequentially, not in parallel.
 - If a bundle or field already exists, skip it and note that in the summary.
 - When the ticket is ambiguous about field types or cardinality, make a reasonable Drupal-standard choice and flag it in the plan for the user to confirm.
+- When the ticket says "select", "dropdown", or "options" for an entity reference field, use the `options_select` widget: `dcm form-display set-widget -f <field> -w options_select`.
+- After creating a form display, reorder fields to match the order they appear in the ticket: `dcm form-display reorder -p <project> -e <type> -b <bundle> -o "field1,field2,field3"`.

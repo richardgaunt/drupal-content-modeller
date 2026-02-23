@@ -13,7 +13,7 @@ Optionally, `dcm` can sync with a live Drupal site via drush integration to impo
 - **Project** — A workspace representing one Drupal site. Contains all bundles, fields, roles, and generated config. Identified by a slug (e.g. `my-site`).
 - **Entity type** — A Drupal content category. Supported types: `node` (content), `media`, `paragraph`, `taxonomy_term`, `block_content`.
 - **Bundle** — A specific type within an entity type (e.g. "Article" is a `node` bundle, "Hero Banner" is a `paragraph` bundle). Has a label and machine name.
-- **Field** — A data field on a bundle (e.g. a "Subtitle" string field on Article). Field names are auto-prefixed per entity type: `field_n_` (node), `field_m_` (media), `field_p_` (paragraph), `field_t_` (taxonomy_term), `field_b_` (block_content).
+- **Field** — A data field on a bundle (e.g. a "Subtitle" string field on Article). Field names must be specified and use a prefix per entity type: `field_n_` (node), `field_m_` (media), `field_p_` (paragraph), `field_t_` (taxonomy_term), `field_b_` (block_content). Use `dcm field prefixes` to query these.
 - **Form display** — Controls how fields appear on the entity edit form. Supports widgets, field groups (tabs, fieldsets, details), ordering, and hiding fields.
 - **Role** — A user role with permissions for CRUD operations on bundles.
 
@@ -21,8 +21,8 @@ Optionally, `dcm` can sync with a live Drupal site via drush integration to impo
 
 1. Create a project: `dcm project create -n "My Site" -c /path/to/config`
 2. Optionally sync existing Drupal config: `dcm project sync -p my-site`
-3. Create bundles: `dcm bundle create -p my-site -e node -l "Article"`
-4. Add fields to bundles: `dcm field create -p my-site -e node -b article -t string -l "Subtitle"`
+3. Create bundles: `dcm bundle create -p my-site -e node -l "Article" -m article`
+4. Add fields to bundles: `dcm field create -p my-site -e node -b article -t string -l "Subtitle" -n field_n_subtitle`
 5. Configure form displays: `dcm form-display create -p my-site -e node -b article`
 6. Set up roles and permissions: `dcm role create -p my-site -l "Editor"`
 7. Generate reports: `dcm report project -p my-site`
@@ -176,7 +176,7 @@ dcm bundle create \
   --project "project-slug" \
   --entity-type "node|media|paragraph|taxonomy_term|block_content" \
   --label "Bundle Label" \
-  [--machine-name "bundle_name"] \
+  --machine-name "bundle_name" \
   [--description "Description text"] \
   [--source-type "image|file|remote_video"]
 ```
@@ -186,7 +186,7 @@ dcm bundle create \
 | `--project` | `-p` | Yes | Project slug |
 | `--entity-type` | `-e` | Yes | Entity type: `node`, `media`, `paragraph`, `taxonomy_term`, `block_content` |
 | `--label` | `-l` | Yes | Human-readable bundle label |
-| `--machine-name` | `-m` | No | Machine name (auto-generated from label if omitted) |
+| `--machine-name` | `-m` | Yes | Machine name |
 | `--description` | `-d` | No | Bundle description |
 | `--source-type` | `-s` | No | Media source type (required for media): `image`, `file`, `remote_video` |
 | `--json` | `-j` | No | Output as JSON |
@@ -194,10 +194,10 @@ dcm bundle create \
 **Examples:**
 ```bash
 # Create a content type
-dcm bundle create -p my-site -e node -l "Blog Post" -d "Blog post content type"
+dcm bundle create -p my-site -e node -l "Blog Post" -m blog_post -d "Blog post content type"
 
 # Create a media type
-dcm bundle create -p my-site -e media -l "Document" -s file
+dcm bundle create -p my-site -e media -l "Document" -m document -s file
 
 # Create a paragraph type
 dcm bundle create -p my-site -e paragraph -l "Hero Banner" -m hero_banner
@@ -244,6 +244,7 @@ dcm field create \
   --bundle "bundle_name" \
   --field-type "string" \
   --label "Field Label" \
+  --field-name "field_n_example" \
   [options...]
 ```
 
@@ -256,12 +257,12 @@ dcm field create \
 | `--bundle` | `-b` | Bundle machine name |
 | `--field-type` | `-t` | Field type (see list below) |
 | `--label` | `-l` | Human-readable field label |
+| `--field-name` | `-n` | Field machine name (use entity type prefix, see `dcm field prefixes`) |
 
 #### Common Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--field-name` | `-n` | Machine name (auto-generated if omitted) |
 | `--description` | `-d` | Field description/help text |
 | `--required` | `-r` | Make field required |
 | `--cardinality` | | Number of values: `1` (single) or `-1` (unlimited) |
@@ -303,21 +304,21 @@ dcm field create \
 **Examples:**
 ```bash
 # Simple text field
-dcm field create -p my-site -e node -b article -t string -l "Subtitle"
+dcm field create -p my-site -e node -b article -t string -l "Subtitle" -n field_n_subtitle
 
 # Required long text
-dcm field create -p my-site -e node -b article -t text_long -l "Body" --required
+dcm field create -p my-site -e node -b article -t text_long -l "Body" -n field_n_body --required
 
 # Select list
-dcm field create -p my-site -e node -b article -t list_string -l "Status" \
+dcm field create -p my-site -e node -b article -t list_string -l "Status" -n field_n_status \
   --allowed-values "draft|Draft,published|Published,archived|Archived"
 
 # Entity reference to paragraphs
 dcm field create -p my-site -e node -b article -t entity_reference_revisions \
-  -l "Components" --target-bundles "hero,text_block,image_gallery" --cardinality -1
+  -l "Components" -n field_n_components --target-bundles "hero,text_block,image_gallery" --cardinality -1
 
 # Image field
-dcm field create -p my-site -e node -b article -t image -l "Featured Image" \
+dcm field create -p my-site -e node -b article -t image -l "Featured Image" -n field_n_featured_image \
   --file-extensions "png jpg jpeg webp" --alt-required
 ```
 
@@ -388,6 +389,40 @@ dcm field edit \
 ```bash
 dcm field edit -p my-site -e node -b article -n field_n_subtitle \
   --label "Article Subtitle" --required
+```
+
+---
+
+### `dcm field prefixes`
+
+Show field name prefixes per entity type.
+
+```bash
+dcm field prefixes [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Human-readable table
+dcm field prefixes
+
+# JSON output for programmatic use
+dcm field prefixes --json
+```
+
+**Output:**
+```
+Field Name Prefixes:
+
+  node                field_n_
+  media               field_m_
+  paragraph           field_p_
+  taxonomy_term       field_t_
+  block_content       field_b_
 ```
 
 ---
@@ -1304,7 +1339,7 @@ Many commands support the `--sync` flag to automatically sync with Drupal after 
 **Example:**
 ```bash
 # Create a field and sync immediately
-dcm field create -p my-site -e node -b article -t string -l "Subtitle" --sync
+dcm field create -p my-site -e node -b article -t string -l "Subtitle" -n field_n_subtitle --sync
 
 # Add permissions and sync
 dcm role add-permission -p my-site -r content_editor -e node -b article \

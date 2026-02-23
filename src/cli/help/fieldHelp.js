@@ -23,7 +23,7 @@ export const FIELD_HELP_DATA = {
       ]
     },
     {
-      label: 'Field Name Prefixes (auto-generated per entity type)',
+      label: 'Field Name Prefixes (per entity type)',
       values: [
         { name: 'node', description: 'field_n_' },
         { name: 'media', description: 'field_m_' },
@@ -34,10 +34,11 @@ export const FIELD_HELP_DATA = {
     }
   ],
   examples: [
-    'dcm field create -p my-site -e node -b article -t string -l "Subtitle"',
-    'dcm field create -p my-site -e node -b article -t entity_reference_revisions -l "Components" --target-bundles "hero,text_block" --cardinality -1',
+    'dcm field create -p my-site -e node -b article -t string -l "Subtitle" -n field_n_subtitle',
+    'dcm field create -p my-site -e node -b article -t entity_reference_revisions -l "Components" -n field_n_components --target-bundles "hero,text_block" --cardinality -1',
     'dcm field list -p my-site -e node -b article --json',
-    'dcm field edit -p my-site -e node -b article -n field_n_subtitle --label "Article Subtitle"'
+    'dcm field edit -p my-site -e node -b article -n field_n_subtitle --label "Article Subtitle"',
+    'dcm field prefixes --json'
   ]
 };
 
@@ -75,9 +76,9 @@ export const FIELD_CREATE_HELP_DATA = {
     }
   ],
   examples: [
-    'dcm field create -p my-site -e node -b article -t list_string -l "Status" --allowed-values "draft|Draft,published|Published,archived|Archived"',
-    'dcm field create -p my-site -e node -b article -t image -l "Hero Image" --file-extensions "png jpg jpeg webp" --alt-required',
-    'dcm field create -p my-site -e node -b article -t entity_reference -l "Category" --target-type taxonomy_term --target-bundles "categories"'
+    'dcm field create -p my-site -e node -b article -t list_string -l "Status" -n field_n_status --allowed-values "draft|Draft,published|Published,archived|Archived"',
+    'dcm field create -p my-site -e node -b article -t image -l "Hero Image" -n field_n_hero_image --file-extensions "png jpg jpeg webp" --alt-required',
+    'dcm field create -p my-site -e node -b article -t entity_reference -l "Category" -n field_n_category --target-type taxonomy_term --target-bundles "categories"'
   ]
 };
 

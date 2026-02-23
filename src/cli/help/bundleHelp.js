@@ -15,12 +15,12 @@ export const BUNDLE_HELP_DATA = {
   ],
   notes: [
     'Media bundles require --source-type (image, file, or remote_video)',
-    'Machine names are auto-generated from labels if --machine-name is omitted'
+    'Machine name is required (--machine-name / -m)'
   ],
   examples: [
-    'dcm bundle create -p my-site -e node -l "Blog Post"',
-    'dcm bundle create -p my-site -e media -l "Document" -s file',
-    'dcm bundle create -p my-site -e paragraph -l "Hero Banner"',
+    'dcm bundle create -p my-site -e node -l "Blog Post" -m blog_post',
+    'dcm bundle create -p my-site -e media -l "Document" -m document -s file',
+    'dcm bundle create -p my-site -e paragraph -l "Hero Banner" -m hero_banner',
     'dcm bundle list -p my-site -e node --json'
   ]
 };

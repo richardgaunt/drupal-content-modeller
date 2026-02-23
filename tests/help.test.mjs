@@ -306,4 +306,43 @@ describe('CLI Help Output', () => {
     const commandNames = parsed.commands.map(c => c.name);
     expect(commandNames).toContain('log');
   });
+
+  test('dcm field prefixes outputs prefix list', async () => {
+    const { stdout } = await runDcm('field', 'prefixes');
+    expect(stdout).toContain('Field Name Prefixes');
+    expect(stdout).toContain('node');
+    expect(stdout).toContain('field_n_');
+    expect(stdout).toContain('media');
+    expect(stdout).toContain('field_m_');
+    expect(stdout).toContain('paragraph');
+    expect(stdout).toContain('field_p_');
+    expect(stdout).toContain('taxonomy_term');
+    expect(stdout).toContain('field_t_');
+    expect(stdout).toContain('block_content');
+    expect(stdout).toContain('field_b_');
+  });
+
+  test('dcm field prefixes --json outputs structured JSON', async () => {
+    const { stdout } = await runDcm('field', 'prefixes', '--json');
+    const parsed = JSON.parse(stdout);
+    expect(parsed).toEqual({
+      node: 'field_n_',
+      media: 'field_m_',
+      paragraph: 'field_p_',
+      taxonomy_term: 'field_t_',
+      block_content: 'field_b_'
+    });
+  });
+
+  test('dcm bundle create errors without --machine-name', async () => {
+    await expect(
+      runDcm('bundle', 'create', '-p', 'x', '-e', 'node', '-l', 'Test')
+    ).rejects.toThrow();
+  });
+
+  test('dcm field create errors without --field-name', async () => {
+    await expect(
+      runDcm('field', 'create', '-p', 'x', '-e', 'node', '-b', 'page', '-t', 'string', '-l', 'Test')
+    ).rejects.toThrow();
+  });
 });

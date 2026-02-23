@@ -12,6 +12,7 @@ import {
   cmdBundleCreate,
   cmdBundleList,
   cmdFieldCreate,
+  cmdFieldPrefixes,
   cmdFieldList,
   cmdFieldEdit,
   cmdReportEntity,
@@ -133,7 +134,7 @@ bundleCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .requiredOption('-e, --entity-type <type>', 'Entity type (node, media, paragraph, taxonomy_term, block_content)')
   .requiredOption('-l, --label <label>', 'Bundle label')
-  .option('-m, --machine-name <name>', 'Machine name (auto-generated if omitted)')
+  .requiredOption('-m, --machine-name <name>', 'Machine name')
   .option('-d, --description <desc>', 'Bundle description')
   .option('-s, --source-type <type>', 'Media source type (image, file, remote_video) - required for media')
   .option('--sync', 'Sync with Drupal after creation (runs drush cim && drush cex)')
@@ -167,7 +168,7 @@ const fieldCreateCmd = fieldCmd
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .requiredOption('-t, --field-type <type>', 'Field type')
   .requiredOption('-l, --label <label>', 'Field label')
-  .option('-n, --field-name <name>', 'Field machine name (auto-generated if omitted)')
+  .requiredOption('-n, --field-name <name>', 'Field machine name')
   .option('-d, --description <desc>', 'Field description/help text')
   .option('-r, --required', 'Make field required')
   .option('--cardinality <num>', 'Number of values (1 for single, -1 for unlimited)')
@@ -196,6 +197,12 @@ fieldCmd
   .option('-b, --bundle <bundle>', 'Bundle machine name (if omitted, lists all fields)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldList);
+
+fieldCmd
+  .command('prefixes')
+  .description('Show field name prefixes per entity type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFieldPrefixes);
 
 fieldCmd
   .command('edit')

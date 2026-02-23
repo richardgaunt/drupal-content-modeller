@@ -33,7 +33,7 @@ src/
   io/            # I/O: file system read/write (fileSystem.js, configReader.js)
 projects/        # User project storage (gitignored)
 config/          # Sample CivicTheme configuration for reference
-docs/            # Tickets and documentation in Obsidian format
+tickets/         # Ticket tracking (todo, in-progress, refining, done)
 ```
 
 ## Supported Entity Types
@@ -67,9 +67,10 @@ docs/            # Tickets and documentation in Obsidian format
 
 ## Ticket System
 
-Implementation tickets are in `docs/ContentModeller/`. Ticket format:
-- `##` Ticket Number + Title
-- Dependencies on other tickets
-- Acceptance criteria as checkboxes
-- Implementation notes
-- Test specifications
+Implementation tickets are in `tickets/` with subdirectories for status:
+- `todo/` — Not yet started
+- `in-progress/` — Currently being worked on
+- `refining/` — Needs further refinement
+- `done/` — Completed
+
+Move ticket files between directories to update status.

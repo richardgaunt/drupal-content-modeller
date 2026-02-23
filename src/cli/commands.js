@@ -18,8 +18,7 @@ import {
   getFieldsForBundle
 } from '../commands/list.js';
 import { getBundleAdminUrls } from '../generators/reportGenerator.js';
-import { generateMachineName } from '../generators/bundleGenerator.js';
-import { generateFieldName } from '../generators/fieldGenerator.js';
+import { ENTITY_PREFIXES } from '../generators/fieldGenerator.js';
 import { getReportsDir } from '../io/fileSystem.js';
 import {
   loadFormDisplay,
@@ -526,7 +525,7 @@ export async function cmdBundleCreate(options) {
 
     const project = await loadProject(options.project);
 
-    const machineName = options.machineName || generateMachineName(options.label);
+    const machineName = options.machineName;
 
     const bundleOptions = {
       label: options.label,
@@ -624,6 +623,27 @@ function parseAllowedValues(value) {
 }
 
 /**
+ * Show field name prefixes per entity type
+ */
+export async function cmdFieldPrefixes(options) {
+  try {
+    if (options.json) {
+      output(ENTITY_PREFIXES, true);
+    } else {
+      console.log();
+      console.log(chalk.cyan('Field Name Prefixes:'));
+      console.log();
+      for (const [entityType, prefix] of Object.entries(ENTITY_PREFIXES)) {
+        console.log(`  ${entityType.padEnd(20)}${prefix}`);
+      }
+      console.log();
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
  * Create a new field
  */
 export async function cmdFieldCreate(options) {
@@ -652,8 +672,7 @@ export async function cmdFieldCreate(options) {
 
     const project = await loadProject(options.project);
 
-    // Generate field name if not provided
-    const fieldName = options.fieldName || generateFieldName(options.entityType, options.label);
+    const fieldName = options.fieldName;
 
     // Build settings based on field type
     const settings = {};

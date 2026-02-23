@@ -566,6 +566,7 @@ export async function cmdBundleList(options) {
     }
 
     const project = await loadProject(options.project);
+    await autoSyncProject(project);
 
     if (!project.entities) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');
@@ -776,6 +777,7 @@ export async function cmdFieldList(options) {
     }
 
     const project = await loadProject(options.project);
+    await autoSyncProject(project);
 
     if (!project.entities) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');
@@ -896,6 +898,7 @@ export async function cmdReportEntity(options) {
     }
 
     const project = await loadProject(options.project);
+    await autoSyncProject(project);
 
     if (!project.entities) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');
@@ -926,6 +929,7 @@ export async function cmdReportProject(options) {
     }
 
     const project = await loadProject(options.project);
+    await autoSyncProject(project);
 
     if (!project.entities) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');
@@ -969,6 +973,7 @@ export async function cmdAdminLinks(options) {
     }
 
     const project = await loadProject(options.project);
+    await autoSyncProject(project);
 
     if (!project.entities || !project.entities[options.entityType]) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');

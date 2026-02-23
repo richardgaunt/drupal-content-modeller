@@ -63,6 +63,7 @@ import {
   syncWithDrupal,
   getSyncStatus
 } from '../commands/drush.js';
+import { appendLog, readLog } from '../io/commandLog.js';
 
 /**
  * Valid entity types
@@ -123,6 +124,39 @@ function output(data, json = false) {
 function handleError(error) {
   console.error(chalk.red(`Error: ${error.message}`));
   process.exit(1);
+}
+
+/**
+ * Get the CLI command string from process.argv
+ * @returns {string} - The dcm command string
+ */
+function getCliString() {
+  return 'dcm ' + process.argv.slice(2).join(' ');
+}
+
+/**
+ * Log a successful command execution
+ * @param {string} slug - Project slug
+ */
+function logSuccess(slug) {
+  try {
+    appendLog(slug, { cli: getCliString(), success: true });
+  } catch {
+    // Silent fail - logging should not interrupt the main operation
+  }
+}
+
+/**
+ * Log a failed command execution
+ * @param {string} slug - Project slug
+ * @param {string} errorMessage - Error message
+ */
+function logFailure(slug, errorMessage) {
+  try {
+    appendLog(slug, { cli: getCliString(), success: false, error: errorMessage });
+  } catch {
+    // Silent fail - logging should not interrupt the main operation
+  }
 }
 
 // ============================================
@@ -337,6 +371,7 @@ export async function cmdProjectCreate(options) {
     }
 
     const project = await createProject(options.name, options.configPath, options.baseUrl || '');
+    logSuccess(project.slug);
 
     if (options.json) {
       output(project, true);
@@ -393,6 +428,7 @@ export async function cmdProjectEdit(options) {
     };
 
     const updated = await updateProject(project, updates);
+    logSuccess(updated.slug);
 
     if (options.json) {
       output(updated, true);
@@ -418,6 +454,7 @@ export async function cmdProjectSync(options) {
 
     const project = await loadProject(options.project);
     const result = await syncProject(project);
+    logSuccess(options.project);
 
     if (options.json) {
       output(result, true);
@@ -445,6 +482,7 @@ export async function cmdProjectDelete(options) {
     const deleted = await deleteProject(options.project);
 
     if (deleted) {
+      // Note: log file is deleted with the project directory
       if (options.json) {
         output({ deleted: true, slug: options.project }, true);
       } else {
@@ -498,6 +536,7 @@ export async function cmdBundleCreate(options) {
     };
 
     const result = await createBundle(project, options.entityType, bundleOptions);
+    logSuccess(options.project);
 
     if (options.json) {
       output(result, true);
@@ -680,6 +719,7 @@ export async function cmdFieldCreate(options) {
     };
 
     const result = await createField(project, options.entityType, [options.bundle], fieldOptions);
+    logSuccess(options.project);
 
     if (options.json) {
       output(result, true);
@@ -802,6 +842,7 @@ export async function cmdFieldEdit(options) {
     }
 
     const result = await updateField(project, options.entityType, options.bundle, options.fieldName, updates);
+    logSuccess(options.project);
 
     if (options.json) {
       output(result, true);
@@ -977,6 +1018,7 @@ export async function cmdFormDisplayCreate(options) {
 
     const project = await loadProject(options.project);
     const formDisplay = await createFormDisplay(project, options.entityType, options.bundle);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1104,6 +1146,7 @@ export async function cmdFormDisplayHide(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1157,6 +1200,7 @@ export async function cmdFormDisplayShow(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1202,6 +1246,7 @@ export async function cmdFormDisplaySetWidget(options) {
 
     formDisplay = await updateFieldWidget(project, formDisplay, options.field, options.widget);
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1257,6 +1302,7 @@ export async function cmdFormDisplaySetWidgetSetting(options) {
     const settings = { [options.setting]: parsedValue };
     formDisplay = updateFieldSettings(formDisplay, options.field, settings);
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1343,6 +1389,7 @@ export async function cmdFormDisplayGroupCreate(options) {
     });
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1397,6 +1444,7 @@ export async function cmdFormDisplayGroupEdit(options) {
 
     formDisplay = updateFieldGroup(formDisplay, options.name, updates);
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1440,6 +1488,7 @@ export async function cmdFormDisplayGroupDelete(options) {
     const moveToParent = options.moveChildrenTo !== 'root';
     formDisplay = deleteFieldGroup(formDisplay, options.name, moveToParent);
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1543,6 +1592,7 @@ export async function cmdFormDisplayMove(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1589,6 +1639,7 @@ export async function cmdFormDisplayReorder(options) {
 
     formDisplay = reorderGroupChildren(formDisplay, groupName, newOrder);
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1651,6 +1702,7 @@ export async function cmdFormDisplaySetWeight(options) {
     }
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1694,6 +1746,7 @@ export async function cmdFormDisplayReset(options) {
     });
 
     await saveFormDisplay(project, formDisplay);
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1729,6 +1782,7 @@ export async function cmdRoleCreate(options) {
       id: options.name,
       isAdmin: options.isAdmin || false
     });
+    logSuccess(options.project);
 
     if (options.json) {
       output(role, true);
@@ -1856,6 +1910,7 @@ export async function cmdRoleDelete(options) {
       throw new Error(`Role not found: ${options.role}`);
     }
 
+    logSuccess(options.project);
     await autoSyncProject(project);
 
     if (options.json) {
@@ -1903,6 +1958,7 @@ export async function cmdRoleAddPermission(options) {
     }
 
     const role = await addRolePermissions(project, options.role, permissions);
+    logSuccess(options.project);
 
     if (options.json) {
       output({ role: role.id, added: permissions }, true);
@@ -1940,6 +1996,7 @@ export async function cmdRoleRemovePermission(options) {
     const permissions = options.permissions.split(',').map(p => p.trim());
 
     const role = await removeRolePermissions(project, options.role, permissions);
+    logSuccess(options.project);
 
     if (options.json) {
       output({ role: role.id, removed: permissions }, true);
@@ -1995,6 +2052,7 @@ export async function cmdRoleSetPermissions(options) {
       options.bundle,
       permissions
     );
+    logSuccess(options.project);
 
     if (options.json) {
       output({ role: role.id, entityType: options.entityType, bundle: options.bundle, permissions }, true);
@@ -2076,6 +2134,8 @@ export async function cmdDrushSync(options) {
       onProgress: (msg) => console.log(chalk.gray('  ' + msg))
     });
 
+    logSuccess(options.project);
+
     // Sync project.json after drush sync
     await autoSyncProject(project);
 
@@ -2145,6 +2205,52 @@ export async function cmdSkillInstall(options) {
     } else {
       console.log(chalk.green('dcm skill installed successfully!'));
       console.log(chalk.cyan(`Installed to: ${target}`));
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Log Commands
+// ============================================
+
+/**
+ * View command log for a project
+ */
+export async function cmdLog(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    // Verify project exists
+    await loadProject(options.project);
+
+    const limit = options.limit ? parseInt(options.limit, 10) : 20;
+    const entries = readLog(options.project, { limit });
+
+    if (options.json) {
+      output(entries, true);
+    } else {
+      if (entries.length === 0) {
+        console.log(chalk.yellow('No log entries found.'));
+        return;
+      }
+
+      console.log();
+      console.log(chalk.cyan(`Command log for "${options.project}" (${entries.length} entries):`));
+      console.log();
+
+      for (const entry of entries) {
+        const time = new Date(entry.timestamp).toLocaleString();
+        const status = entry.success ? chalk.green('OK') : chalk.red('FAIL');
+        console.log(`  ${chalk.gray(time)}  ${status}  ${entry.cli}`);
+        if (entry.error) {
+          console.log(`    ${chalk.red(entry.error)}`);
+        }
+      }
+      console.log();
     }
   } catch (error) {
     handleError(error);

@@ -291,4 +291,19 @@ describe('CLI Help Output', () => {
     const commandNames = parsed.commands.map(c => c.name);
     expect(commandNames).toContain('skill');
   });
+
+  test('dcm log --help shows log command', async () => {
+    const { stdout } = await runDcm('log', '--help');
+    expect(stdout).toContain('View command log');
+    expect(stdout).toContain('--project');
+    expect(stdout).toContain('--limit');
+    expect(stdout).toContain('--json');
+  });
+
+  test('dcm help --json includes log command', async () => {
+    const { stdout } = await runDcm('help', '--json');
+    const parsed = JSON.parse(stdout);
+    const commandNames = parsed.commands.map(c => c.name);
+    expect(commandNames).toContain('log');
+  });
 });

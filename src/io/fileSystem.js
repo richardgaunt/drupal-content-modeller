@@ -61,6 +61,15 @@ export function getReportsDir(slug) {
 }
 
 /**
+ * Get the path to a project's command log file
+ * @param {string} slug - Project slug
+ * @returns {string} - Absolute path to log.jsonl
+ */
+export function getLogPath(slug) {
+  return join(getProjectPath(slug), 'log.jsonl');
+}
+
+/**
  * Check if a directory exists
  * @param {string} dirPath - Path to check
  * @returns {boolean} - True if exists

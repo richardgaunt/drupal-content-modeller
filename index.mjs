@@ -43,7 +43,8 @@ import {
   cmdRoleListPermissions,
   cmdDrushSync,
   cmdDrushStatus,
-  cmdSkillInstall
+  cmdSkillInstall,
+  cmdLog
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -558,6 +559,18 @@ drushCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .option('-j, --json', 'Output as JSON')
   .action(cmdDrushStatus);
+
+// ============================================
+// Log Commands
+// ============================================
+
+program
+  .command('log')
+  .description('View command log for a project')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-l, --limit <count>', 'Number of entries to show (default: 20)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdLog);
 
 // ============================================
 // Skill Commands

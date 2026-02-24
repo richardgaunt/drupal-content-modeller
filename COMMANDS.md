@@ -427,6 +427,50 @@ Field Name Prefixes:
 
 ---
 
+### `dcm field types`
+
+List available field types.
+
+```bash
+dcm field types [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Human-readable table
+dcm field types
+
+# JSON output for programmatic use
+dcm field types --json
+```
+
+**Output:**
+```
+Available Field Types:
+
+  string                        Plain text (single line)
+  string_long                   Plain text (multi-line)
+  text_long                     Formatted text (HTML)
+  boolean                       True/false
+  integer                       Whole number
+  list_string                   Select list (text keys)
+  list_integer                  Select list (integer keys)
+  datetime                      Date/time
+  daterange                     Date range
+  link                          URL/link
+  image                         Image file
+  file                          File upload
+  entity_reference              Reference to another entity
+  entity_reference_revisions    Paragraph reference
+  webform                       Webform reference
+```
+
+---
+
 ## Report Commands
 
 ### `dcm report entity`

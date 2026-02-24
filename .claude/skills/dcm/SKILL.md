@@ -22,9 +22,11 @@ dcm help role --json
 dcm help project --json
 dcm help drush --json
 dcm help report --json
+dcm field types --json
+dcm field prefixes --json
 ```
 
-Use the output from these commands as your reference for all available commands, options, field types, and valid values. Do NOT rely on any hardcoded reference — always use the live help output.
+Use the output from these commands as your reference for all available commands, options, field types, prefixes, and valid values. Do NOT rely on any hardcoded reference — always use the live help output.
 
 ## Step 1: Ask which project to use
 

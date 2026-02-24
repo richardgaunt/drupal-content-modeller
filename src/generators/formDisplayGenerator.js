@@ -4,6 +4,7 @@
  */
 
 import yaml from 'js-yaml';
+import { isBaseField } from '../constants/baseFields.js';
 
 /**
  * Available field group format types
@@ -186,9 +187,11 @@ export function generateDependencies(groups, fields, entityType, bundle) {
   const configDeps = [];
   const moduleDeps = new Set();
 
-  // Add field dependencies
+  // Add field dependencies (skip base fields - they don't have field.field.* config)
   for (const field of fields) {
-    configDeps.push(`field.field.${entityType}.${bundle}.${field.name}`);
+    if (!isBaseField(entityType, field.name)) {
+      configDeps.push(`field.field.${entityType}.${bundle}.${field.name}`);
+    }
   }
 
   // Add bundle dependency

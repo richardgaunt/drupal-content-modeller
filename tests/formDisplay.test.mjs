@@ -408,6 +408,48 @@ describe('Form Display Generator - Pure Functions', () => {
 
       expect(result.module).toContain('field_group');
     });
+
+    test('excludes node base fields from config dependencies', () => {
+      const fields = [
+        { name: 'title' },
+        { name: 'uid' },
+        { name: 'path', type: 'path' },
+        { name: 'moderation_state' },
+        { name: 'field_n_body' }
+      ];
+      const result = generateDependencies([], fields, 'node', 'article');
+
+      expect(result.config).not.toContain('field.field.node.article.title');
+      expect(result.config).not.toContain('field.field.node.article.uid');
+      expect(result.config).not.toContain('field.field.node.article.path');
+      expect(result.config).not.toContain('field.field.node.article.moderation_state');
+      expect(result.config).toContain('field.field.node.article.field_n_body');
+      expect(result.config).toContain('node.type.article');
+    });
+
+    test('excludes taxonomy_term base fields from config dependencies', () => {
+      const fields = [
+        { name: 'name' },
+        { name: 'description' },
+        { name: 'field_t_color' }
+      ];
+      const result = generateDependencies([], fields, 'taxonomy_term', 'tags');
+
+      expect(result.config).not.toContain('field.field.taxonomy_term.tags.name');
+      expect(result.config).not.toContain('field.field.taxonomy_term.tags.description');
+      expect(result.config).toContain('field.field.taxonomy_term.tags.field_t_color');
+      expect(result.config).toContain('taxonomy.vocabulary.tags');
+    });
+
+    test('only contains bundle dep when all visible fields are base fields', () => {
+      const fields = [
+        { name: 'title' },
+        { name: 'status' }
+      ];
+      const result = generateDependencies([], fields, 'node', 'page');
+
+      expect(result.config).toEqual(['node.type.page']);
+    });
   });
 
   describe('generateFormDisplay', () => {

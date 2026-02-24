@@ -13,6 +13,7 @@ import {
   cmdBundleList,
   cmdFieldCreate,
   cmdFieldPrefixes,
+  cmdFieldTypes,
   cmdFieldList,
   cmdFieldEdit,
   cmdReportEntity,
@@ -203,6 +204,12 @@ fieldCmd
   .description('Show field name prefixes per entity type')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldPrefixes);
+
+fieldCmd
+  .command('types')
+  .description('List available field types')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFieldTypes);
 
 fieldCmd
   .command('edit')

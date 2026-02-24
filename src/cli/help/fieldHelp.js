@@ -38,7 +38,9 @@ export const FIELD_HELP_DATA = {
     'dcm field create -p my-site -e node -b article -t entity_reference_revisions -l "Components" -n field_n_components --target-bundles "hero,text_block" --cardinality -1',
     'dcm field list -p my-site -e node -b article --json',
     'dcm field edit -p my-site -e node -b article -n field_n_subtitle --label "Article Subtitle"',
-    'dcm field prefixes --json'
+    'dcm field prefixes --json',
+    'dcm field types',
+    'dcm field types --json'
   ]
 };
 

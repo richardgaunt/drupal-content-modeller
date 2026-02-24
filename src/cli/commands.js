@@ -645,6 +645,48 @@ export async function cmdFieldPrefixes(options) {
 }
 
 /**
+ * List available field types
+ */
+export async function cmdFieldTypes(options) {
+  try {
+    const fieldTypes = VALID_FIELD_TYPES.map(type => {
+      const descriptions = {
+        string: 'Plain text (single line)',
+        string_long: 'Plain text (multi-line)',
+        text_long: 'Formatted text (HTML)',
+        boolean: 'True/false',
+        integer: 'Whole number',
+        list_string: 'Select list (text keys)',
+        list_integer: 'Select list (integer keys)',
+        datetime: 'Date/time',
+        daterange: 'Date range',
+        link: 'URL/link',
+        image: 'Image file',
+        file: 'File upload',
+        entity_reference: 'Reference to another entity',
+        entity_reference_revisions: 'Paragraph reference',
+        webform: 'Webform reference'
+      };
+      return { type, description: descriptions[type] || type };
+    });
+
+    if (options.json) {
+      output(fieldTypes, true);
+    } else {
+      console.log();
+      console.log(chalk.cyan('Available Field Types:'));
+      console.log();
+      for (const ft of fieldTypes) {
+        console.log(`  ${ft.type.padEnd(30)}${ft.description}`);
+      }
+      console.log();
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
  * Create a new field
  */
 export async function cmdFieldCreate(options) {

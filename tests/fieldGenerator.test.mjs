@@ -78,6 +78,10 @@ describe('Field Generator', () => {
       expect(getModuleForFieldType('daterange')).toBe('datetime_range');
     });
 
+    test('returns core for email', () => {
+      expect(getModuleForFieldType('email')).toBe('core');
+    });
+
     test('returns core for unknown type', () => {
       expect(getModuleForFieldType('unknown')).toBe('core');
     });

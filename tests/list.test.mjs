@@ -8,7 +8,8 @@ import {
   getFieldsForEntityType,
   getFieldsForBundle,
   formatEntityFieldsTable,
-  formatBundleFieldsTable
+  formatBundleFieldsTable,
+  findEntityReferenceFieldsTargeting
 } from '../src/commands/list.js';
 
 describe('List Commands', () => {
@@ -481,6 +482,196 @@ describe('List Commands', () => {
       const result = formatBundleFieldsTable(fields);
 
       expect(result).toContain('Yes');
+    });
+  });
+
+  describe('findEntityReferenceFieldsTargeting', () => {
+    const mockProject = {
+      entities: {
+        node: {
+          article: {
+            label: 'Article',
+            fields: {
+              field_n_components: {
+                label: 'Components',
+                type: 'entity_reference_revisions',
+                settings: {
+                  handler_settings: {
+                    target_bundles: { hero: 'hero', text_block: 'text_block' }
+                  }
+                }
+              },
+              field_n_category: {
+                label: 'Category',
+                type: 'entity_reference',
+                settings: {
+                  target_type: 'taxonomy_term',
+                  handler_settings: {
+                    target_bundles: { tags: 'tags' }
+                  }
+                }
+              },
+              field_n_body: {
+                label: 'Body',
+                type: 'text_long'
+              }
+            }
+          },
+          page: {
+            label: 'Page',
+            fields: {
+              field_n_sections: {
+                label: 'Sections',
+                type: 'entity_reference_revisions',
+                settings: {
+                  handler_settings: {
+                    target_bundles: { hero: 'hero' }
+                  }
+                }
+              }
+            }
+          }
+        },
+        paragraph: {
+          hero: {
+            label: 'Hero',
+            fields: {
+              field_p_related: {
+                label: 'Related Content',
+                type: 'entity_reference',
+                settings: {
+                  target_type: 'node',
+                  handler_settings: {
+                    target_bundles: { article: 'article' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    test('finds entity_reference_revisions fields targeting paragraph', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'paragraph');
+
+      const fieldNames = results.map(r => r.fieldName);
+      expect(fieldNames).toContain('field_n_components');
+      expect(fieldNames).toContain('field_n_sections');
+    });
+
+    test('finds entity_reference fields targeting taxonomy_term', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'taxonomy_term');
+
+      expect(results.length).toBe(1);
+      expect(results[0].fieldName).toBe('field_n_category');
+      expect(results[0].entityType).toBe('node');
+      expect(results[0].bundleId).toBe('article');
+    });
+
+    test('finds entity_reference fields targeting node', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'node');
+
+      expect(results.length).toBe(1);
+      expect(results[0].fieldName).toBe('field_p_related');
+      expect(results[0].entityType).toBe('paragraph');
+      expect(results[0].bundleId).toBe('hero');
+    });
+
+    test('excludes non-reference fields', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'paragraph');
+
+      const fieldNames = results.map(r => r.fieldName);
+      expect(fieldNames).not.toContain('field_n_body');
+    });
+
+    test('returns correct currentTargetBundles', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'paragraph');
+      const components = results.find(r => r.fieldName === 'field_n_components');
+
+      expect(components.currentTargetBundles).toEqual(['hero', 'text_block']);
+    });
+
+    test('returns bundle label and field label', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'paragraph');
+      const components = results.find(r => r.fieldName === 'field_n_components');
+
+      expect(components.bundleLabel).toBe('Article');
+      expect(components.fieldLabel).toBe('Components');
+      expect(components.fieldType).toBe('entity_reference_revisions');
+    });
+
+    test('returns empty array for no matches', () => {
+      const results = findEntityReferenceFieldsTargeting(mockProject, 'media');
+
+      expect(results).toEqual([]);
+    });
+
+    test('returns empty array for null entities', () => {
+      const results = findEntityReferenceFieldsTargeting({ entities: null }, 'node');
+
+      expect(results).toEqual([]);
+    });
+
+    test('returns empty array for undefined entities', () => {
+      const results = findEntityReferenceFieldsTargeting({}, 'node');
+
+      expect(results).toEqual([]);
+    });
+
+    test('handles entity_reference with handler-based target type', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              label: 'Page',
+              fields: {
+                field_n_ref: {
+                  label: 'Ref',
+                  type: 'entity_reference',
+                  settings: {
+                    handler: 'default:taxonomy_term',
+                    handler_settings: {
+                      target_bundles: { tags: 'tags' }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const results = findEntityReferenceFieldsTargeting(project, 'taxonomy_term');
+
+      expect(results.length).toBe(1);
+      expect(results[0].fieldName).toBe('field_n_ref');
+    });
+
+    test('handles fields with no target_bundles settings', () => {
+      const project = {
+        entities: {
+          node: {
+            page: {
+              label: 'Page',
+              fields: {
+                field_n_ref: {
+                  label: 'Ref',
+                  type: 'entity_reference',
+                  settings: {
+                    target_type: 'node'
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      const results = findEntityReferenceFieldsTargeting(project, 'node');
+
+      expect(results.length).toBe(1);
+      expect(results[0].currentTargetBundles).toEqual([]);
     });
   });
 });

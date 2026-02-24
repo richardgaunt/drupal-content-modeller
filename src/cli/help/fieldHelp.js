@@ -19,7 +19,8 @@ export const FIELD_HELP_DATA = {
         { name: 'file', description: 'File upload' },
         { name: 'entity_reference', description: 'Reference to another entity' },
         { name: 'entity_reference_revisions', description: 'Paragraph reference' },
-        { name: 'webform', description: 'Webform reference' }
+        { name: 'webform', description: 'Webform reference' },
+        { name: 'email', description: 'Email address' }
       ]
     },
     {
@@ -40,7 +41,9 @@ export const FIELD_HELP_DATA = {
     'dcm field edit -p my-site -e node -b article -n field_n_subtitle --label "Article Subtitle"',
     'dcm field prefixes --json',
     'dcm field types',
-    'dcm field types --json'
+    'dcm field types --json',
+    'dcm field add-to-refs -p my-site -e paragraph -b hero_banner',
+    'dcm field add-to-refs -p my-site -e paragraph -b hero_banner --fields "node.article.field_n_components" --json'
   ]
 };
 
@@ -65,7 +68,8 @@ export const FIELD_CREATE_HELP_DATA = {
         { name: 'file', description: '--file-extensions "pdf doc" --file-directory "documents"' },
         { name: 'entity_reference', description: '--target-type <entity_type> --target-bundles "bundle1,bundle2"' },
         { name: 'entity_reference_revisions', description: '--target-bundles "paragraph1,paragraph2"' },
-        { name: 'webform', description: '(no type-specific options)' }
+        { name: 'webform', description: '(no type-specific options)' },
+        { name: 'email', description: '(no type-specific options)' }
       ]
     },
     {

@@ -48,7 +48,7 @@ tickets/         # Ticket tracking (todo, in-progress, refining, done)
 
 ## Supported Field Types
 
-`string`, `string_long`, `text_long`, `boolean`, `integer`, `list_string`, `list_integer`, `datetime`, `daterange`, `link`, `image`, `file`, `entity_reference`, `entity_reference_revisions`, `webform`
+`string`, `string_long`, `text_long`, `boolean`, `integer`, `list_string`, `list_integer`, `datetime`, `daterange`, `link`, `image`, `file`, `entity_reference`, `entity_reference_revisions`, `webform`, `email`
 
 ## Code Style Guidelines
 

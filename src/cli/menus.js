@@ -27,7 +27,8 @@ import {
   getFieldsForEntityType,
   getFieldsForBundle,
   formatEntityFieldsTable,
-  formatBundleFieldsTable
+  formatBundleFieldsTable,
+  findEntityReferenceFieldsTargeting
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../commands/create.js';
 import { createEntityReport, createProjectReport, createBundleReport } from '../commands/report.js';
@@ -301,6 +302,10 @@ async function showProjectMenu(project) {
           break;
         case 'edit-field':
           await handleEditField(project);
+          project = await loadProject(project.slug);
+          break;
+        case 'add-bundle-to-refs':
+          await handleAddBundleToRefs(project);
           project = await loadProject(project.slug);
           break;
         case 'edit-form-display':
@@ -2001,6 +2006,121 @@ async function handleEditField(project) {
     console.log(chalk.green(`Field "${result.fieldName}" updated successfully!`));
     console.log(chalk.cyan(`Updated file: ${result.updatedFile}`));
     console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle add bundle to entity reference fields action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleAddBundleToRefs(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityChoices
+    });
+
+    // Select bundle to add
+    const bundles = project.entities[entityType];
+    const bundleEntries = Object.entries(bundles)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([id, bundle]) => ({
+        value: id,
+        name: `${bundle.label || id} (${id})`,
+        label: bundle.label || id
+      }));
+
+    const selectedBundle = await search({
+      message: 'Select bundle to add (type to search):',
+      source: async (searchInput) => {
+        const searchTerm = (searchInput || '').toLowerCase();
+        return bundleEntries.filter(b =>
+          b.name.toLowerCase().includes(searchTerm) ||
+          b.value.toLowerCase().includes(searchTerm)
+        );
+      }
+    });
+
+    const bundleLabel = bundles[selectedBundle]?.label || selectedBundle;
+
+    // Find all entity reference fields targeting this entity type
+    const matchingFields = findEntityReferenceFieldsTargeting(project, entityType);
+
+    // Filter out fields that already have this bundle
+    const fieldsToOffer = matchingFields.filter(
+      f => !f.currentTargetBundles.includes(selectedBundle)
+    );
+
+    if (fieldsToOffer.length === 0) {
+      console.log(chalk.yellow(`No entity reference fields found that target ${entityType}, or all already include "${selectedBundle}".`));
+      return;
+    }
+
+    // Multi-select from matching fields
+    const fieldChoices = fieldsToOffer.map(f => ({
+      value: `${f.entityType}.${f.bundleId}.${f.fieldName}`,
+      name: `${f.fieldLabel} (${f.fieldName}) — ${f.entityType} > ${f.bundleLabel}`,
+      checked: true
+    }));
+
+    const selectedFields = await checkbox({
+      message: `Add "${bundleLabel}" (${selectedBundle}) to:`,
+      choices: fieldChoices
+    });
+
+    if (selectedFields.length === 0) {
+      console.log(chalk.yellow('No fields selected.'));
+      return;
+    }
+
+    // Update each selected field
+    let updatedCount = 0;
+    for (const fieldSpec of selectedFields) {
+      const [fieldEntityType, fieldBundleId, fieldName] = fieldSpec.split('.');
+      const matchInfo = fieldsToOffer.find(
+        f => f.entityType === fieldEntityType && f.bundleId === fieldBundleId && f.fieldName === fieldName
+      );
+
+      if (!matchInfo) continue;
+
+      const updatedBundles = [...matchInfo.currentTargetBundles, selectedBundle];
+
+      await updateField(project, fieldEntityType, fieldBundleId, fieldName, {
+        targetBundles: updatedBundles
+      });
+      updatedCount++;
+      console.log(chalk.green(`  Updated ${fieldName} on ${fieldEntityType} > ${fieldBundleId}`));
+    }
+
+    console.log(chalk.green(`\nAdded "${selectedBundle}" to ${updatedCount} field(s).`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

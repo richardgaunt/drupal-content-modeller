@@ -23,7 +23,8 @@ export const FIELD_MODULES = {
   image: 'image',
   file: 'file',
   entity_reference: 'core',
-  entity_reference_revisions: 'entity_reference_revisions'
+  entity_reference_revisions: 'entity_reference_revisions',
+  email: 'core'
 };
 
 /**
@@ -65,7 +66,8 @@ export const FIELD_TYPES = [
   { value: 'image', name: 'Image (image)' },
   { value: 'file', name: 'File (file)' },
   { value: 'entity_reference', name: 'Entity reference (entity_reference)' },
-  { value: 'entity_reference_revisions', name: 'Paragraphs (entity_reference_revisions)' }
+  { value: 'entity_reference_revisions', name: 'Paragraphs (entity_reference_revisions)' },
+  { value: 'email', name: 'Email (email)' }
 ];
 
 /**

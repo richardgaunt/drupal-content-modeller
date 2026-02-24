@@ -300,6 +300,7 @@ dcm field create \
 - `entity_reference` - Reference to entity
 - `entity_reference_revisions` - Paragraph reference
 - `webform` - Webform reference
+- `email` - Email address
 
 **Examples:**
 ```bash
@@ -393,6 +394,38 @@ dcm field edit -p my-site -e node -b article -n field_n_subtitle \
 
 ---
 
+### `dcm field add-to-refs`
+
+Add a bundle to entity reference fields that target its entity type. Finds all entity_reference and entity_reference_revisions fields across the project that reference the given entity type, and adds the specified bundle to their target_bundles configuration.
+
+```bash
+dcm field add-to-refs \
+  --project "project-slug" \
+  --entity-type "paragraph" \
+  --bundle "hero_banner" \
+  [--fields "node.article.field_n_components,node.page.field_n_components"]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type of the bundle to add |
+| `--bundle` | `-b` | Yes | Bundle machine name to add |
+| `--fields` | | No | Comma-separated field specs (entityType.bundle.fieldName) to limit update |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Add hero_banner paragraph to all entity reference fields that target paragraphs
+dcm field add-to-refs -p my-site -e paragraph -b hero_banner
+
+# Add only to specific fields
+dcm field add-to-refs -p my-site -e paragraph -b hero_banner \
+  --fields "node.article.field_n_components,node.page.field_n_components"
+```
+
+---
+
 ### `dcm field prefixes`
 
 Show field name prefixes per entity type.
@@ -467,6 +500,7 @@ Available Field Types:
   entity_reference              Reference to another entity
   entity_reference_revisions    Paragraph reference
   webform                       Webform reference
+  email                         Email address
 ```
 
 ---

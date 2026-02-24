@@ -15,7 +15,8 @@ import { createEntityReport, createProjectReport } from '../commands/report.js';
 import {
   groupBundlesByEntityType,
   getFieldsForEntityType,
-  getFieldsForBundle
+  getFieldsForBundle,
+  findEntityReferenceFieldsTargeting
 } from '../commands/list.js';
 import { getBundleAdminUrls } from '../generators/reportGenerator.js';
 import { ENTITY_PREFIXES } from '../generators/fieldGenerator.js';
@@ -80,7 +81,7 @@ const VALID_SOURCE_TYPES = ['image', 'file', 'remote_video'];
 const VALID_FIELD_TYPES = [
   'string', 'string_long', 'text_long', 'boolean', 'integer',
   'list_string', 'list_integer', 'datetime', 'daterange',
-  'link', 'image', 'file', 'entity_reference', 'entity_reference_revisions', 'webform'
+  'link', 'image', 'file', 'entity_reference', 'entity_reference_revisions', 'webform', 'email'
 ];
 
 /**
@@ -665,7 +666,8 @@ export async function cmdFieldTypes(options) {
         file: 'File upload',
         entity_reference: 'Reference to another entity',
         entity_reference_revisions: 'Paragraph reference',
-        webform: 'Webform reference'
+        webform: 'Webform reference',
+        email: 'Email address'
       };
       return { type, description: descriptions[type] || type };
     });
@@ -915,6 +917,98 @@ export async function cmdFieldEdit(options) {
     }
 
     await runSyncIfRequested(project, options);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Add a bundle to entity reference fields that target its entity type
+ */
+export async function cmdFieldAddToRefs(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+    if (!options.entityType) {
+      throw new Error('--entity-type is required');
+    }
+    if (!isValidEntityType(options.entityType)) {
+      throw new Error(`Invalid entity type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
+    }
+    if (!options.bundle) {
+      throw new Error('--bundle is required');
+    }
+
+    const project = await loadProject(options.project);
+    await autoSyncProject(project);
+
+    if (!project.entities) {
+      throw new Error('No entities found. Run sync first.');
+    }
+
+    // Find all entity reference fields targeting this entity type
+    const matchingFields = findEntityReferenceFieldsTargeting(project, options.entityType);
+
+    // Filter out fields that already have this bundle
+    const fieldsToUpdate = matchingFields.filter(
+      f => !f.currentTargetBundles.includes(options.bundle)
+    );
+
+    // If --fields specified, filter to only those
+    if (options.fields) {
+      const requestedSpecs = options.fields.split(',').map(s => s.trim());
+      const filtered = fieldsToUpdate.filter(f => {
+        const spec = `${f.entityType}.${f.bundleId}.${f.fieldName}`;
+        return requestedSpecs.includes(spec);
+      });
+
+      if (filtered.length === 0) {
+        const msg = 'No matching fields found for the specified --fields filter.';
+        if (options.json) {
+          output({ updated: [], message: msg }, true);
+        } else {
+          console.log(chalk.yellow(msg));
+        }
+        return;
+      }
+
+      fieldsToUpdate.length = 0;
+      fieldsToUpdate.push(...filtered);
+    }
+
+    if (fieldsToUpdate.length === 0) {
+      const msg = `No entity reference fields found that target ${options.entityType}, or all already include "${options.bundle}".`;
+      if (options.json) {
+        output({ updated: [], message: msg }, true);
+      } else {
+        console.log(chalk.yellow(msg));
+      }
+      return;
+    }
+
+    // Update each field
+    const results = [];
+    for (const field of fieldsToUpdate) {
+      const updatedBundles = [...field.currentTargetBundles, options.bundle];
+
+      const result = await updateField(project, field.entityType, field.bundleId, field.fieldName, {
+        targetBundles: updatedBundles
+      });
+      results.push(result);
+
+      if (!options.json) {
+        console.log(chalk.green(`  Updated ${field.fieldName} on ${field.entityType} > ${field.bundleId}`));
+      }
+    }
+
+    logSuccess(options.project);
+
+    if (options.json) {
+      output({ updated: results, bundle: options.bundle, entityType: options.entityType }, true);
+    } else {
+      console.log(chalk.green(`\nAdded "${options.bundle}" to ${results.length} field(s).`));
+    }
   } catch (error) {
     handleError(error);
   }

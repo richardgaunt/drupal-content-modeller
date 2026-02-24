@@ -16,6 +16,7 @@ import {
   cmdFieldTypes,
   cmdFieldList,
   cmdFieldEdit,
+  cmdFieldAddToRefs,
   cmdReportEntity,
   cmdReportProject,
   cmdAdminLinks,
@@ -226,6 +227,16 @@ fieldCmd
   .option('--sync', 'Sync with Drupal after edit (runs drush cim && drush cex)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFieldEdit);
+
+fieldCmd
+  .command('add-to-refs')
+  .description('Add a bundle to entity reference fields that target its entity type')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type of the bundle to add')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name to add')
+  .option('--fields <fields>', 'Comma-separated field specs (entityType.bundle.fieldName) to limit update')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFieldAddToRefs);
 
 // ============================================
 // Report Commands

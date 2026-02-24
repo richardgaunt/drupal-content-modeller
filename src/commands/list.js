@@ -353,3 +353,51 @@ export function formatBundleFieldsTable(fields) {
 function padRight(str, width) {
   return str.padEnd(width);
 }
+
+/**
+ * Find all entity reference fields that target a specific entity type
+ * @param {object} project - Project with entities
+ * @param {string} targetEntityType - Entity type being targeted (e.g. 'paragraph')
+ * @returns {object[]} - Array of matching field info objects
+ */
+export function findEntityReferenceFieldsTargeting(project, targetEntityType) {
+  const results = [];
+
+  for (const [entityType, bundles] of Object.entries(project.entities || {})) {
+    for (const [bundleId, bundle] of Object.entries(bundles)) {
+      for (const [fieldName, field] of Object.entries(bundle.fields || {})) {
+        if (field.type !== 'entity_reference' && field.type !== 'entity_reference_revisions') continue;
+
+        let fieldTargetType;
+        if (field.type === 'entity_reference_revisions') {
+          fieldTargetType = 'paragraph';
+        } else {
+          fieldTargetType = field.settings?.target_type;
+          if (!fieldTargetType && field.settings?.handler) {
+            const match = field.settings.handler.match(/^default:(.+)$/);
+            if (match) fieldTargetType = match[1];
+          }
+          fieldTargetType = fieldTargetType || 'node';
+        }
+
+        if (fieldTargetType !== targetEntityType) continue;
+
+        const currentTargetBundles = field.settings?.handler_settings?.target_bundles
+          ? Object.keys(field.settings.handler_settings.target_bundles)
+          : [];
+
+        results.push({
+          entityType,
+          bundleId,
+          bundleLabel: bundle.label || bundleId,
+          fieldName,
+          fieldLabel: field.label || fieldName,
+          fieldType: field.type,
+          currentTargetBundles
+        });
+      }
+    }
+  }
+
+  return results;
+}

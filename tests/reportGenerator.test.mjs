@@ -498,7 +498,8 @@ describe('Report Generator', () => {
         description: '',
         cardinality: 1,
         required: true,
-        other: 'Max: 255'
+        other: 'Max: 255',
+        settings: { max_length: 255 }
       });
     });
 
@@ -542,6 +543,7 @@ describe('Report Generator', () => {
       const result = generateBundleReportData(bundle, 'node');
       const bodyField = result.fields.find(f => f.name === 'field_body');
       expect(bodyField.other).toBeNull();
+      expect(bodyField.settings).toEqual({});
     });
 
     test('sets other to string for fields with extra info', () => {
@@ -562,6 +564,10 @@ describe('Report Generator', () => {
       };
       const result = generateBundleReportData(refBundle, 'node');
       expect(result.fields[0].other).toBe('References: page(node)');
+      expect(result.fields[0].settings).toEqual({
+        handler: 'default:node',
+        handler_settings: { target_bundles: { page: 'page' } }
+      });
     });
 
     test('includes base fields for node', () => {

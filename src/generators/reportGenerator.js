@@ -287,7 +287,8 @@ export function generateBundleReportData(bundle, entityType, baseUrl = '', optio
         description: field.description || '',
         cardinality: field.cardinality || 1,
         required: !!field.required,
-        other: other === '-' ? null : other
+        other: other === '-' ? null : other,
+        settings: field.settings || {}
       };
     }),
     permissions: generateBundlePermissionsData(options.roles || [], entityType, bundle.id)

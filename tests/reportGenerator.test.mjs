@@ -8,7 +8,10 @@ import {
   generateBundleReport,
   generateSingleBundleReport,
   generateEntityTypeReport,
-  generateProjectReport
+  generateProjectReport,
+  generateBundleReportData,
+  generateEntityTypeReportData,
+  generateProjectReportData
 } from '../src/generators/reportGenerator.js';
 
 describe('Report Generator', () => {
@@ -445,6 +448,244 @@ describe('Report Generator', () => {
       const noUrlProject = { ...project, baseUrl: undefined };
       const result = generateProjectReport(noUrlProject);
       expect(result).toContain('_Not set_');
+    });
+  });
+
+  describe('generateBundleReportData', () => {
+    const bundle = {
+      id: 'page',
+      label: 'Page',
+      description: 'A basic page',
+      fields: {
+        field_title: {
+          name: 'field_title',
+          label: 'Title',
+          type: 'string',
+          required: true,
+          cardinality: 1,
+          settings: { max_length: 255 }
+        },
+        field_body: {
+          name: 'field_body',
+          label: 'Body',
+          type: 'text_long',
+          required: false,
+          cardinality: 1
+        }
+      }
+    };
+
+    test('returns correct object shape', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      expect(result).toHaveProperty('entityType', 'node');
+      expect(result).toHaveProperty('bundle', 'page');
+      expect(result).toHaveProperty('label', 'Page');
+      expect(result).toHaveProperty('description', 'A basic page');
+      expect(result).toHaveProperty('adminLinks');
+      expect(result).toHaveProperty('baseFields');
+      expect(result).toHaveProperty('fields');
+    });
+
+    test('maps fields correctly', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      const titleField = result.fields.find(f => f.name === 'field_title');
+      expect(titleField).toEqual({
+        name: 'field_title',
+        label: 'Title',
+        type: 'string',
+        description: '',
+        cardinality: 1,
+        required: true,
+        other: 'Max: 255'
+      });
+    });
+
+    test('sorts fields alphabetically by label', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      const labels = result.fields.map(f => f.label);
+      expect(labels).toEqual(['Body', 'Title']);
+    });
+
+    test('includes admin links without baseUrl', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      expect(result.adminLinks.length).toBeGreaterThan(0);
+      expect(result.adminLinks[0]).toHaveProperty('name');
+      expect(result.adminLinks[0]).toHaveProperty('url');
+      expect(result.adminLinks[0].url).toMatch(/^\/admin\//);
+    });
+
+    test('includes admin links with baseUrl', () => {
+      const result = generateBundleReportData(bundle, 'node', 'https://example.com');
+      expect(result.adminLinks[0].url).toMatch(/^https:\/\/example\.com\/admin\//);
+    });
+
+    test('returns cardinality from field', () => {
+      const unlimitedBundle = {
+        id: 'test',
+        label: 'Test',
+        fields: {
+          field_images: {
+            name: 'field_images',
+            label: 'Images',
+            type: 'image',
+            cardinality: -1
+          }
+        }
+      };
+      const result = generateBundleReportData(unlimitedBundle, 'node');
+      expect(result.fields[0].cardinality).toBe(-1);
+    });
+
+    test('sets other to null for fields with no extra info', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      const bodyField = result.fields.find(f => f.name === 'field_body');
+      expect(bodyField.other).toBeNull();
+    });
+
+    test('sets other to string for fields with extra info', () => {
+      const refBundle = {
+        id: 'test',
+        label: 'Test',
+        fields: {
+          field_ref: {
+            name: 'field_ref',
+            label: 'Reference',
+            type: 'entity_reference',
+            settings: {
+              handler: 'default:node',
+              handler_settings: { target_bundles: { page: 'page' } }
+            }
+          }
+        }
+      };
+      const result = generateBundleReportData(refBundle, 'node');
+      expect(result.fields[0].other).toBe('References: page(node)');
+    });
+
+    test('includes base fields for node', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      expect(result.baseFields.length).toBeGreaterThan(0);
+      const titleBase = result.baseFields.find(f => f.name === 'title');
+      expect(titleBase).toEqual({
+        name: 'title',
+        label: 'Title',
+        type: 'string',
+        widget: 'string_textfield'
+      });
+    });
+
+    test('applies base field overrides', () => {
+      const options = {
+        baseFieldOverrides: {
+          title: { label: 'Custom Title' }
+        }
+      };
+      const result = generateBundleReportData(bundle, 'node', '', options);
+      const titleBase = result.baseFields.find(f => f.name === 'title');
+      expect(titleBase.label).toBe('Custom Title');
+    });
+
+    test('returns empty fields array for bundle with no fields', () => {
+      const emptyBundle = { id: 'empty', label: 'Empty', fields: {} };
+      const result = generateBundleReportData(emptyBundle, 'node');
+      expect(result.fields).toEqual([]);
+    });
+
+    test('uses bundle id as label when label is missing', () => {
+      const noLabelBundle = { id: 'no_label', fields: {} };
+      const result = generateBundleReportData(noLabelBundle, 'node');
+      expect(result.label).toBe('no_label');
+    });
+  });
+
+  describe('generateEntityTypeReportData', () => {
+    const project = {
+      name: 'Test Project',
+      entities: {
+        node: {
+          page: { id: 'page', label: 'Page', fields: {} },
+          article: { id: 'article', label: 'Article', fields: {} }
+        }
+      }
+    };
+
+    test('returns correct entity type and label', () => {
+      const result = generateEntityTypeReportData(project, 'node');
+      expect(result.entityType).toBe('node');
+      expect(result.label).toBe('Content Types');
+    });
+
+    test('sorts bundles alphabetically by label', () => {
+      const result = generateEntityTypeReportData(project, 'node');
+      const labels = result.bundles.map(b => b.label);
+      expect(labels).toEqual(['Article', 'Page']);
+    });
+
+    test('returns empty bundles array for empty entity type', () => {
+      const result = generateEntityTypeReportData(project, 'media');
+      expect(result.bundles).toEqual([]);
+      expect(result.label).toBe('Media Types');
+    });
+  });
+
+  describe('generateProjectReportData', () => {
+    const project = {
+      name: 'Test Project',
+      baseUrl: 'https://example.com',
+      entities: {
+        node: {
+          page: { id: 'page', label: 'Page', fields: {} }
+        },
+        media: {
+          image: { id: 'image', label: 'Image', fields: {} }
+        },
+        paragraph: {},
+        taxonomy_term: {},
+        block_content: {}
+      }
+    };
+
+    test('includes project name', () => {
+      const result = generateProjectReportData(project);
+      expect(result.project).toBe('Test Project');
+    });
+
+    test('uses project baseUrl when no override', () => {
+      const result = generateProjectReportData(project);
+      expect(result.baseUrl).toBe('https://example.com');
+    });
+
+    test('uses override baseUrl when provided', () => {
+      const result = generateProjectReportData(project, 'https://custom.com');
+      expect(result.baseUrl).toBe('https://custom.com');
+    });
+
+    test('sets baseUrl to null when none available', () => {
+      const noUrlProject = { ...project, baseUrl: undefined };
+      const result = generateProjectReportData(noUrlProject);
+      expect(result.baseUrl).toBeNull();
+    });
+
+    test('includes only entity types with bundles', () => {
+      const result = generateProjectReportData(project);
+      const types = result.entityTypes.map(et => et.entityType);
+      expect(types).toEqual(['node', 'media']);
+    });
+
+    test('orders entity types per ENTITY_ORDER', () => {
+      const fullProject = {
+        name: 'Full',
+        entities: {
+          node: { page: { id: 'page', label: 'Page', fields: {} } },
+          media: { image: { id: 'image', label: 'Image', fields: {} } },
+          paragraph: { hero: { id: 'hero', label: 'Hero', fields: {} } },
+          taxonomy_term: { tags: { id: 'tags', label: 'Tags', fields: {} } },
+          block_content: { banner: { id: 'banner', label: 'Banner', fields: {} } }
+        }
+      };
+      const result = generateProjectReportData(fullProject);
+      const types = result.entityTypes.map(et => et.entityType);
+      expect(types).toEqual(['node', 'media', 'paragraph', 'taxonomy_term', 'block_content']);
     });
   });
 });

@@ -18,7 +18,11 @@ import {
   getFieldsForBundle,
   findEntityReferenceFieldsTargeting
 } from '../commands/list.js';
-import { getBundleAdminUrls } from '../generators/reportGenerator.js';
+import {
+  getBundleAdminUrls,
+  generateEntityTypeReportData,
+  generateProjectReportData
+} from '../generators/reportGenerator.js';
 import { ENTITY_PREFIXES } from '../generators/fieldGenerator.js';
 import { getReportsDir } from '../io/fileSystem.js';
 import {
@@ -1041,13 +1045,13 @@ export async function cmdReportEntity(options) {
     }
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
-    const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-${options.entityType}-report.md`);
-
-    await createEntityReport(project, options.entityType, outputPath, baseUrl);
 
     if (options.json) {
-      output({ outputPath, entityType: options.entityType }, true);
+      const data = generateEntityTypeReportData(project, options.entityType, baseUrl);
+      output(data, true);
     } else {
+      const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-${options.entityType}-report.md`);
+      await createEntityReport(project, options.entityType, outputPath, baseUrl);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
     }
   } catch (error) {
@@ -1072,13 +1076,13 @@ export async function cmdReportProject(options) {
     }
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
-    const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-content-model.md`);
-
-    await createProjectReport(project, outputPath, baseUrl);
 
     if (options.json) {
-      output({ outputPath }, true);
+      const data = generateProjectReportData(project, baseUrl);
+      output(data, true);
     } else {
+      const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-content-model.md`);
+      await createProjectReport(project, outputPath, baseUrl);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
     }
   } catch (error) {

@@ -181,6 +181,95 @@ export function generateAnchor(label, entityType) {
 }
 
 /**
+ * Generate structured data for a single bundle
+ * @param {object} bundle - Bundle object
+ * @param {string} entityType - Entity type
+ * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options
+ * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
+ * @returns {object} - Structured bundle data
+ */
+export function generateBundleReportData(bundle, entityType, baseUrl = '', options = {}) {
+  const adminUrls = getBundleAdminUrls(entityType, bundle.id);
+  const baseFieldOverrides = options.baseFieldOverrides || {};
+  const baseFieldsConfig = getBaseFields(entityType);
+
+  const fields = Object.values(bundle.fields || {});
+  const sortedFields = [...fields].sort((a, b) =>
+    (a.label || '').localeCompare(b.label || '')
+  );
+
+  return {
+    entityType,
+    bundle: bundle.id,
+    label: bundle.label || bundle.id,
+    description: bundle.description || '',
+    adminLinks: adminUrls.map(url => ({
+      name: url.name,
+      url: baseUrl ? `${baseUrl}${url.path}` : url.path
+    })),
+    baseFields: Object.entries(baseFieldsConfig).map(([name, config]) => ({
+      name,
+      label: baseFieldOverrides[name]?.label || config.label,
+      type: config.type,
+      widget: config.widget
+    })),
+    fields: sortedFields.map(field => {
+      const other = getFieldOtherInfo(field);
+      return {
+        name: field.name,
+        label: field.label || field.name,
+        type: field.type,
+        description: field.description || '',
+        cardinality: field.cardinality || 1,
+        required: !!field.required,
+        other: other === '-' ? null : other
+      };
+    })
+  };
+}
+
+/**
+ * Generate structured data for a single entity type
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @param {string} baseUrl - Base URL for links
+ * @returns {object} - Structured entity type data
+ */
+export function generateEntityTypeReportData(project, entityType, baseUrl = '') {
+  const bundles = project.entities[entityType] || {};
+  const bundleList = Object.values(bundles);
+
+  const sortedBundles = [...bundleList].sort((a, b) =>
+    (a.label || '').localeCompare(b.label || '')
+  );
+
+  return {
+    entityType,
+    label: getEntityTypeLabel(entityType),
+    bundles: sortedBundles.map(b => generateBundleReportData(b, entityType, baseUrl))
+  };
+}
+
+/**
+ * Generate structured data for a full project report
+ * @param {object} project - Project object
+ * @param {string} baseUrl - Base URL for links
+ * @returns {object} - Structured project data
+ */
+export function generateProjectReportData(project, baseUrl = '') {
+  const resolvedBaseUrl = baseUrl || project.baseUrl || null;
+
+  return {
+    project: project.name,
+    baseUrl: resolvedBaseUrl,
+    entityTypes: ENTITY_ORDER
+      .filter(et => Object.keys(project.entities[et] || {}).length > 0)
+      .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || ''))
+  };
+}
+
+/**
  * Generate a report for a single bundle
  * @param {object} bundle - Bundle object
  * @param {string} entityType - Entity type

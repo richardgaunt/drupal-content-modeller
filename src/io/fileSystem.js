@@ -14,6 +14,41 @@ const defaultProjectRoot = join(__dirname, '..', '..');
 // Configurable projects directory for testing
 let _projectsDir = null;
 
+// Permission error handler for interactive retry
+let permissionErrorHandler = null;
+
+/**
+ * Set a handler for permission errors (EACCES/EPERM) during file writes.
+ * The handler receives the error and should return true to retry or false to abort.
+ * @param {Function|null} handler - Async function(error) => boolean, or null to clear
+ */
+export function setPermissionErrorHandler(handler) {
+  permissionErrorHandler = handler;
+}
+
+/**
+ * Wrap an async operation with permission error retry logic.
+ * If a handler is set and the error is a permission error, the handler is called.
+ * @param {Function} fn - Async function to execute
+ * @returns {Promise<*>} - Result of fn
+ */
+async function withPermissionRetry(fn) {
+  while (true) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (
+        (error.code === 'EACCES' || error.code === 'EPERM') &&
+        permissionErrorHandler
+      ) {
+        const shouldRetry = await permissionErrorHandler(error);
+        if (shouldRetry) continue;
+      }
+      throw error;
+    }
+  }
+}
+
 /**
  * Set the projects directory (for testing)
  * @param {string|null} dir - Path to projects directory, or null to reset
@@ -118,11 +153,13 @@ export async function readJsonFile(filePath) {
  * @param {object} data - Data to write
  */
 export async function writeJsonFile(filePath, data) {
-  const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  return withPermissionRetry(async () => {
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  });
 }
 
 /**
@@ -222,11 +259,13 @@ export async function readTextFile(filePath) {
  * @param {string} content - YAML content
  */
 export async function writeYamlFile(filePath, content) {
-  const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(filePath, content, 'utf-8');
+  return withPermissionRetry(async () => {
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    await writeFile(filePath, content, 'utf-8');
+  });
 }
 
 /**
@@ -235,9 +274,11 @@ export async function writeYamlFile(filePath, content) {
  * @param {string} content - Text content
  */
 export async function writeTextFile(filePath, content) {
-  const dir = dirname(filePath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(filePath, content, 'utf-8');
+  return withPermissionRetry(async () => {
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    await writeFile(filePath, content, 'utf-8');
+  });
 }

@@ -32,7 +32,7 @@ import {
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../commands/create.js';
 import { createEntityReport, createProjectReport, createBundleReport } from '../commands/report.js';
-import { getReportsDir } from '../io/fileSystem.js';
+import { getReportsDir, setPermissionErrorHandler } from '../io/fileSystem.js';
 import {
   loadFormDisplay,
   saveFormDisplay,
@@ -132,6 +132,21 @@ const REFERENCE_TARGET_CHOICES = [
  * @returns {Promise<void>}
  */
 export async function showMainMenu() {
+  setPermissionErrorHandler(async (error) => {
+    console.log(chalk.red(`\nPermission denied: ${error.message}`));
+    console.log(
+      chalk.yellow('Fix file permissions in another terminal, then retry.\n')
+    );
+    const retry = await select({
+      message: 'Would you like to retry?',
+      choices: [
+        { value: true, name: 'Yes, retry' },
+        { value: false, name: 'No, cancel' },
+      ],
+    });
+    return retry;
+  });
+
   console.log();
   console.log(chalk.cyan('Drupal Content Modeller'));
   console.log();

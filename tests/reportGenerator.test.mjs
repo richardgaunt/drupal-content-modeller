@@ -11,7 +11,9 @@ import {
   generateProjectReport,
   generateBundleReportData,
   generateEntityTypeReportData,
-  generateProjectReportData
+  generateProjectReportData,
+  generateBundlePermissionsTable,
+  generateBundlePermissionsData
 } from '../src/generators/reportGenerator.js';
 
 describe('Report Generator', () => {
@@ -686,6 +688,347 @@ describe('Report Generator', () => {
       const result = generateProjectReportData(fullProject);
       const types = result.entityTypes.map(et => et.entityType);
       expect(types).toEqual(['node', 'media', 'paragraph', 'taxonomy_term', 'block_content']);
+    });
+
+    test('threads roles through to bundle data', () => {
+      const roles = [
+        { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] }
+      ];
+      const result = generateProjectReportData(project, '', { roles });
+      const nodeType = result.entityTypes.find(et => et.entityType === 'node');
+      const pageBundle = nodeType.bundles.find(b => b.bundle === 'page');
+      expect(pageBundle.permissions).toBeDefined();
+      expect(pageBundle.permissions.length).toBe(1);
+      expect(pageBundle.permissions[0].role).toBe('editor');
+    });
+  });
+
+  // ============================================
+  // Permissions Tests
+  // ============================================
+
+  describe('generateBundlePermissionsTable', () => {
+    const mockRoles = [
+      {
+        id: 'anonymous',
+        label: 'Anonymous',
+        isAdmin: false,
+        permissions: []
+      },
+      {
+        id: 'authenticated',
+        label: 'Authenticated',
+        isAdmin: false,
+        permissions: ['create page content']
+      },
+      {
+        id: 'editor',
+        label: 'Editor',
+        isAdmin: false,
+        permissions: [
+          'create page content',
+          'edit own page content',
+          'edit any page content',
+          'delete own page content'
+        ]
+      },
+      {
+        id: 'administrator',
+        label: 'Administrator',
+        isAdmin: true,
+        permissions: []
+      }
+    ];
+
+    test('generates correct column headers for node', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'node', 'page');
+      expect(result).toContain('| Role | Create new content | Edit own content | Edit any content | Delete own content | Delete any content | View revisions | Revert revisions | Delete revisions |');
+    });
+
+    test('generates correct column headers for taxonomy_term', () => {
+      const taxRoles = [{ id: 'editor', label: 'Editor', isAdmin: false, permissions: [] }];
+      const result = generateBundlePermissionsTable(taxRoles, 'taxonomy_term', 'tags');
+      expect(result).toContain('| Role | Create terms | Edit terms | Delete terms | View term revisions | Revert term revisions | Delete term revisions |');
+    });
+
+    test('admin role shows Yes for all permissions', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'node', 'page');
+      const adminRow = result.split('\n').find(line => line.includes('Administrator'));
+      const cells = adminRow.split('|').map(c => c.trim()).filter(Boolean);
+      // All cells after "Administrator" should be "Yes"
+      const permCells = cells.slice(1);
+      expect(permCells.every(c => c === 'Yes')).toBe(true);
+    });
+
+    test('anonymous with no permissions shows all No', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'node', 'page');
+      const anonRow = result.split('\n').find(line => line.includes('Anonymous'));
+      const cells = anonRow.split('|').map(c => c.trim()).filter(Boolean);
+      const permCells = cells.slice(1);
+      expect(permCells.every(c => c === 'No')).toBe(true);
+    });
+
+    test('editor shows correct Yes/No mapping', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'node', 'page');
+      const editorRow = result.split('\n').find(line => line.includes('Editor'));
+      const cells = editorRow.split('|').map(c => c.trim()).filter(Boolean);
+      // Editor has: create, edit_own, edit_any, delete_own — Yes for first 4, No for rest
+      expect(cells[1]).toBe('Yes'); // Create
+      expect(cells[2]).toBe('Yes'); // Edit own
+      expect(cells[3]).toBe('Yes'); // Edit any
+      expect(cells[4]).toBe('Yes'); // Delete own
+      expect(cells[5]).toBe('No');  // Delete any
+      expect(cells[6]).toBe('No');  // View revisions
+    });
+
+    test('returns empty string for paragraph entity type', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'paragraph', 'hero');
+      expect(result).toBe('');
+    });
+
+    test('returns empty string when roles is empty', () => {
+      const result = generateBundlePermissionsTable([], 'node', 'page');
+      expect(result).toBe('');
+    });
+
+    test('returns empty string when roles is null', () => {
+      const result = generateBundlePermissionsTable(null, 'node', 'page');
+      expect(result).toBe('');
+    });
+
+    test('includes Permissions heading', () => {
+      const result = generateBundlePermissionsTable(mockRoles, 'node', 'page');
+      expect(result).toContain('#### Permissions');
+    });
+  });
+
+  describe('generateBundlePermissionsData', () => {
+    const mockRoles = [
+      {
+        id: 'anonymous',
+        label: 'Anonymous',
+        isAdmin: false,
+        permissions: []
+      },
+      {
+        id: 'editor',
+        label: 'Editor',
+        isAdmin: false,
+        permissions: [
+          'create page content',
+          'edit own page content',
+          'edit any page content'
+        ]
+      },
+      {
+        id: 'administrator',
+        label: 'Administrator',
+        isAdmin: true,
+        permissions: []
+      }
+    ];
+
+    test('returns correct structure for each role', () => {
+      const result = generateBundlePermissionsData(mockRoles, 'node', 'page');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({
+        role: 'anonymous',
+        label: 'Anonymous',
+        isAdmin: false,
+        permissions: []
+      });
+    });
+
+    test('admin role gets all permissions', () => {
+      const result = generateBundlePermissionsData(mockRoles, 'node', 'page');
+      const admin = result.find(r => r.role === 'administrator');
+      expect(admin.isAdmin).toBe(true);
+      expect(admin.permissions).toHaveLength(8); // node has 8 permissions
+      expect(admin.permissions).toContain('create page content');
+      expect(admin.permissions).toContain('delete page revisions');
+    });
+
+    test('non-admin gets only matching permissions', () => {
+      const result = generateBundlePermissionsData(mockRoles, 'node', 'page');
+      const editor = result.find(r => r.role === 'editor');
+      expect(editor.permissions).toHaveLength(3);
+      expect(editor.permissions).toContain('create page content');
+      expect(editor.permissions).toContain('edit own page content');
+      expect(editor.permissions).toContain('edit any page content');
+    });
+
+    test('returns empty array for paragraph entity type', () => {
+      const result = generateBundlePermissionsData(mockRoles, 'paragraph', 'hero');
+      expect(result).toEqual([]);
+    });
+
+    test('returns empty array when roles is empty', () => {
+      const result = generateBundlePermissionsData([], 'node', 'page');
+      expect(result).toEqual([]);
+    });
+
+    test('returns empty array when roles is null', () => {
+      const result = generateBundlePermissionsData(null, 'node', 'page');
+      expect(result).toEqual([]);
+    });
+
+    test('handles media entity type', () => {
+      const roles = [{ id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create image media'] }];
+      const result = generateBundlePermissionsData(roles, 'media', 'image');
+      expect(result[0].permissions).toEqual(['create image media']);
+    });
+
+    test('handles block_content entity type', () => {
+      const roles = [{ id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create banner block content'] }];
+      const result = generateBundlePermissionsData(roles, 'block_content', 'banner');
+      expect(result[0].permissions).toEqual(['create banner block content']);
+    });
+  });
+
+  describe('generateBundleReport with permissions', () => {
+    const bundle = {
+      id: 'page',
+      label: 'Page',
+      description: 'A basic page',
+      fields: {
+        field_body: {
+          name: 'field_body',
+          label: 'Body',
+          type: 'text_long',
+          required: false,
+          cardinality: 1
+        }
+      }
+    };
+
+    const roles = [
+      { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] },
+      { id: 'administrator', label: 'Administrator', isAdmin: true, permissions: [] }
+    ];
+
+    test('includes permissions section when roles provided', () => {
+      const result = generateBundleReport(bundle, 'node', '', { roles });
+      expect(result).toContain('#### Permissions');
+      expect(result).toContain('| Editor |');
+      expect(result).toContain('| Administrator |');
+    });
+
+    test('omits permissions section when no roles', () => {
+      const result = generateBundleReport(bundle, 'node');
+      expect(result).not.toContain('#### Permissions');
+    });
+
+    test('omits permissions section for paragraph type', () => {
+      const paraBundle = { id: 'hero', label: 'Hero', fields: { field_body: bundle.fields.field_body } };
+      const result = generateBundleReport(paraBundle, 'paragraph', '', { roles });
+      expect(result).not.toContain('#### Permissions');
+    });
+
+    test('includes permissions even when bundle has no custom fields', () => {
+      const emptyBundle = { id: 'page', label: 'Page', fields: {} };
+      const result = generateBundleReport(emptyBundle, 'node', '', { roles });
+      expect(result).toContain('_No custom fields_');
+      expect(result).toContain('#### Permissions');
+    });
+  });
+
+  describe('generateBundleReportData with permissions', () => {
+    const bundle = { id: 'page', label: 'Page', fields: {} };
+    const roles = [
+      { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] }
+    ];
+
+    test('includes permissions property when roles provided', () => {
+      const result = generateBundleReportData(bundle, 'node', '', { roles });
+      expect(result.permissions).toBeDefined();
+      expect(result.permissions).toHaveLength(1);
+      expect(result.permissions[0].role).toBe('editor');
+    });
+
+    test('returns empty permissions array when no roles', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      expect(result.permissions).toEqual([]);
+    });
+
+    test('returns empty permissions array for paragraph type', () => {
+      const paraBundle = { id: 'hero', label: 'Hero', fields: {} };
+      const result = generateBundleReportData(paraBundle, 'paragraph', '', { roles });
+      expect(result.permissions).toEqual([]);
+    });
+  });
+
+  describe('generateEntityTypeReport with permissions', () => {
+    const project = {
+      name: 'Test Project',
+      entities: {
+        node: {
+          page: { id: 'page', label: 'Page', fields: {} }
+        }
+      }
+    };
+    const roles = [
+      { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] }
+    ];
+
+    test('threads roles through to bundle reports', () => {
+      const result = generateEntityTypeReport(project, 'node', '', { roles });
+      expect(result).toContain('#### Permissions');
+      expect(result).toContain('| Editor |');
+    });
+
+    test('no permissions section without roles', () => {
+      const result = generateEntityTypeReport(project, 'node');
+      expect(result).not.toContain('#### Permissions');
+    });
+  });
+
+  describe('generateEntityTypeReportData with permissions', () => {
+    const project = {
+      name: 'Test Project',
+      entities: {
+        node: {
+          page: { id: 'page', label: 'Page', fields: {} }
+        }
+      }
+    };
+    const roles = [
+      { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] }
+    ];
+
+    test('threads roles through to bundle data', () => {
+      const result = generateEntityTypeReportData(project, 'node', '', { roles });
+      expect(result.bundles[0].permissions).toHaveLength(1);
+      expect(result.bundles[0].permissions[0].role).toBe('editor');
+    });
+  });
+
+  describe('generateProjectReport with permissions', () => {
+    const project = {
+      name: 'Test Project',
+      baseUrl: 'https://example.com',
+      entities: {
+        node: {
+          page: { id: 'page', label: 'Page', fields: {} }
+        },
+        media: {},
+        paragraph: {},
+        taxonomy_term: {},
+        block_content: {}
+      }
+    };
+    const roles = [
+      { id: 'editor', label: 'Editor', isAdmin: false, permissions: ['create page content'] }
+    ];
+
+    test('threads roles through to bundle reports', () => {
+      const result = generateProjectReport(project, '', { roles });
+      expect(result).toContain('#### Permissions');
+      expect(result).toContain('| Editor |');
+    });
+
+    test('no permissions section without roles', () => {
+      const result = generateProjectReport(project);
+      expect(result).not.toContain('#### Permissions');
     });
   });
 });

@@ -13,8 +13,8 @@ import { writeTextFile } from '../io/fileSystem.js';
  * @param {string} baseUrl - Base URL for links
  * @returns {Promise<string>} - Output path
  */
-export async function createEntityReport(project, entityType, outputPath, baseUrl = '') {
-  const content = generateEntityTypeReport(project, entityType, baseUrl);
+export async function createEntityReport(project, entityType, outputPath, baseUrl = '', options = {}) {
+  const content = generateEntityTypeReport(project, entityType, baseUrl, options);
   await writeTextFile(outputPath, content);
   return outputPath;
 }
@@ -26,8 +26,8 @@ export async function createEntityReport(project, entityType, outputPath, baseUr
  * @param {string} baseUrl - Base URL for links
  * @returns {Promise<string>} - Output path
  */
-export async function createProjectReport(project, outputPath, baseUrl = '') {
-  const content = generateProjectReport(project, baseUrl);
+export async function createProjectReport(project, outputPath, baseUrl = '', options = {}) {
+  const content = generateProjectReport(project, baseUrl, options);
   await writeTextFile(outputPath, content);
   return outputPath;
 }

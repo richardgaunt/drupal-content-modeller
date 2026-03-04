@@ -3,6 +3,7 @@
  */
 
 import { getBaseFields } from '../constants/baseFields.js';
+import { getPermissionTemplates, getPermissionsForBundle } from '../constants/permissions.js';
 
 /**
  * Entity type to admin path mapping (for fields page)
@@ -181,12 +182,75 @@ export function generateAnchor(label, entityType) {
 }
 
 /**
+ * Generate a Markdown permissions table for a bundle
+ * @param {object[]} roles - Array of role objects
+ * @param {string} entityType - Entity type
+ * @param {string} bundleId - Bundle machine name
+ * @returns {string} - Markdown table or empty string
+ */
+export function generateBundlePermissionsTable(roles, entityType, bundleId) {
+  const templates = getPermissionTemplates(entityType);
+  if (templates.length === 0 || !roles || roles.length === 0) {
+    return '';
+  }
+
+  const bundlePermissions = getPermissionsForBundle(entityType, bundleId);
+  const headers = templates.map(t => t.label);
+
+  let md = `#### Permissions\n\n`;
+  md += `| Role | ${headers.join(' | ')} |\n`;
+  md += `|------${headers.map(() => '|------').join('')}|\n`;
+
+  for (const role of roles) {
+    const permSet = new Set(role.permissions || []);
+    const cells = bundlePermissions.map(p =>
+      role.isAdmin || permSet.has(p.key) ? 'Yes' : 'No'
+    );
+    md += `| ${role.label || role.id} | ${cells.join(' | ')} |\n`;
+  }
+
+  md += '\n';
+  return md;
+}
+
+/**
+ * Generate structured permissions data for a bundle
+ * @param {object[]} roles - Array of role objects
+ * @param {string} entityType - Entity type
+ * @param {string} bundleId - Bundle machine name
+ * @returns {object[]} - Array of role permission objects
+ */
+export function generateBundlePermissionsData(roles, entityType, bundleId) {
+  const templates = getPermissionTemplates(entityType);
+  if (templates.length === 0 || !roles || roles.length === 0) {
+    return [];
+  }
+
+  const bundlePermissions = getPermissionsForBundle(entityType, bundleId);
+
+  return roles.map(role => {
+    const permSet = new Set(role.permissions || []);
+    const matchedPermissions = role.isAdmin
+      ? bundlePermissions.map(p => p.key)
+      : bundlePermissions.filter(p => permSet.has(p.key)).map(p => p.key);
+
+    return {
+      role: role.id,
+      label: role.label || role.id,
+      isAdmin: role.isAdmin || false,
+      permissions: matchedPermissions
+    };
+  });
+}
+
+/**
  * Generate structured data for a single bundle
  * @param {object} bundle - Bundle object
  * @param {string} entityType - Entity type
  * @param {string} baseUrl - Base URL for links
  * @param {object} options - Options
  * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
+ * @param {object[]} [options.roles] - Array of role objects for permissions
  * @returns {object} - Structured bundle data
  */
 export function generateBundleReportData(bundle, entityType, baseUrl = '', options = {}) {
@@ -225,7 +289,8 @@ export function generateBundleReportData(bundle, entityType, baseUrl = '', optio
         required: !!field.required,
         other: other === '-' ? null : other
       };
-    })
+    }),
+    permissions: generateBundlePermissionsData(options.roles || [], entityType, bundle.id)
   };
 }
 
@@ -234,9 +299,10 @@ export function generateBundleReportData(bundle, entityType, baseUrl = '', optio
  * @param {object} project - Project object
  * @param {string} entityType - Entity type
  * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options (e.g., roles)
  * @returns {object} - Structured entity type data
  */
-export function generateEntityTypeReportData(project, entityType, baseUrl = '') {
+export function generateEntityTypeReportData(project, entityType, baseUrl = '', options = {}) {
   const bundles = project.entities[entityType] || {};
   const bundleList = Object.values(bundles);
 
@@ -247,7 +313,7 @@ export function generateEntityTypeReportData(project, entityType, baseUrl = '') 
   return {
     entityType,
     label: getEntityTypeLabel(entityType),
-    bundles: sortedBundles.map(b => generateBundleReportData(b, entityType, baseUrl))
+    bundles: sortedBundles.map(b => generateBundleReportData(b, entityType, baseUrl, options))
   };
 }
 
@@ -255,9 +321,10 @@ export function generateEntityTypeReportData(project, entityType, baseUrl = '') 
  * Generate structured data for a full project report
  * @param {object} project - Project object
  * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options (e.g., roles)
  * @returns {object} - Structured project data
  */
-export function generateProjectReportData(project, baseUrl = '') {
+export function generateProjectReportData(project, baseUrl = '', options = {}) {
   const resolvedBaseUrl = baseUrl || project.baseUrl || null;
 
   return {
@@ -265,7 +332,7 @@ export function generateProjectReportData(project, baseUrl = '') {
     baseUrl: resolvedBaseUrl,
     entityTypes: ENTITY_ORDER
       .filter(et => Object.keys(project.entities[et] || {}).length > 0)
-      .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || ''))
+      .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || '', options))
   };
 }
 
@@ -276,6 +343,7 @@ export function generateProjectReportData(project, baseUrl = '') {
  * @param {string} baseUrl - Base URL for links
  * @param {object} options - Options
  * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
+ * @param {object[]} [options.roles] - Array of role objects for permissions
  * @returns {string} - Markdown content
  */
 export function generateBundleReport(bundle, entityType, baseUrl = '', options = {}) {
@@ -323,6 +391,9 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
 
   if (fields.length === 0) {
     md += '_No custom fields_\n\n';
+    if (options.roles && options.roles.length > 0) {
+      md += generateBundlePermissionsTable(options.roles, entityType, bundle.id);
+    }
     return md;
   }
 
@@ -350,6 +421,11 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
   }
 
   md += '\n';
+
+  if (options.roles && options.roles.length > 0) {
+    md += generateBundlePermissionsTable(options.roles, entityType, bundle.id);
+  }
+
   return md;
 }
 
@@ -358,9 +434,10 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
  * @param {object} project - Project object
  * @param {string} entityType - Entity type
  * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options (e.g., roles)
  * @returns {string} - Markdown content
  */
-export function generateEntityTypeReport(project, entityType, baseUrl = '') {
+export function generateEntityTypeReport(project, entityType, baseUrl = '', options = {}) {
   const bundles = project.entities[entityType] || {};
 
   let md = `# ${getEntityTypeLabel(entityType)} Report\n\n`;
@@ -380,7 +457,7 @@ export function generateEntityTypeReport(project, entityType, baseUrl = '') {
   );
 
   for (const bundle of sortedBundles) {
-    md += generateBundleReport(bundle, entityType, baseUrl);
+    md += generateBundleReport(bundle, entityType, baseUrl, options);
   }
 
   return md;
@@ -418,9 +495,10 @@ export function generateSingleBundleReport(project, entityType, bundleId, baseUr
  * Generate a full project report with table of contents
  * @param {object} project - Project object
  * @param {string} baseUrl - Base URL for links
+ * @param {object} options - Options (e.g., roles)
  * @returns {string} - Markdown content
  */
-export function generateProjectReport(project, baseUrl = '') {
+export function generateProjectReport(project, baseUrl = '', options = {}) {
   const displayUrl = baseUrl || project.baseUrl || '_Not set_';
 
   let md = `# Project: ${project.name}\n\n`;
@@ -465,7 +543,7 @@ export function generateProjectReport(project, baseUrl = '') {
     md += `## ${getEntityTypeLabel(entityType)}\n\n`;
 
     for (const bundle of sortedBundles) {
-      md += generateBundleReport(bundle, entityType, baseUrl);
+      md += generateBundleReport(bundle, entityType, baseUrl, options);
     }
   }
 

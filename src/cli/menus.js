@@ -2262,12 +2262,15 @@ async function handleBundleReport(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
     // Generate reports for all selected bundles
     for (const bundleId of bundleIds) {
       const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
       const outputPath = join(getReportsDir(project.slug), filename);
 
-      const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl);
+      const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl, { roles });
       if (result) {
         console.log(chalk.green(`Report saved to: ${outputPath}`));
       } else {
@@ -2319,11 +2322,14 @@ async function handleEntityReport(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-${entityType}-report.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createEntityReport(project, entityType, outputPath, baseUrl);
+    await createEntityReport(project, entityType, outputPath, baseUrl, { roles });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
@@ -2350,11 +2356,14 @@ async function handleProjectReport(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-content-model.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createProjectReport(project, outputPath, baseUrl);
+    await createProjectReport(project, outputPath, baseUrl, { roles });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {

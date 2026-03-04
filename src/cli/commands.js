@@ -1045,13 +1045,15 @@ export async function cmdReportEntity(options) {
     }
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
+    const roles = await listRoles(project);
+    const reportOptions = { roles };
 
     if (options.json) {
-      const data = generateEntityTypeReportData(project, options.entityType, baseUrl);
+      const data = generateEntityTypeReportData(project, options.entityType, baseUrl, reportOptions);
       output(data, true);
     } else {
       const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-${options.entityType}-report.md`);
-      await createEntityReport(project, options.entityType, outputPath, baseUrl);
+      await createEntityReport(project, options.entityType, outputPath, baseUrl, reportOptions);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
     }
   } catch (error) {
@@ -1076,13 +1078,15 @@ export async function cmdReportProject(options) {
     }
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
+    const roles = await listRoles(project);
+    const reportOptions = { roles };
 
     if (options.json) {
-      const data = generateProjectReportData(project, baseUrl);
+      const data = generateProjectReportData(project, baseUrl, reportOptions);
       output(data, true);
     } else {
       const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-content-model.md`);
-      await createProjectReport(project, outputPath, baseUrl);
+      await createProjectReport(project, outputPath, baseUrl, reportOptions);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
     }
   } catch (error) {

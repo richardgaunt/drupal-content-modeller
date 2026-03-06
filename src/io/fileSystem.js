@@ -138,6 +138,21 @@ export async function directoryContainsYmlFiles(dirPath) {
 }
 
 /**
+ * Ensure parent directory exists and write file content, with permission retry.
+ * @param {string} filePath - Path to write to
+ * @param {string} content - File content
+ */
+async function ensureDirectoryAndWrite(filePath, content) {
+  return withPermissionRetry(async () => {
+    const dir = dirname(filePath);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    await writeFile(filePath, content, 'utf-8');
+  });
+}
+
+/**
  * Read a JSON file
  * @param {string} filePath - Path to JSON file
  * @returns {Promise<object>} - Parsed JSON content
@@ -153,13 +168,7 @@ export async function readJsonFile(filePath) {
  * @param {object} data - Data to write
  */
 export async function writeJsonFile(filePath, data) {
-  return withPermissionRetry(async () => {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
-    }
-    await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  });
+  return ensureDirectoryAndWrite(filePath, JSON.stringify(data, null, 2));
 }
 
 /**
@@ -259,13 +268,7 @@ export async function readTextFile(filePath) {
  * @param {string} content - YAML content
  */
 export async function writeYamlFile(filePath, content) {
-  return withPermissionRetry(async () => {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
-    }
-    await writeFile(filePath, content, 'utf-8');
-  });
+  return ensureDirectoryAndWrite(filePath, content);
 }
 
 /**
@@ -274,11 +277,5 @@ export async function writeYamlFile(filePath, content) {
  * @param {string} content - Text content
  */
 export async function writeTextFile(filePath, content) {
-  return withPermissionRetry(async () => {
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true });
-    }
-    await writeFile(filePath, content, 'utf-8');
-  });
+  return ensureDirectoryAndWrite(filePath, content);
 }

@@ -109,6 +109,30 @@ export function getBundleSummary(project) {
 }
 
 /**
+ * Create a formatted text table from column definitions and row data.
+ * @param {object[]} columns - Column definitions: { header, minWidth, getValue }
+ * @param {object[]} rows - Data rows
+ * @returns {string} - Formatted table string
+ */
+function createTable(columns, rows) {
+  // Calculate column widths from header and data
+  const widths = columns.map(col => {
+    const dataMax = rows.length > 0
+      ? Math.max(...rows.map(row => String(col.getValue(row)).length))
+      : 0;
+    return Math.max(col.minWidth || 15, col.header.length, dataMax) + 2;
+  });
+
+  const header = columns.map((col, i) => col.header.padEnd(widths[i])).join(' | ');
+  const separator = widths.map(w => '-'.repeat(w)).join('-+-');
+  const dataRows = rows.map(row =>
+    columns.map((col, i) => String(col.getValue(row)).padEnd(widths[i])).join(' | ')
+  );
+
+  return [header, separator, ...dataRows].join('\n');
+}
+
+/**
  * Format entity type table for display
  * @param {string} entityType - Entity type key
  * @param {object} group - Group object with label and bundles
@@ -119,42 +143,16 @@ export function formatEntityTypeTable(entityType, group) {
     return '';
   }
 
-  const lines = [];
-  lines.push(`${group.label} (${group.bundles.length})`);
+  const table = createTable(
+    [
+      { header: 'Label', minWidth: 20, getValue: b => b.label },
+      { header: 'Machine Name', minWidth: 20, getValue: b => b.id },
+      { header: 'Fields', minWidth: 6, getValue: b => String(b.fieldCount) }
+    ],
+    group.bundles
+  );
 
-  // Calculate column widths
-  const labelWidth = Math.max(20, ...group.bundles.map(b => b.label.length)) + 2;
-  const nameWidth = Math.max(20, ...group.bundles.map(b => b.id.length)) + 2;
-  const fieldWidth = 8;
-
-  // Header
-  const header = [
-    padRight('Label', labelWidth),
-    padRight('Machine Name', nameWidth),
-    padRight('Fields', fieldWidth)
-  ].join(' | ');
-
-  const separator = [
-    '-'.repeat(labelWidth),
-    '-'.repeat(nameWidth),
-    '-'.repeat(fieldWidth)
-  ].join('-+-');
-
-  lines.push(header);
-  lines.push(separator);
-
-  // Rows
-  for (const bundle of group.bundles) {
-    const row = [
-      padRight(bundle.label, labelWidth),
-      padRight(bundle.id, nameWidth),
-      padRight(String(bundle.fieldCount), fieldWidth)
-    ].join(' | ');
-    lines.push(row);
-  }
-
-  lines.push('');
-  return lines.join('\n');
+  return `${group.label} (${group.bundles.length})\n${table}\n`;
 }
 
 /**
@@ -231,44 +229,15 @@ export function formatEntityFieldsTable(fields) {
     return 'No fields found.';
   }
 
-  const lines = [];
-
-  // Calculate column widths
-  const labelWidth = Math.max(15, ...fields.map(f => f.label.length)) + 2;
-  const nameWidth = Math.max(15, ...fields.map(f => f.name.length)) + 2;
-  const typeWidth = Math.max(15, ...fields.map(f => f.type.length)) + 2;
-  const bundlesWidth = Math.max(20, ...fields.map(f => f.bundles.join(', ').length)) + 2;
-
-  // Header
-  const header = [
-    padRight('Label', labelWidth),
-    padRight('Machine Name', nameWidth),
-    padRight('Type', typeWidth),
-    padRight('Used In Bundles', bundlesWidth)
-  ].join(' | ');
-
-  const separator = [
-    '-'.repeat(labelWidth),
-    '-'.repeat(nameWidth),
-    '-'.repeat(typeWidth),
-    '-'.repeat(bundlesWidth)
-  ].join('-+-');
-
-  lines.push(header);
-  lines.push(separator);
-
-  // Rows
-  for (const field of fields) {
-    const row = [
-      padRight(field.label, labelWidth),
-      padRight(field.name, nameWidth),
-      padRight(field.type, typeWidth),
-      padRight(field.bundles.join(', '), bundlesWidth)
-    ].join(' | ');
-    lines.push(row);
-  }
-
-  return lines.join('\n');
+  return createTable(
+    [
+      { header: 'Label', getValue: f => f.label },
+      { header: 'Machine Name', getValue: f => f.name },
+      { header: 'Type', getValue: f => f.type },
+      { header: 'Used In Bundles', minWidth: 20, getValue: f => f.bundles.join(', ') }
+    ],
+    fields
+  );
 }
 
 /**
@@ -281,58 +250,16 @@ export function formatBundleFieldsTable(fields) {
     return 'No fields found.';
   }
 
-  const lines = [];
-
-  // Calculate column widths
-  const labelWidth = Math.max(15, ...fields.map(f => f.label.length)) + 2;
-  const nameWidth = Math.max(15, ...fields.map(f => f.name.length)) + 2;
-  const typeWidth = Math.max(15, ...fields.map(f => f.type.length)) + 2;
-  const requiredWidth = 10;
-  const cardinalityWidth = 12;
-
-  // Header
-  const header = [
-    padRight('Label', labelWidth),
-    padRight('Machine Name', nameWidth),
-    padRight('Type', typeWidth),
-    padRight('Required', requiredWidth),
-    padRight('Cardinality', cardinalityWidth)
-  ].join(' | ');
-
-  const separator = [
-    '-'.repeat(labelWidth),
-    '-'.repeat(nameWidth),
-    '-'.repeat(typeWidth),
-    '-'.repeat(requiredWidth),
-    '-'.repeat(cardinalityWidth)
-  ].join('-+-');
-
-  lines.push(header);
-  lines.push(separator);
-
-  // Rows
-  for (const field of fields) {
-    const row = [
-      padRight(field.label, labelWidth),
-      padRight(field.name, nameWidth),
-      padRight(field.type, typeWidth),
-      padRight(formatRequired(field.required), requiredWidth),
-      padRight(formatCardinality(field.cardinality), cardinalityWidth)
-    ].join(' | ');
-    lines.push(row);
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Pad string to the right
- * @param {string} str - String to pad
- * @param {number} width - Target width
- * @returns {string} - Padded string
- */
-function padRight(str, width) {
-  return str.padEnd(width);
+  return createTable(
+    [
+      { header: 'Label', getValue: f => f.label },
+      { header: 'Machine Name', getValue: f => f.name },
+      { header: 'Type', getValue: f => f.type },
+      { header: 'Required', minWidth: 8, getValue: f => formatRequired(f.required) },
+      { header: 'Cardinality', minWidth: 10, getValue: f => formatCardinality(f.cardinality) }
+    ],
+    fields
+  );
 }
 
 /**

@@ -37,6 +37,51 @@ import {
 } from '../constants/baseFields.js';
 
 /**
+ * Resolve the Drupal field type for a field (base field or custom field).
+ * @param {object} project - Project object with configDirectory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field name
+ * @returns {Promise<string>} - Field type
+ * @throws {Error} If field instance not found
+ */
+async function resolveFieldType(project, entityType, bundle, fieldName) {
+  if (isBaseField(entityType, fieldName)) {
+    return getBaseFieldConfig(entityType, fieldName).type;
+  }
+  const fieldInstance = await readFieldInstance(
+    project.configDirectory, entityType, bundle, fieldName
+  );
+  if (!fieldInstance) {
+    throw new Error(`Field instance not found: ${fieldName}`);
+  }
+  return fieldInstance.type;
+}
+
+/**
+ * Resolve the default widget for a field (base field or custom field).
+ * @param {object} project - Project object with configDirectory
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle name
+ * @param {string} fieldName - Field name
+ * @returns {Promise<{type: string, settings: object}|null>} - Widget info or null
+ */
+async function resolveDefaultWidget(project, entityType, bundle, fieldName) {
+  if (isBaseField(entityType, fieldName)) {
+    const config = getBaseFieldConfig(entityType, fieldName);
+    return { type: config.widget, settings: config.settings };
+  }
+  const fieldInstance = await readFieldInstance(
+    project.configDirectory, entityType, bundle, fieldName
+  );
+  if (!fieldInstance) {
+    return null;
+  }
+  const widget = getDefaultWidget(fieldInstance.type);
+  return widget ? { type: widget.type, settings: widget.settings } : null;
+}
+
+/**
  * Load form display for a bundle
  * @param {object} project - Project object with configDirectory
  * @param {string} entityType - Entity type
@@ -631,36 +676,13 @@ export async function showHiddenField(project, formDisplay, fieldName) {
     throw new Error(`Field is not hidden: ${fieldName}`);
   }
 
-  let widgetType;
-  let widgetSettings;
-
-  // Check if it's a base field first
-  if (isBaseField(entityType, fieldName)) {
-    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
-    widgetType = baseFieldConfig.widget;
-    widgetSettings = baseFieldConfig.settings;
-  } else {
-    // Read field instance to get field type
-    const fieldInstance = await readFieldInstance(
-      project.configDirectory,
-      entityType,
-      bundle,
-      fieldName
-    );
-
-    if (!fieldInstance) {
-      throw new Error(`Field instance not found: ${fieldName}`);
-    }
-
-    // Get default widget for field type
-    const defaultWidget = getDefaultWidget(fieldInstance.type);
-    if (!defaultWidget) {
-      throw new Error(`No widget found for field type: ${fieldInstance.type}`);
-    }
-
-    widgetType = defaultWidget.type;
-    widgetSettings = defaultWidget.settings;
+  const widget = await resolveDefaultWidget(project, entityType, bundle, fieldName);
+  if (!widget) {
+    throw new Error(`No widget found for field: ${fieldName}`);
   }
+
+  const widgetType = widget.type;
+  const widgetSettings = widget.settings;
 
   // Create new field entry with widget
   const newField = {
@@ -696,27 +718,7 @@ export async function updateFieldWidget(project, formDisplay, fieldName, newWidg
     throw new Error(`Field not found: ${fieldName}`);
   }
 
-  let fieldType;
-
-  // Check if it's a base field first
-  if (isBaseField(entityType, fieldName)) {
-    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
-    fieldType = baseFieldConfig.type;
-  } else {
-    // Read field instance to get field type
-    const fieldInstance = await readFieldInstance(
-      project.configDirectory,
-      entityType,
-      bundle,
-      fieldName
-    );
-
-    if (!fieldInstance) {
-      throw new Error(`Field instance not found: ${fieldName}`);
-    }
-
-    fieldType = fieldInstance.type;
-  }
+  const fieldType = await resolveFieldType(project, entityType, bundle, fieldName);
 
   // Get the new widget configuration
   const newWidget = getWidgetByType(fieldType, newWidgetType);
@@ -780,24 +782,12 @@ export function updateFieldSettings(formDisplay, fieldName, newSettings) {
 export async function getAvailableWidgetsForField(project, formDisplay, fieldName) {
   const { entityType, bundle } = formDisplay;
 
-  // Check if it's a base field first
-  if (isBaseField(entityType, fieldName)) {
-    const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
-    return getWidgetsForFieldType(baseFieldConfig.type);
-  }
-
-  const fieldInstance = await readFieldInstance(
-    project.configDirectory,
-    entityType,
-    bundle,
-    fieldName
-  );
-
-  if (!fieldInstance) {
+  try {
+    const fieldType = await resolveFieldType(project, entityType, bundle, fieldName);
+    return getWidgetsForFieldType(fieldType);
+  } catch {
     return [];
   }
-
-  return getWidgetsForFieldType(fieldInstance.type);
 }
 
 /**
@@ -882,7 +872,6 @@ export async function createNewFormDisplay(project, entityType, bundle, mode = '
 export async function resetFormDisplay(project, formDisplay, options = {}) {
   const { keepFieldOrder = true, clearGroups = false } = options;
   const { entityType, bundle, fields, hidden, groups } = formDisplay;
-  const configPath = project.configDirectory;
 
   // Get all current field names (visible and hidden)
   const allFieldNames = [...fields.map(f => f.name), ...hidden];
@@ -893,38 +882,17 @@ export async function resetFormDisplay(project, formDisplay, options = {}) {
   for (let i = 0; i < allFieldNames.length; i++) {
     const fieldName = allFieldNames[i];
     const existingField = fields.find(f => f.name === fieldName);
+    const widget = await resolveDefaultWidget(project, entityType, bundle, fieldName);
 
-    // Check if it's a base field first
-    if (isBaseField(entityType, fieldName)) {
-      const baseFieldConfig = getBaseFieldConfig(entityType, fieldName);
+    if (widget) {
       newFields.push({
         name: fieldName,
-        type: baseFieldConfig.widget,
+        type: widget.type,
         weight: keepFieldOrder && existingField ? existingField.weight : i,
         region: 'content',
-        settings: { ...baseFieldConfig.settings },
+        settings: { ...widget.settings },
         thirdPartySettings: {}
       });
-    } else {
-      const fieldInstance = await readFieldInstance(
-        configPath,
-        entityType,
-        bundle,
-        fieldName
-      );
-
-      if (fieldInstance) {
-        const widget = getDefaultWidget(fieldInstance.type);
-
-        newFields.push({
-          name: fieldName,
-          type: widget?.type || 'string_textfield',
-          weight: keepFieldOrder && existingField ? existingField.weight : i,
-          region: 'content',
-          settings: widget?.settings ? { ...widget.settings } : {},
-          thirdPartySettings: {}
-        });
-      }
     }
   }
 

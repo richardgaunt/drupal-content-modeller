@@ -42,6 +42,21 @@ export async function loadRole(project, roleId) {
 }
 
 /**
+ * Load a role or throw if not found
+ * @param {object} project - Project object
+ * @param {string} roleId - Role machine name
+ * @returns {Promise<object>} - Role
+ * @throws {Error} If role not found
+ */
+async function loadRoleOrThrow(project, roleId) {
+  const role = await loadRole(project, roleId);
+  if (!role) {
+    throw new Error(`Role not found: ${roleId}`);
+  }
+  return role;
+}
+
+/**
  * Check if role exists in project
  * @param {object} project - Project object
  * @param {string} roleId - Role machine name
@@ -131,10 +146,7 @@ export async function deleteRole(project, roleId) {
  * @returns {Promise<object>} - Updated role
  */
 export async function updateRoleLabel(project, roleId, newLabel) {
-  const role = await loadRole(project, roleId);
-  if (!role) {
-    throw new Error(`Role not found: ${roleId}`);
-  }
+  const role = await loadRoleOrThrow(project, roleId);
 
   role.label = newLabel;
   await saveRole(project, role);
@@ -149,10 +161,7 @@ export async function updateRoleLabel(project, roleId, newLabel) {
  * @returns {Promise<object>} - Updated role
  */
 export async function addRolePermissions(project, roleId, permissions) {
-  const role = await loadRole(project, roleId);
-  if (!role) {
-    throw new Error(`Role not found: ${roleId}`);
-  }
+  const role = await loadRoleOrThrow(project, roleId);
 
   const updated = addPermissionsToRole(role, permissions);
   await saveRole(project, updated);
@@ -167,10 +176,7 @@ export async function addRolePermissions(project, roleId, permissions) {
  * @returns {Promise<object>} - Updated role
  */
 export async function removeRolePermissions(project, roleId, permissions) {
-  const role = await loadRole(project, roleId);
-  if (!role) {
-    throw new Error(`Role not found: ${roleId}`);
-  }
+  const role = await loadRoleOrThrow(project, roleId);
 
   const updated = removePermissionsFromRole(role, permissions);
   await saveRole(project, updated);
@@ -187,10 +193,7 @@ export async function removeRolePermissions(project, roleId, permissions) {
  * @returns {Promise<object>} - Updated role
  */
 export async function setRoleBundlePermissionsCmd(project, roleId, entityType, bundle, permissions) {
-  const role = await loadRole(project, roleId);
-  if (!role) {
-    throw new Error(`Role not found: ${roleId}`);
-  }
+  const role = await loadRoleOrThrow(project, roleId);
 
   const updated = setRoleBundlePermissions(role, entityType, bundle, permissions);
   await saveRole(project, updated);
@@ -249,10 +252,7 @@ export async function getRoleBundlePermissions(project, roleId, entityType, bund
  * @returns {Promise<object>} - Role summary
  */
 export async function getRoleSummaryCmd(project, roleId) {
-  const role = await loadRole(project, roleId);
-  if (!role) {
-    throw new Error(`Role not found: ${roleId}`);
-  }
+  const role = await loadRoleOrThrow(project, roleId);
 
   return getRoleSummary(role);
 }

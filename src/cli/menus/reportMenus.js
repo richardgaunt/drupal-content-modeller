@@ -1,0 +1,485 @@
+/**
+ * Report Menu Handlers
+ * Handles report generation, import, admin links, and drush sync menu actions.
+ */
+
+import { select, input, checkbox, search } from '@inquirer/prompts';
+import chalk from 'chalk';
+import { join } from 'path';
+import { readFileSync } from 'fs';
+
+import { getBundleSummary } from '../../commands/list.js';
+import { createEntityReport, createProjectReport, createBundleReport } from '../../commands/report.js';
+import { getReportsDir } from '../../io/fileSystem.js';
+import { getEntityTypeLabel } from '../../generators/reportGenerator.js';
+import { listRoles } from '../../commands/role.js';
+import { auditImport, importContentModel, validateReportData } from '../../commands/import.js';
+import { syncWithDrupal, getSyncStatus } from '../../commands/drush.js';
+import { promptForReportUrl } from './contentMenus.js';
+
+/**
+ * Handle single bundle report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleBundleReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityTypeChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${getEntityTypeLabel(type)} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityTypeChoices
+    });
+
+    // Select bundles (multi-select)
+    const bundles = project.entities[entityType];
+    const bundleChoices = Object.values(bundles)
+      .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+      .map(b => ({
+        value: b.id,
+        name: `${b.label || b.id} (${Object.keys(b.fields || {}).length} fields)`
+      }));
+
+    if (bundleChoices.length === 0) {
+      console.log(chalk.yellow('No bundles found for this entity type.'));
+      return;
+    }
+
+    const bundleIds = await checkbox({
+      message: 'Select bundles to generate reports for:',
+      choices: bundleChoices
+    });
+
+    if (bundleIds.length === 0) {
+      console.log(chalk.yellow('No bundles selected.'));
+      return;
+    }
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
+    // Generate reports for all selected bundles
+    for (const bundleId of bundleIds) {
+      const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
+      const outputPath = join(getReportsDir(project.slug), filename);
+
+      const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl, { roles });
+      if (result) {
+        console.log(chalk.green(`Report saved to: ${outputPath}`));
+      } else {
+        console.log(chalk.red(`Bundle "${bundleId}" not found.`));
+      }
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle entity type report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleEntityReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const choices = entityTypes.map(type => ({
+      value: type,
+      name: `${getEntityTypeLabel(type)} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices
+    });
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
+    // Generate filename in project reports directory
+    const filename = `${project.slug}-${entityType}-report.md`;
+    const outputPath = join(getReportsDir(project.slug), filename);
+
+    await createEntityReport(project, entityType, outputPath, baseUrl, { roles });
+    console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle full project report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleProjectReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    // Read roles for permissions
+    const roles = await listRoles(project);
+
+    // Generate filename in project reports directory
+    const filename = `${project.slug}-content-model.md`;
+    const outputPath = join(getReportsDir(project.slug), filename);
+
+    await createProjectReport(project, outputPath, baseUrl, { roles });
+    console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle import content model from JSON
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleImportModel(project) {
+  try {
+    const filePath = await input({
+      message: 'Path to JSON report file:',
+      validate: (val) => {
+        if (!val || !val.trim()) return 'File path is required';
+        try {
+          const content = readFileSync(val.trim(), 'utf8');
+          JSON.parse(content);
+          return true;
+        } catch (error) {
+          return `Cannot read/parse file: ${error.message}`;
+        }
+      }
+    });
+
+    const raw = readFileSync(filePath.trim(), 'utf8');
+    const reportData = JSON.parse(raw);
+
+    const validation = validateReportData(reportData);
+    if (validation !== true) {
+      console.log(chalk.red(`Invalid report data: ${validation}`));
+      return;
+    }
+
+    const audit = auditImport(project, reportData);
+
+    if (audit.hasBlockers) {
+      console.log(chalk.red('\nImport blocked — resolve the following issues:\n'));
+      for (const b of audit.blocked) {
+        console.log(chalk.red(`  • ${b.message}`));
+      }
+      console.log(chalk.yellow('\nEdit the JSON file to fix collisions, then re-run.\n'));
+      return;
+    }
+
+    // Show summary
+    const bundleCount = audit.toCreate.filter(i => i.kind === 'bundle').length;
+    const fieldCount = audit.toCreate.filter(i => i.kind === 'field').length;
+    console.log(chalk.cyan(`\nImport summary:`));
+    console.log(chalk.cyan(`  Bundles to create: ${bundleCount}`));
+    console.log(chalk.cyan(`  Fields to create:  ${fieldCount}`));
+    if (audit.reused.length > 0) {
+      console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
+    }
+
+    const confirm = await select({
+      message: 'Proceed with import?',
+      choices: [
+        { value: 'yes', name: 'Yes' },
+        { value: 'no', name: 'No' }
+      ]
+    });
+
+    if (confirm !== 'yes') {
+      console.log(chalk.yellow('Import cancelled.'));
+      return;
+    }
+
+    const result = await importContentModel(project, reportData, audit);
+
+    const bundlesCreated = result.created.filter(c => c.kind === 'bundle').length;
+    const fieldsCreated = result.created.filter(c => c.kind === 'field').length;
+    console.log(chalk.green(`\nImport complete!`));
+    console.log(chalk.cyan(`  Bundles created: ${bundlesCreated}`));
+    console.log(chalk.cyan(`  Fields created:  ${fieldsCreated}`));
+
+    if (result.errors.length > 0) {
+      console.log(chalk.red(`\n  Errors: ${result.errors.length}`));
+      for (const err of result.errors) {
+        console.log(chalk.red(`    • ${err.message}`));
+      }
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Get admin URLs for a bundle based on entity type
+ * @param {string} entityType - Entity type
+ * @param {string} bundle - Bundle machine name
+ * @returns {object[]} - Array of {name, path} objects
+ */
+function getAdminUrls(entityType, bundle) {
+  const urls = {
+    node: [
+      { name: 'Edit Form', path: `/admin/structure/types/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/types/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/types/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/types/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/types/manage/${bundle}/permissions` }
+    ],
+    paragraph: [
+      { name: 'Edit Form', path: `/admin/structure/paragraphs_type/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/paragraphs_type/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/paragraphs_type/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/paragraphs_type/${bundle}/display` }
+    ],
+    taxonomy_term: [
+      { name: 'Edit Form', path: `/admin/structure/taxonomy/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/taxonomy/manage/${bundle}/overview/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/taxonomy/manage/${bundle}/overview/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/taxonomy/manage/${bundle}/overview/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/taxonomy/manage/${bundle}/overview/permissions` }
+    ],
+    block_content: [
+      { name: 'Edit Form', path: `/admin/structure/block-content/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/block-content/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/block-content/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/block-content/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/block-content/manage/${bundle}/permissions` }
+    ],
+    media: [
+      { name: 'Edit Form', path: `/admin/structure/media/manage/${bundle}` },
+      { name: 'Manage Fields', path: `/admin/structure/media/manage/${bundle}/fields` },
+      { name: 'Manage Form Display', path: `/admin/structure/media/manage/${bundle}/form-display` },
+      { name: 'Manage Display', path: `/admin/structure/media/manage/${bundle}/display` },
+      { name: 'Manage Permissions', path: `/admin/structure/media/manage/${bundle}/permissions` }
+    ]
+  };
+
+  return urls[entityType] || [];
+}
+
+/**
+ * Handle admin links action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleAdminLinks(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Select entity type
+    const entityTypes = Object.keys(project.entities).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found.'));
+      return;
+    }
+
+    const entityChoices = entityTypes.map(type => ({
+      value: type,
+      name: `${type} (${Object.keys(project.entities[type]).length} bundles)`
+    }));
+
+    const entityType = await select({
+      message: 'Select entity type:',
+      choices: entityChoices
+    });
+
+    // Select bundle
+    const bundles = project.entities[entityType];
+    const bundleEntries = Object.entries(bundles)
+      .sort(([, a], [, b]) => (a.label || '').localeCompare(b.label || ''))
+      .map(([id, bundle]) => ({
+        value: id,
+        name: `${bundle.label || id} (${id})`,
+        label: bundle.label || id
+      }));
+
+    const selectedBundle = await search({
+      message: 'Select bundle (type to search):',
+      source: async (searchInput) => {
+        const searchTerm = (searchInput || '').toLowerCase();
+        return bundleEntries.filter(b =>
+          b.name.toLowerCase().includes(searchTerm) ||
+          b.value.toLowerCase().includes(searchTerm)
+        );
+      }
+    });
+
+    const bundle = bundles[selectedBundle];
+    const adminUrls = getAdminUrls(entityType, selectedBundle);
+
+    if (adminUrls.length === 0) {
+      console.log(chalk.yellow(`No admin links available for ${entityType}.`));
+      return;
+    }
+
+    const baseUrl = project.baseUrl || '';
+
+    console.log();
+    console.log(chalk.cyan(`Admin links for ${entityType} > ${bundle.label || selectedBundle}`));
+    console.log();
+
+    for (const url of adminUrls) {
+      const fullUrl = baseUrl ? `${baseUrl}${url.path}` : url.path;
+      console.log(`  ${url.name}: ${chalk.blue(fullUrl)}`);
+    }
+    console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle drush sync action
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleDrushSync(project) {
+  try {
+    const status = getSyncStatus(project);
+
+    console.log();
+    console.log(chalk.cyan('Drupal Configuration Sync'));
+    console.log();
+
+    if (!status.configured) {
+      console.log(chalk.yellow(status.message));
+      console.log();
+
+      const configure = await select({
+        message: 'Would you like to configure drush sync now?',
+        choices: [
+          { value: true, name: 'Yes, edit project settings' },
+          { value: false, name: 'No, go back' }
+        ]
+      });
+
+      if (configure) {
+        console.log(chalk.cyan('Use "Edit project" to set the Drupal root directory.'));
+      }
+      return;
+    }
+
+    console.log(`  Drupal root: ${chalk.cyan(status.drupalRoot)}`);
+    console.log(`  Drush command: ${chalk.cyan(status.drushCommand)}`);
+    console.log();
+
+    const confirm = await select({
+      message: 'Run drush config import then export?',
+      choices: [
+        { value: true, name: 'Yes, sync now' },
+        { value: false, name: 'No, cancel' }
+      ]
+    });
+
+    if (!confirm) {
+      return;
+    }
+
+    console.log();
+
+    const result = await syncWithDrupal(project, {
+      onProgress: (msg) => console.log(chalk.cyan(msg))
+    });
+
+    console.log();
+    if (result.success) {
+      console.log(chalk.green(result.message));
+    } else {
+      console.log(chalk.red(result.message));
+    }
+
+    // Show drush output
+    if (result.details.import?.output) {
+      console.log();
+      console.log(chalk.cyan('Import output:'));
+      console.log(result.details.import.output.trim());
+    }
+    if (result.details.export?.output) {
+      console.log();
+      console.log(chalk.cyan('Export output:'));
+      console.log(result.details.export.output.trim());
+    }
+    console.log();
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}

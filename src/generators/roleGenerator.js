@@ -5,27 +5,7 @@
 
 import { dump as yamlDump } from 'js-yaml';
 import { parsePermissionKey } from '../constants/permissions.js';
-
-/**
- * Entity type to config prefix mapping
- */
-const ENTITY_CONFIG_PREFIX = {
-  node: 'node.type',
-  media: 'media.type',
-  paragraph: 'paragraphs.paragraphs_type',
-  taxonomy_term: 'taxonomy.vocabulary',
-  block_content: 'block_content.type'
-};
-
-/**
- * Entity type to module mapping
- */
-const ENTITY_MODULE = {
-  node: 'node',
-  media: 'media',
-  taxonomy_term: 'taxonomy',
-  block_content: 'block_content'
-};
+import { getBundleConfigName, getEntityModule } from '../constants/entityTypes.js';
 
 /**
  * Calculate config dependencies from permissions
@@ -39,9 +19,10 @@ export function calculateConfigDependencies(permissions, _project) {
   for (const permission of permissions) {
     const parsed = parsePermissionKey(permission);
     if (parsed) {
-      const prefix = ENTITY_CONFIG_PREFIX[parsed.entityType];
-      if (prefix) {
-        configDeps.add(`${prefix}.${parsed.bundle}`);
+      try {
+        configDeps.add(getBundleConfigName(parsed.entityType, parsed.bundle));
+      } catch {
+        // Unknown entity type, skip
       }
     }
   }
@@ -60,7 +41,7 @@ export function calculateModuleDependencies(permissions) {
   for (const permission of permissions) {
     const parsed = parsePermissionKey(permission);
     if (parsed) {
-      const module = ENTITY_MODULE[parsed.entityType];
+      const module = getEntityModule(parsed.entityType);
       if (module) {
         moduleDeps.add(module);
       }

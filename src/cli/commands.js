@@ -11,6 +11,7 @@ import { homedir } from 'os';
 import { createProject, loadProject, listProjects, updateProject, deleteProject } from '../commands/project.js';
 import { syncProject } from '../commands/sync.js';
 import { createBundle, createField, updateField } from '../commands/create.js';
+import { auditImport, importContentModel, validateReportData } from '../commands/import.js';
 import { createEntityReport, createProjectReport } from '../commands/report.js';
 import {
   groupBundlesByEntityType,
@@ -1088,6 +1089,85 @@ export async function cmdReportProject(options) {
       const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-content-model.md`);
       await createProjectReport(project, outputPath, baseUrl, reportOptions);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Import Commands
+// ============================================
+
+/**
+ * Import content model from JSON report
+ */
+export async function cmdImportModel(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+    if (!options.file) {
+      throw new Error('--file is required');
+    }
+
+    const project = await loadProject(options.project);
+    await autoSyncProject(project);
+
+    if (!project.entities) {
+      throw new Error('Project has not been synced. Run "dcm project sync" first.');
+    }
+
+    // Read and parse JSON file
+    let reportData;
+    try {
+      const raw = readFileSync(options.file, 'utf8');
+      reportData = JSON.parse(raw);
+    } catch (error) {
+      throw new Error(`Failed to read JSON file: ${error.message}`);
+    }
+
+    const validation = validateReportData(reportData);
+    if (validation !== true) {
+      throw new Error(`Invalid report data: ${validation}`);
+    }
+
+    // Audit
+    const audit = auditImport(project, reportData);
+
+    if (audit.hasBlockers) {
+      if (options.json) {
+        output({ success: false, audit }, true);
+      } else {
+        console.log(chalk.red('\nImport blocked — resolve the following issues:\n'));
+        for (const b of audit.blocked) {
+          console.log(chalk.red(`  • ${b.message}`));
+        }
+        console.log(chalk.yellow('\nEdit the JSON file to fix collisions, then re-run.\n'));
+      }
+      process.exit(1);
+    }
+
+    // Import
+    const result = await importContentModel(project, reportData, audit);
+
+    if (options.json) {
+      output({ success: true, ...result, reused: audit.reused }, true);
+    } else {
+      console.log(chalk.green(`\nImport complete!`));
+      const bundles = result.created.filter(c => c.kind === 'bundle');
+      const fields = result.created.filter(c => c.kind === 'field');
+      console.log(chalk.cyan(`  Bundles created: ${bundles.length}`));
+      console.log(chalk.cyan(`  Fields created:  ${fields.length}`));
+      if (audit.reused.length > 0) {
+        console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
+      }
+      if (result.errors.length > 0) {
+        console.log(chalk.red(`\n  Errors: ${result.errors.length}`));
+        for (const err of result.errors) {
+          console.log(chalk.red(`    • ${err.message}`));
+        }
+      }
     }
   } catch (error) {
     handleError(error);

@@ -35,6 +35,7 @@ export const PROJECT_MENU_CHOICES = [
   { value: 'report-bundle', name: 'Generate report for bundle' },
   { value: 'report-entity', name: 'Generate report for entity type' },
   { value: 'report-project', name: 'Generate report for project' },
+  { value: 'import-model', name: 'Import content model from JSON' },
   { value: 'manage-roles', name: 'Manage roles' },
   { value: 'manage-stories', name: 'Manage stories' },
   { value: 'drush-sync', name: 'Sync with Drupal' },

@@ -5,6 +5,7 @@
 
 import yaml from 'js-yaml';
 import { isBaseField } from '../constants/baseFields.js';
+import { getBundleConfigName } from '../constants/entityTypes.js';
 
 /**
  * Available field group format types
@@ -195,23 +196,7 @@ export function generateDependencies(groups, fields, entityType, bundle) {
   }
 
   // Add bundle dependency
-  switch (entityType) {
-    case 'node':
-      configDeps.push(`node.type.${bundle}`);
-      break;
-    case 'media':
-      configDeps.push(`media.type.${bundle}`);
-      break;
-    case 'paragraph':
-      configDeps.push(`paragraphs.paragraphs_type.${bundle}`);
-      break;
-    case 'taxonomy_term':
-      configDeps.push(`taxonomy.vocabulary.${bundle}`);
-      break;
-    case 'block_content':
-      configDeps.push(`block_content.type.${bundle}`);
-      break;
-  }
+  configDeps.push(getBundleConfigName(entityType, bundle));
 
   // Add field_group module if groups exist
   if (groups && groups.length > 0) {

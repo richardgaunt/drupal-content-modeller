@@ -3,15 +3,7 @@
  * Functions for listing entity types and fields.
  */
 
-/**
- * Entity type display names
- */
-const ENTITY_TYPE_LABELS = {
-  node: 'Node Types',
-  media: 'Media Types',
-  paragraph: 'Paragraph Types',
-  taxonomy_term: 'Taxonomy Vocabularies'
-};
+import { getEntityTypeLabel } from '../constants/entityTypes.js';
 
 /**
  * Format a date for display
@@ -87,7 +79,7 @@ export function groupBundlesByEntityType(entities) {
         .sort((a, b) => a.label.localeCompare(b.label));
 
       groups[entityType] = {
-        label: ENTITY_TYPE_LABELS[entityType],
+        label: getEntityTypeLabel(entityType),
         bundles: sortedBundles
       };
     }

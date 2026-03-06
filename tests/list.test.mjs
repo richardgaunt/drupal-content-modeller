@@ -81,7 +81,7 @@ describe('List Commands', () => {
       const result = groupBundlesByEntityType(entities);
 
       expect(Object.keys(result)).toEqual(['node', 'media']);
-      expect(result.node.label).toBe('Node Types');
+      expect(result.node.label).toBe('Content Types');
       expect(result.node.bundles.length).toBe(2);
       expect(result.media.label).toBe('Media Types');
       expect(result.media.bundles.length).toBe(1);

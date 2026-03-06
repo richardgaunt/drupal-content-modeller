@@ -3,45 +3,21 @@
  */
 
 import { formatCardinality, getFieldOtherInfo } from './reportGenerator.js';
+import {
+  getEntityTypeSingularLabel,
+  getEntityOverviewPage
+} from '../constants/entityTypes.js';
+
+// Re-export for backward compatibility
+export { getEntityOverviewPage };
 
 /**
- * Entity type labels for display
- */
-const ENTITY_TYPE_LABELS = {
-  node: 'content type',
-  media: 'media type',
-  paragraph: 'paragraph type',
-  taxonomy_term: 'vocabulary',
-  block_content: 'block type'
-};
-
-/**
- * Entity type overview page descriptions
- */
-const ENTITY_OVERVIEW_PAGES = {
-  node: 'Admin > Structure > Content types',
-  media: 'Admin > Structure > Media types',
-  paragraph: 'Admin > Structure > Paragraph types',
-  taxonomy_term: 'Admin > Structure > Taxonomy',
-  block_content: 'Admin > Structure > Block types'
-};
-
-/**
- * Get entity type label
+ * Get entity type label (singular form)
  * @param {string} entityType - Entity type
  * @returns {string} - Human-readable label
  */
 export function getEntityTypeLabel(entityType) {
-  return ENTITY_TYPE_LABELS[entityType] || entityType;
-}
-
-/**
- * Get entity overview page description
- * @param {string} entityType - Entity type
- * @returns {string} - Overview page path
- */
-export function getEntityOverviewPage(entityType) {
-  return ENTITY_OVERVIEW_PAGES[entityType] || 'Admin panel';
+  return getEntityTypeSingularLabel(entityType);
 }
 
 /**

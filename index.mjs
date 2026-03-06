@@ -47,7 +47,8 @@ import {
   cmdDrushSync,
   cmdDrushStatus,
   cmdSkillInstall,
-  cmdLog
+  cmdLog,
+  cmdImportModel
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -596,6 +597,18 @@ program
   .option('-l, --limit <count>', 'Number of entries to show (default: 20)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdLog);
+
+// ============================================
+// Import Commands
+// ============================================
+
+program
+  .command('import')
+  .description('Import content model from JSON report')
+  .requiredOption('-p, --project <slug>', 'Target project slug')
+  .requiredOption('-f, --file <path>', 'Path to JSON report file')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdImportModel);
 
 // ============================================
 // Skill Commands

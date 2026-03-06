@@ -4,6 +4,7 @@
  */
 
 import yaml from 'js-yaml';
+import { ENTITY_TYPES } from '../constants/entityTypes.js';
 
 /**
  * Media source types and their Drupal plugin IDs
@@ -52,20 +53,11 @@ export function validateMachineName(machineName) {
  * @returns {string} - Filename
  */
 export function getBundleFilename(entityType, machineName) {
-  switch (entityType) {
-    case 'node':
-      return `node.type.${machineName}.yml`;
-    case 'media':
-      return `media.type.${machineName}.yml`;
-    case 'paragraph':
-      return `paragraphs.paragraphs_type.${machineName}.yml`;
-    case 'taxonomy_term':
-      return `taxonomy.vocabulary.${machineName}.yml`;
-    case 'block_content':
-      return `block_content.type.${machineName}.yml`;
-    default:
-      throw new Error(`Unknown entity type: ${entityType}`);
+  const type = ENTITY_TYPES[entityType];
+  if (!type) {
+    throw new Error(`Unknown entity type: ${entityType}`);
   }
+  return `${type.bundlePrefix}${machineName}.yml`;
 }
 
 /**

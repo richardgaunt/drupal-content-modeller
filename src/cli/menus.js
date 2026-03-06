@@ -8,6 +8,7 @@ import sortableCheckbox from 'inquirer-sortable-checkbox';
 import chalk from 'chalk';
 import { selectWithBack, BACK } from './selectWithBack.js';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 
 import {
   getMainMenuChoices,
@@ -31,6 +32,7 @@ import {
   findEntityReferenceFieldsTargeting
 } from '../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../commands/create.js';
+import { auditImport, importContentModel, validateReportData } from '../commands/import.js';
 import { createEntityReport, createProjectReport, createBundleReport } from '../commands/report.js';
 import { getReportsDir, setPermissionErrorHandler } from '../io/fileSystem.js';
 import {
@@ -340,6 +342,10 @@ async function showProjectMenu(project) {
           break;
         case 'report-project':
           await handleProjectReport(project);
+          break;
+        case 'import-model':
+          await handleImportModel(project);
+          project = await loadProject(project.slug);
           break;
         case 'admin-links':
           await handleAdminLinks(project);
@@ -2380,6 +2386,92 @@ async function handleProjectReport(project) {
 
     await createProjectReport(project, outputPath, baseUrl, { roles });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle import content model from JSON
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+async function handleImportModel(project) {
+  try {
+    const filePath = await input({
+      message: 'Path to JSON report file:',
+      validate: (val) => {
+        if (!val || !val.trim()) return 'File path is required';
+        try {
+          const content = readFileSync(val.trim(), 'utf8');
+          JSON.parse(content);
+          return true;
+        } catch (error) {
+          return `Cannot read/parse file: ${error.message}`;
+        }
+      }
+    });
+
+    const raw = readFileSync(filePath.trim(), 'utf8');
+    const reportData = JSON.parse(raw);
+
+    const validation = validateReportData(reportData);
+    if (validation !== true) {
+      console.log(chalk.red(`Invalid report data: ${validation}`));
+      return;
+    }
+
+    const audit = auditImport(project, reportData);
+
+    if (audit.hasBlockers) {
+      console.log(chalk.red('\nImport blocked — resolve the following issues:\n'));
+      for (const b of audit.blocked) {
+        console.log(chalk.red(`  • ${b.message}`));
+      }
+      console.log(chalk.yellow('\nEdit the JSON file to fix collisions, then re-run.\n'));
+      return;
+    }
+
+    // Show summary
+    const bundleCount = audit.toCreate.filter(i => i.kind === 'bundle').length;
+    const fieldCount = audit.toCreate.filter(i => i.kind === 'field').length;
+    console.log(chalk.cyan(`\nImport summary:`));
+    console.log(chalk.cyan(`  Bundles to create: ${bundleCount}`));
+    console.log(chalk.cyan(`  Fields to create:  ${fieldCount}`));
+    if (audit.reused.length > 0) {
+      console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
+    }
+
+    const confirm = await select({
+      message: 'Proceed with import?',
+      choices: [
+        { value: 'yes', name: 'Yes' },
+        { value: 'no', name: 'No' }
+      ]
+    });
+
+    if (confirm !== 'yes') {
+      console.log(chalk.yellow('Import cancelled.'));
+      return;
+    }
+
+    const result = await importContentModel(project, reportData, audit);
+
+    const bundlesCreated = result.created.filter(c => c.kind === 'bundle').length;
+    const fieldsCreated = result.created.filter(c => c.kind === 'field').length;
+    console.log(chalk.green(`\nImport complete!`));
+    console.log(chalk.cyan(`  Bundles created: ${bundlesCreated}`));
+    console.log(chalk.cyan(`  Fields created:  ${fieldsCreated}`));
+
+    if (result.errors.length > 0) {
+      console.log(chalk.red(`\n  Errors: ${result.errors.length}`));
+      for (const err of result.errors) {
+        console.log(chalk.red(`    • ${err.message}`));
+      }
+    }
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

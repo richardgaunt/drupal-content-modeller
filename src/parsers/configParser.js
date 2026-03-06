@@ -5,6 +5,7 @@
  */
 
 import yaml from 'js-yaml';
+import { ENTITY_TYPES } from '../constants/entityTypes.js';
 
 /**
  * Recommended modules for content modelling
@@ -22,39 +23,19 @@ export const RECOMMENDED_MODULES = [
 
 /**
  * Entity type configuration patterns
+ * Re-exported from central registry with bundleSuffix added for parser use.
  */
-export const ENTITY_TYPE_PATTERNS = {
-  node: {
-    bundlePrefix: 'node.type.',
-    bundleSuffix: '.yml',
-    fieldStoragePrefix: 'field.storage.node.',
-    fieldInstancePrefix: 'field.field.node.'
-  },
-  media: {
-    bundlePrefix: 'media.type.',
-    bundleSuffix: '.yml',
-    fieldStoragePrefix: 'field.storage.media.',
-    fieldInstancePrefix: 'field.field.media.'
-  },
-  paragraph: {
-    bundlePrefix: 'paragraphs.paragraphs_type.',
-    bundleSuffix: '.yml',
-    fieldStoragePrefix: 'field.storage.paragraph.',
-    fieldInstancePrefix: 'field.field.paragraph.'
-  },
-  taxonomy_term: {
-    bundlePrefix: 'taxonomy.vocabulary.',
-    bundleSuffix: '.yml',
-    fieldStoragePrefix: 'field.storage.taxonomy_term.',
-    fieldInstancePrefix: 'field.field.taxonomy_term.'
-  },
-  block_content: {
-    bundlePrefix: 'block_content.type.',
-    bundleSuffix: '.yml',
-    fieldStoragePrefix: 'field.storage.block_content.',
-    fieldInstancePrefix: 'field.field.block_content.'
-  }
-};
+export const ENTITY_TYPE_PATTERNS = Object.fromEntries(
+  Object.entries(ENTITY_TYPES).map(([key, type]) => [
+    key,
+    {
+      bundlePrefix: type.bundlePrefix,
+      bundleSuffix: '.yml',
+      fieldStoragePrefix: type.fieldStoragePrefix,
+      fieldInstancePrefix: type.fieldInstancePrefix
+    }
+  ])
+);
 
 /**
  * Parse a YAML string safely

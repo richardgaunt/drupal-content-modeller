@@ -5,6 +5,11 @@
 
 import yaml from 'js-yaml';
 import { generateMachineName } from './bundleGenerator.js';
+import {
+  ENTITY_TYPES,
+  getBundleConfigName,
+  getEntityModule
+} from '../constants/entityTypes.js';
 
 /**
  * Field type to module mapping
@@ -29,26 +34,11 @@ export const FIELD_MODULES = {
 
 /**
  * Entity type prefixes for field names
+ * Re-exported from central registry for backward compatibility.
  */
-export const ENTITY_PREFIXES = {
-  node: 'field_n_',
-  media: 'field_m_',
-  paragraph: 'field_p_',
-  taxonomy_term: 'field_t_',
-  block_content: 'field_b_'
-};
-
-/**
- * Entity type to module mapping
- * Used for dependency declarations in field config
- */
-export const ENTITY_TYPE_MODULES = {
-  node: 'node',
-  media: 'media',
-  paragraph: 'paragraphs',
-  taxonomy_term: 'taxonomy',
-  block_content: 'block_content'
-};
+export const ENTITY_PREFIXES = Object.fromEntries(
+  Object.entries(ENTITY_TYPES).map(([key, type]) => [key, type.fieldPrefix])
+);
 
 /**
  * Supported field types for UI selection
@@ -358,7 +348,7 @@ export function generateFieldStorage(options) {
   } else if (fieldType === 'entity_reference') {
     // Entity reference fields depend on the target entity type's module
     const targetType = settings.targetType || 'node';
-    const targetModule = ENTITY_TYPE_MODULES[targetType];
+    const targetModule = getEntityModule(targetType);
     if (targetModule) {
       moduleDeps.push(targetModule);
     }
@@ -368,7 +358,7 @@ export function generateFieldStorage(options) {
   }
 
   // Always include the host entity type's module
-  const entityModule = ENTITY_TYPE_MODULES[entityType];
+  const entityModule = getEntityModule(entityType);
   if (entityModule && !moduleDeps.includes(entityModule)) {
     moduleDeps.push(entityModule);
   }
@@ -422,28 +412,12 @@ export function generateFieldInstance(options) {
   ];
 
   // Add bundle dependency based on entity type
-  switch (entityType) {
-    case 'node':
-      configDeps.push(`node.type.${bundle}`);
-      break;
-    case 'media':
-      configDeps.push(`media.type.${bundle}`);
-      break;
-    case 'paragraph':
-      configDeps.push(`paragraphs.paragraphs_type.${bundle}`);
-      break;
-    case 'taxonomy_term':
-      configDeps.push(`taxonomy.vocabulary.${bundle}`);
-      break;
-    case 'block_content':
-      configDeps.push(`block_content.type.${bundle}`);
-      break;
-  }
+  configDeps.push(getBundleConfigName(entityType, bundle));
 
   // For entity_reference_revisions, add paragraph type dependencies
   if (fieldType === 'entity_reference_revisions' && settings.targetBundles) {
     for (const targetBundle of settings.targetBundles) {
-      configDeps.push(`paragraphs.paragraphs_type.${targetBundle}`);
+      configDeps.push(getBundleConfigName('paragraph', targetBundle));
     }
   }
 
@@ -451,23 +425,7 @@ export function generateFieldInstance(options) {
   if (fieldType === 'entity_reference' && settings.targetBundles) {
     const targetType = settings.targetType || 'node';
     for (const targetBundle of settings.targetBundles) {
-      switch (targetType) {
-        case 'node':
-          configDeps.push(`node.type.${targetBundle}`);
-          break;
-        case 'media':
-          configDeps.push(`media.type.${targetBundle}`);
-          break;
-        case 'paragraph':
-          configDeps.push(`paragraphs.paragraphs_type.${targetBundle}`);
-          break;
-        case 'taxonomy_term':
-          configDeps.push(`taxonomy.vocabulary.${targetBundle}`);
-          break;
-        case 'block_content':
-          configDeps.push(`block_content.type.${targetBundle}`);
-          break;
-      }
+      configDeps.push(getBundleConfigName(targetType, targetBundle));
     }
   }
 

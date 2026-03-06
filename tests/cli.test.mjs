@@ -49,7 +49,7 @@ describe('CLI Prompts', () => {
       const result = getProjectMenuChoices('My Test Project');
 
       expect(result.choices).toEqual(PROJECT_MENU_CHOICES);
-      expect(result.choices.length).toBe(19);
+      expect(result.choices.length).toBe(20);
 
       const values = result.choices.map(c => c.value);
       expect(values).toContain('sync');

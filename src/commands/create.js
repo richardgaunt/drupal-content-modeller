@@ -24,6 +24,18 @@ import {
 } from '../generators/fieldGenerator.js';
 import { saveProject } from './project.js';
 import { parseConfigDirectory } from '../io/configReader.js';
+import { validateProject } from '../utils/project.js';
+
+/**
+ * Re-sync project entities after config changes
+ * @param {object} project - Project object
+ */
+async function resyncProject(project) {
+  const entities = await parseConfigDirectory(project.configDirectory);
+  project.entities = entities;
+  project.lastSync = new Date().toISOString();
+  await saveProject(project);
+}
 
 /**
  * Get reusable fields for a given entity type and field type
@@ -160,9 +172,7 @@ export function validateFieldMachineName(fieldName) {
  * @returns {Promise<object>} - Result with created files
  */
 export async function createBundle(project, entityType, options) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   const validation = validateBundleMachineName(project, entityType, options.machineName);
   if (validation !== true) {
@@ -215,11 +225,7 @@ export async function createBundle(project, entityType, options) {
   await writeYamlFile(bundlePath, bundleYaml);
   createdFiles.push(bundleFilename);
 
-  // Re-sync project entities
-  const entities = await parseConfigDirectory(configDir);
-  project.entities = entities;
-  project.lastSync = new Date().toISOString();
-  await saveProject(project);
+  await resyncProject(project);
 
   return {
     entityType,
@@ -238,9 +244,7 @@ export async function createBundle(project, entityType, options) {
  * @returns {Promise<object>} - Result with created files
  */
 export async function createField(project, entityType, bundles, options) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   if (!bundles || bundles.length === 0) {
     throw new Error('At least one bundle is required');
@@ -299,11 +303,7 @@ export async function createField(project, entityType, bundles, options) {
     createdFiles.push(instanceFilename);
   }
 
-  // Re-sync project entities
-  const entities = await parseConfigDirectory(configDir);
-  project.entities = entities;
-  project.lastSync = new Date().toISOString();
-  await saveProject(project);
+  await resyncProject(project);
 
   return {
     entityType,
@@ -330,9 +330,7 @@ export async function createField(project, entityType, bundles, options) {
  * @returns {Promise<object>} - Result with updated file
  */
 export async function updateField(project, entityType, bundle, fieldName, updates) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   const configDir = project.configDirectory;
   const instanceFilename = getInstanceFilename(entityType, bundle, fieldName);
@@ -398,11 +396,7 @@ export async function updateField(project, entityType, bundle, fieldName, update
   const updatedYaml = yaml.dump(config, { quotingType: "'", forceQuotes: false });
   await writeYamlFile(instancePath, updatedYaml);
 
-  // Re-sync project entities
-  const entities = await parseConfigDirectory(configDir);
-  project.entities = entities;
-  project.lastSync = new Date().toISOString();
-  await saveProject(project);
+  await resyncProject(project);
 
   return {
     entityType,

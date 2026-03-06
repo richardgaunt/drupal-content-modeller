@@ -10,9 +10,10 @@ import {
   getEntityAdminPath,
   getBundleAdminUrls
 } from '../constants/entityTypes.js';
+import { formatCardinality } from '../utils/slug.js';
 
 // Re-export for backward compatibility
-export { getEntityTypeLabel, getEntityAdminPath, getBundleAdminUrls };
+export { getEntityTypeLabel, getEntityAdminPath, getBundleAdminUrls, formatCardinality };
 
 /**
  * Get the admin path for a field on a bundle
@@ -24,15 +25,6 @@ export { getEntityTypeLabel, getEntityAdminPath, getBundleAdminUrls };
 export function getFieldAdminPath(entityType, bundle, fieldName) {
   const basePath = getEntityAdminPath(entityType, bundle);
   return `${basePath}/${entityType}.${bundle}.${fieldName}`;
-}
-
-/**
- * Format cardinality for display
- * @param {number} value - Cardinality value
- * @returns {string} - Formatted string
- */
-export function formatCardinality(value) {
-  return value === -1 ? 'Unlimited' : String(value);
 }
 
 /**

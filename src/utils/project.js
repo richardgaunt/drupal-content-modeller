@@ -3,6 +3,18 @@
  */
 
 /**
+ * Validate that a project has a config directory.
+ * Throws if the project is invalid.
+ * @param {object} project - Project object
+ * @throws {Error} If project is null or missing configDirectory
+ */
+export function validateProject(project) {
+  if (!project || !project.configDirectory) {
+    throw new Error('Invalid project: missing configDirectory');
+  }
+}
+
+/**
  * Create a new project object with default structure
  * @param {string} name - Human-readable project name
  * @param {string} slug - Directory-safe slug

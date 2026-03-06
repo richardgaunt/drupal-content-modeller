@@ -6,6 +6,7 @@
 import { parseConfigDirectory, checkRecommendedModules, enableModules } from '../io/configReader.js';
 import { saveProject } from './project.js';
 import { RECOMMENDED_MODULES } from '../parsers/configParser.js';
+import { validateProject } from '../utils/project.js';
 
 /**
  * Sync a project's configuration
@@ -14,9 +15,7 @@ import { RECOMMENDED_MODULES } from '../parsers/configParser.js';
  * @returns {Promise<object>} - Summary with bundlesFound and fieldsFound
  */
 export async function syncProject(project) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   // Parse all configuration from the config directory
   const entities = await parseConfigDirectory(project.configDirectory);
@@ -55,9 +54,7 @@ export async function syncProject(project) {
  * @returns {Promise<object>} - Object with enabledModules and missingModules arrays
  */
 export async function checkProjectModules(project) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   return checkRecommendedModules(project.configDirectory);
 }
@@ -69,9 +66,7 @@ export async function checkProjectModules(project) {
  * @returns {Promise<void>}
  */
 export async function enableProjectModules(project, modulesToEnable) {
-  if (!project || !project.configDirectory) {
-    throw new Error('Invalid project: missing configDirectory');
-  }
+  validateProject(project);
 
   await enableModules(project.configDirectory, modulesToEnable);
 }

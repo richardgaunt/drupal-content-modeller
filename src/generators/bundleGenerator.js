@@ -5,6 +5,13 @@
 
 import yaml from 'js-yaml';
 import { ENTITY_TYPES } from '../constants/entityTypes.js';
+import {
+  generateMachineName,
+  validateMachineName
+} from '../utils/slug.js';
+
+// Re-export for backward compatibility
+export { generateMachineName, validateMachineName };
 
 /**
  * Media source types and their Drupal plugin IDs
@@ -14,37 +21,6 @@ export const MEDIA_SOURCE_TYPES = {
   file: 'file',
   remote_video: 'oembed:video'
 };
-
-/**
- * Generate machine name from label
- * @param {string} label - Human-readable label
- * @returns {string} - Machine name (lowercase, underscores)
- */
-export function generateMachineName(label) {
-  if (!label || typeof label !== 'string') {
-    return '';
-  }
-
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/_+/g, '_');
-}
-
-/**
- * Validate machine name format
- * @param {string} machineName - Machine name to validate
- * @returns {boolean} - True if valid
- */
-export function validateMachineName(machineName) {
-  if (!machineName || typeof machineName !== 'string') {
-    return false;
-  }
-
-  // Must be lowercase letters and underscores only, not starting/ending with underscore
-  return /^[a-z][a-z0-9_]*[a-z0-9]$|^[a-z]$/.test(machineName);
-}
 
 /**
  * Get bundle filename for entity type

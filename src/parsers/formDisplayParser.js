@@ -4,6 +4,8 @@
  * No file I/O - receives parsed YAML objects as input.
  */
 
+import { generateMachineName } from '../utils/slug.js';
+
 /**
  * Get filename pattern for form display
  * @param {string} entityType - Entity type
@@ -361,16 +363,7 @@ export function validateGroupName(name, groups) {
  * @returns {string} - Machine name (group_xxx)
  */
 export function generateGroupName(label) {
-  if (!label || typeof label !== 'string') {
-    return '';
-  }
-
-  const normalized = label
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/_+/g, '_');
-
-  return `group_${normalized}`;
+  const name = generateMachineName(label);
+  if (!name) return '';
+  return `group_${name}`;
 }

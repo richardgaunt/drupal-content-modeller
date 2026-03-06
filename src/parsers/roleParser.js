@@ -4,6 +4,7 @@
  */
 
 import { groupPermissionsByBundle, filterBundlePermissions } from '../constants/permissions.js';
+import { generateMachineName } from '../utils/slug.js';
 
 /**
  * Get the filename for a role config
@@ -63,20 +64,12 @@ export function parseRole(config) {
 }
 
 /**
- * Generate machine name from label
+ * Generate machine name from label for roles (max 32 chars)
  * @param {string} label - Human-readable label
  * @returns {string} - Machine name
  */
 export function generateRoleMachineName(label) {
-  if (!label || typeof label !== 'string') {
-    return '';
-  }
-
-  return label
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .substring(0, 32);
+  return generateMachineName(label).substring(0, 32);
 }
 
 /**

@@ -4,6 +4,7 @@
  */
 
 import { getEntityTypeLabel } from '../constants/entityTypes.js';
+import { formatCardinality } from '../utils/slug.js';
 
 /**
  * Format a date for display
@@ -28,20 +29,8 @@ export function formatLastSync(isoString) {
   return date.toLocaleString('en-US', options);
 }
 
-/**
- * Format cardinality for display
- * @param {number} cardinality - Field cardinality
- * @returns {string} - "Single", "Unlimited", or the number
- */
-export function formatCardinality(cardinality) {
-  if (cardinality === 1) {
-    return 'Single';
-  }
-  if (cardinality === -1) {
-    return 'Unlimited';
-  }
-  return String(cardinality);
-}
+// Re-export for backward compatibility
+export { formatCardinality };
 
 /**
  * Format required for display

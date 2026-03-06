@@ -55,8 +55,11 @@ describe('Report Generator', () => {
       expect(formatCardinality(-1)).toBe('Unlimited');
     });
 
+    test('returns "Single" for 1', () => {
+      expect(formatCardinality(1)).toBe('Single');
+    });
+
     test('returns number as string for other values', () => {
-      expect(formatCardinality(1)).toBe('1');
       expect(formatCardinality(5)).toBe('5');
     });
   });

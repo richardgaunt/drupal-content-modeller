@@ -98,22 +98,39 @@ export async function updateComponentYml(componentYmlPath, updatedConfig) {
  * @param {string} options.subdirectory - Component subdirectory (e.g. "01-atoms")
  * @param {string} options.machineName - Component machine name
  * @param {object} options.config - Component config object (name, description, props, slots)
+ * @param {string} [options.sourceDir] - Source component directory to copy assets from
+ * @param {string} [options.sourceMachineName] - Source component machine name (for renaming files)
  * @returns {Promise<{directory: string, files: string[]}>} - Created directory path and list of created file paths
  */
 export async function createNewComponent(options) {
-  const { activeThemeDir, subdirectory, machineName, config } = options;
+  const { activeThemeDir, subdirectory, machineName, config, sourceDir, sourceMachineName } = options;
 
   const componentDir = join(activeThemeDir, 'components', subdirectory, machineName);
   await mkdir(componentDir, { recursive: true });
 
   const ymlPath = join(componentDir, `${machineName}.component.yml`);
   await writeFile(ymlPath, generateComponentYml(config), 'utf-8');
+  const createdFiles = [ymlPath];
 
-  const twigPath = join(componentDir, `${machineName}.twig`);
-  await writeFile(twigPath, '', 'utf-8');
+  if (sourceDir && sourceMachineName) {
+    // Copy assets from source, renaming basename to new machine name
+    const sourceFiles = await readdir(sourceDir);
 
-  const cssPath = join(componentDir, `${machineName}.css`);
-  await writeFile(cssPath, '', 'utf-8');
+    for (const file of sourceFiles) {
+      if (file.endsWith('.component.yml')) continue;
+      const newFileName = file.replace(sourceMachineName, machineName);
+      const destPath = join(componentDir, newFileName);
+      await copyFile(join(sourceDir, file), destPath);
+      createdFiles.push(destPath);
+    }
+  } else {
+    // Create empty starter files
+    const twigPath = join(componentDir, `${machineName}.twig`);
+    await writeFile(twigPath, '', 'utf-8');
+    const cssPath = join(componentDir, `${machineName}.css`);
+    await writeFile(cssPath, '', 'utf-8');
+    createdFiles.push(twigPath, cssPath);
+  }
 
-  return { directory: componentDir, files: [ymlPath, twigPath, cssPath] };
+  return { directory: componentDir, files: createdFiles };
 }

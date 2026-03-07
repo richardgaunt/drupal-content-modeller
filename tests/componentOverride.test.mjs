@@ -520,4 +520,44 @@ describe('createNewComponent', () => {
     const cssContent = await readFile(join(directory, 'divider.css'), 'utf-8');
     expect(cssContent).toBe('');
   });
+
+  it('should copy and rename assets from source component', async () => {
+    // Create a source component directory with assets
+    const sourceDir = join(tmpDir, 'source_theme', 'components', '01-atoms', 'card');
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(join(sourceDir, 'card.component.yml'), 'name: Card');
+    await writeFile(join(sourceDir, 'card.twig'), '<div class="card">{{ content }}</div>');
+    await writeFile(join(sourceDir, 'card.css'), '.card { padding: 1rem; }');
+    await writeFile(join(sourceDir, 'card.js'), '// card js');
+    await writeFile(join(sourceDir, 'card.scss'), '.card { padding: 1rem; }');
+
+    const { directory, files } = await createNewComponent({
+      activeThemeDir,
+      subdirectory: '01-atoms',
+      machineName: 'my_card',
+      config: { name: 'My Card', status: 'stable', description: 'Custom card' },
+      sourceDir,
+      sourceMachineName: 'card'
+    });
+
+    // Should have yml + 4 copied assets
+    expect(files).toHaveLength(5);
+    expect(files.some(f => f.endsWith('my_card.component.yml'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.twig'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.css'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.js'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.scss'))).toBe(true);
+
+    // Verify files were renamed
+    const twigContent = await readFile(join(directory, 'my_card.twig'), 'utf-8');
+    expect(twigContent).toContain('<div class="card">');
+
+    const cssContent = await readFile(join(directory, 'my_card.css'), 'utf-8');
+    expect(cssContent).toContain('.card');
+
+    // Should not contain source component.yml
+    const dirFiles = await readdir(directory);
+    expect(dirFiles).not.toContain('card.twig');
+    expect(dirFiles).not.toContain('card.css');
+  });
 });

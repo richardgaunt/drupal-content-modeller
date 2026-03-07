@@ -941,6 +941,19 @@ async function handleCreateComponent(project) {
         if (detail.props) config.props = detail.props;
         if (detail.slots) config.slots = detail.slots;
         console.log(chalk.cyan(`Copied props and slots from ${selected.id}`));
+
+        // Ask about copying assets
+        if (detail.assets && detail.assets.length > 0) {
+          const copyAssets = await confirm({
+            message: 'Copy assets (twig, css, js, etc.) from the source component?',
+            default: true
+          });
+
+          if (copyAssets) {
+            config._sourceDir = detail.directory;
+            config._sourceMachineName = detail.machine_name;
+          }
+        }
       }
     }
   }
@@ -1011,12 +1024,20 @@ async function handleCreateComponent(project) {
     });
   }
 
+  // Extract source info (set during "base on" flow) and remove from config
+  const sourceDir = config._sourceDir;
+  const sourceMachineName = config._sourceMachineName;
+  delete config._sourceDir;
+  delete config._sourceMachineName;
+
   // Create the component
   const { directory: componentDir, files: createdFiles } = await createNewComponent({
     activeThemeDir: activeTheme.directory,
     subdirectory,
     machineName,
-    config
+    config,
+    sourceDir,
+    sourceMachineName
   });
 
   console.log();

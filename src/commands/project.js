@@ -179,6 +179,11 @@ export async function updateProject(project, updates) {
     updatedProject.theme = updates.theme;
   }
 
+  // Update editableBaseTheme if provided
+  if (updates.editableBaseTheme !== undefined) {
+    updatedProject.editableBaseTheme = updates.editableBaseTheme;
+  }
+
   // Handle slug change: rename directory
   if (slugChanged) {
     await renameProjectDirectory(project.slug, newSlug);

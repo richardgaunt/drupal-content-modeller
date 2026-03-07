@@ -98,6 +98,7 @@ describe('Project Utilities (Pure)', () => {
         drupalRoot: '',
         drushCommand: 'drush',
         theme: null,
+        editableBaseTheme: false,
         lastSync: null,
         entities: {
           node: {},

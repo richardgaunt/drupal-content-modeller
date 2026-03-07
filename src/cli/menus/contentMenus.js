@@ -3,7 +3,7 @@
  * Handles bundle, field, and content-related menu actions.
  */
 
-import { select, input, checkbox, search } from '@inquirer/prompts';
+import { select, input, checkbox, search, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 
 import {
@@ -795,13 +795,25 @@ export async function handleEditProject(project) {
       theme = null;
     }
 
+    // Only ask about editable base theme if there are base themes
+    const hasBaseThemes = theme?.themes?.length > 1 ||
+      (theme === undefined && project.theme?.themes?.length > 1);
+    let editableBaseTheme = project.editableBaseTheme || false;
+    if (hasBaseThemes) {
+      editableBaseTheme = await confirm({
+        message: 'Allow editing base theme components?',
+        default: editableBaseTheme
+      });
+    }
+
     const updates = {
       name: name.trim(),
       configDirectory: configDirectory.trim(),
       baseUrl: baseUrl.trim(),
       drupalRoot: drupalRoot.trim(),
       drushCommand: drushCommand.trim() || 'drush',
-      theme
+      theme,
+      editableBaseTheme
     };
 
     const updatedProject = await updateProject(project, updates);

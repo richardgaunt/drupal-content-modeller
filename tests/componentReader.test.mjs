@@ -7,7 +7,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseComponentYml, getComponentMachineName } from '../src/parsers/componentParser.js';
-import { findComponentFiles, readComponent, discoverThemeComponents } from '../src/io/componentReader.js';
+import { findComponentFiles, readComponent, readComponentDetail, discoverThemeComponents } from '../src/io/componentReader.js';
 
 // --- Pure parser tests ---
 
@@ -196,5 +196,83 @@ describe('discoverThemeComponents', () => {
   it('should return empty object when no components directory', async () => {
     const components = await discoverThemeComponents(tmpDir);
     expect(components).toEqual({});
+  });
+});
+
+describe('readComponentDetail', () => {
+  let tmpDir;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'comp-detail-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true });
+  });
+
+  it('should return full detail including props, slots, and assets', async () => {
+    await writeFile(join(tmpDir, 'card.component.yml'), `
+name: Card
+status: stable
+description: A card component
+replaces: 'base:card'
+props:
+  type: object
+  properties:
+    theme:
+      type: string
+      title: Theme
+      description: Theme variation.
+      enum:
+        - light
+        - dark
+    title:
+      type: string
+      title: Title
+      description: Card title.
+slots:
+  content:
+    title: Content
+    description: Card content.
+`);
+    await writeFile(join(tmpDir, 'card.twig'), '<div></div>');
+    await writeFile(join(tmpDir, 'card.css'), '.card {}');
+    await writeFile(join(tmpDir, 'card.scss'), '.card {}');
+    await writeFile(join(tmpDir, 'card.js'), '// js');
+
+    const result = await readComponentDetail(join(tmpDir, 'card.component.yml'));
+
+    expect(result.name).toBe('Card');
+    expect(result.machine_name).toBe('card');
+    expect(result.description).toBe('A card component');
+    expect(result.status).toBe('stable');
+    expect(result.replaces).toBe('base:card');
+    expect(result.directory).toBe(tmpDir);
+
+    // Props
+    expect(result.props).toBeDefined();
+    expect(result.props.properties.theme.enum).toEqual(['light', 'dark']);
+    expect(result.props.properties.title.type).toBe('string');
+
+    // Slots
+    expect(result.slots).toBeDefined();
+    expect(result.slots.content.title).toBe('Content');
+
+    // Assets (excludes .component.yml)
+    expect(result.assets).toContain('card.twig');
+    expect(result.assets).toContain('card.css');
+    expect(result.assets).toContain('card.scss');
+    expect(result.assets).toContain('card.js');
+    expect(result.assets).not.toContain('card.component.yml');
+  });
+
+  it('should handle component with no props or slots', async () => {
+    await writeFile(join(tmpDir, 'simple.component.yml'), 'name: Simple\n');
+
+    const result = await readComponentDetail(join(tmpDir, 'simple.component.yml'));
+    expect(result.name).toBe('Simple');
+    expect(result.props).toBeNull();
+    expect(result.slots).toBeNull();
+    expect(result.assets).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
  * The routing hub for the CLI application.
  */
 
-import { select, input, search } from '@inquirer/prompts';
+import { select, input, search, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { setPermissionErrorHandler } from '../../io/fileSystem.js';
 
@@ -163,10 +163,19 @@ async function handleCreateProject() {
       }
     }
 
+    let editableBaseTheme = false;
+    if (theme && theme.themes.length > 1) {
+      editableBaseTheme = await confirm({
+        message: 'Allow editing base theme components?',
+        default: false
+      });
+    }
+
     const project = await createProject(name, configDir, baseUrl, {
       drupalRoot: drupalRoot.trim(),
       drushCommand: drushCommand.trim() || 'drush',
-      theme
+      theme,
+      editableBaseTheme
     });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));

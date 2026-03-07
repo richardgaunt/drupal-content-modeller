@@ -79,6 +79,42 @@ export async function readComponent(componentYmlPath) {
 }
 
 /**
+ * Read full detail of a component including props, slots, and asset files.
+ * @param {string} componentYmlPath - Absolute path to a *.component.yml file
+ * @returns {Promise<object>} - Full component detail
+ */
+export async function readComponentDetail(componentYmlPath) {
+  const filename = basename(componentYmlPath);
+  const machineName = getComponentMachineName(filename);
+  const componentDir = dirname(componentYmlPath);
+
+  const content = await readFile(componentYmlPath, 'utf-8');
+  const parsed = parseComponentYml(content);
+
+  // List all files in the component directory
+  let assets = [];
+  try {
+    const entries = await readdir(componentDir);
+    assets = entries.filter(f => !f.endsWith('.component.yml')).sort();
+  } catch {
+    // skip
+  }
+
+  return {
+    name: parsed.name || machineName,
+    machine_name: machineName,
+    description: parsed.description || null,
+    status: parsed.status || null,
+    component_config_path: componentYmlPath,
+    directory: componentDir,
+    replaces: parsed.replaces || null,
+    props: parsed.props || null,
+    slots: parsed.slots || null,
+    assets
+  };
+}
+
+/**
  * Discover all components in a theme directory
  * @param {string} themeDir - Path to the theme directory
  * @returns {Promise<object>} - Components keyed by machine name

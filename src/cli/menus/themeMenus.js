@@ -10,6 +10,7 @@ import { syncProject } from '../../commands/sync.js';
 import { loadProject } from '../../commands/project.js';
 import { createTable } from '../../commands/list.js';
 import { getComponentSubdirectories, createComponentOverride } from '../../io/componentWriter.js';
+import { readComponentDetail } from '../../io/componentReader.js';
 
 /**
  * Get all components across all themes as a flat array with theme context
@@ -169,6 +170,177 @@ function handleListOverriddenComponents(project) {
 }
 
 /**
+ * Format a prop type for display
+ * @param {*} type - Type value (string, array, or undefined)
+ * @returns {string}
+ */
+function formatPropType(type) {
+  if (!type) return '-';
+  if (Array.isArray(type)) return type.join(' | ');
+  return String(type);
+}
+
+/**
+ * Flatten nested object properties into a displayable list of props.
+ * @param {object} properties - The properties object from a component's props
+ * @param {string} prefix - Dot-notation prefix for nested props
+ * @returns {object[]} - Flat array of prop row objects
+ */
+function flattenProps(properties, prefix = '') {
+  if (!properties || typeof properties !== 'object') return [];
+
+  const rows = [];
+  for (const [key, prop] of Object.entries(properties)) {
+    const fullName = prefix ? `${prefix}.${key}` : key;
+    const extra = [];
+
+    if (prop.enum) {
+      extra.push(`Allowed: ${prop.enum.join(', ')}`);
+    }
+    if (prop.default !== undefined) {
+      extra.push(`Default: ${prop.default}`);
+    }
+    if (prop.items) {
+      const itemType = prop.items.type || 'mixed';
+      extra.push(`Items: ${itemType}`);
+    }
+
+    rows.push({
+      name: prop.title || key,
+      machine_name: fullName,
+      type: formatPropType(prop.type),
+      description: prop.description || '',
+      extra: extra.join('; ')
+    });
+
+    // Recurse into nested object properties
+    if (prop.properties) {
+      rows.push(...flattenProps(prop.properties, fullName));
+    }
+    // Recurse into array item object properties
+    if (prop.items?.properties) {
+      rows.push(...flattenProps(prop.items.properties, `${fullName}[]`));
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Handle "List props and slots of component"
+ * @param {object} project - Project object
+ */
+async function handleInspectComponent(project) {
+  if (!project.theme?.themes?.length) {
+    console.log(chalk.yellow('No theme configured.'));
+    return;
+  }
+
+  const allComponents = getAllComponents(project);
+  if (allComponents.length === 0) {
+    console.log(chalk.yellow('No components found.'));
+    return;
+  }
+
+  const selectedId = await search({
+    message: 'Select component to inspect:',
+    source: async (input) => {
+      const term = (input || '').toLowerCase();
+      return allComponents
+        .filter(c =>
+          c.id.toLowerCase().includes(term) ||
+          c.name.toLowerCase().includes(term)
+        )
+        .map(c => ({
+          value: c.id,
+          name: `${c.id} - ${c.name}`,
+          description: c.description || ''
+        }));
+    }
+  });
+
+  const selected = allComponents.find(c => c.id === selectedId);
+  if (!selected) return;
+
+  // Read full detail from the component.yml file
+  const detail = await readComponentDetail(selected.component_config_path);
+
+  // Header
+  console.log();
+  console.log(chalk.cyan(`Component: ${detail.name} (${detail.machine_name})`));
+  if (detail.description) {
+    console.log(chalk.white(`Description: ${detail.description}`));
+  }
+  if (detail.status) {
+    console.log(chalk.white(`Status: ${detail.status}`));
+  }
+  if (detail.replaces) {
+    console.log(chalk.white(`Overrides: ${detail.replaces}`));
+  }
+  console.log(chalk.white(`Path: ${detail.directory}`));
+  console.log();
+
+  // Assets
+  if (detail.assets.length > 0) {
+    console.log(chalk.cyan('Assets:'));
+    for (const asset of detail.assets) {
+      console.log(chalk.white(`  ${asset}`));
+    }
+    console.log();
+  }
+
+  // Props
+  if (detail.props?.properties) {
+    const propRows = flattenProps(detail.props.properties);
+
+    if (propRows.length > 0) {
+      console.log(chalk.cyan('Props:'));
+      const propsTable = createTable(
+        [
+          { header: 'Name', minWidth: 15, getValue: r => r.name },
+          { header: 'Machine Name', minWidth: 20, getValue: r => r.machine_name },
+          { header: 'Type', minWidth: 10, getValue: r => r.type },
+          { header: 'Description', minWidth: 25, getValue: r => r.description },
+          { header: 'Options', minWidth: 15, getValue: r => r.extra }
+        ],
+        propRows
+      );
+      console.log(propsTable);
+      console.log();
+    }
+  } else {
+    console.log(chalk.yellow('No props defined.'));
+    console.log();
+  }
+
+  // Slots
+  if (detail.slots) {
+    const slotRows = Object.entries(detail.slots).map(([key, slot]) => ({
+      name: slot.title || key,
+      machine_name: key,
+      description: slot.description || ''
+    }));
+
+    if (slotRows.length > 0) {
+      console.log(chalk.cyan('Slots:'));
+      const slotsOutput = createTable(
+        [
+          { header: 'Name', minWidth: 15, getValue: r => r.name },
+          { header: 'Machine Name', minWidth: 20, getValue: r => r.machine_name },
+          { header: 'Description', minWidth: 30, getValue: r => r.description }
+        ],
+        slotRows
+      );
+      console.log(slotsOutput);
+      console.log();
+    }
+  } else {
+    console.log(chalk.yellow('No slots defined.'));
+    console.log();
+  }
+}
+
+/**
  * Handle override component action
  * @param {object} project - Project object
  * @returns {Promise<object>} - Updated project
@@ -294,6 +466,7 @@ export async function handleThemeMenu(project) {
     { value: 'list-components', name: 'List components' },
     { value: 'list-custom', name: 'List custom components' },
     { value: 'list-overridden', name: 'List overridden components' },
+    { value: 'inspect-component', name: 'Inspect component (props & slots)' },
     { value: 'override-component', name: 'Override a component' },
     { value: 'back', name: 'Back' }
   ];
@@ -334,6 +507,9 @@ export async function handleThemeMenu(project) {
           break;
         case 'list-overridden':
           handleListOverriddenComponents(project);
+          break;
+        case 'inspect-component':
+          await handleInspectComponent(project);
           break;
         case 'override-component':
           project = await handleOverrideComponent(project);

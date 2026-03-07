@@ -71,7 +71,7 @@ export function parseFieldGroups(thirdPartySettings) {
     groups.push({
       name,
       label: groupConfig.label || name,
-      children: groupConfig.children || [],
+      children: Array.isArray(groupConfig.children) ? groupConfig.children : [],
       parentName: groupConfig.parent_name || '',
       weight: groupConfig.weight ?? 0,
       formatType: groupConfig.format_type || 'fieldset',

@@ -13,7 +13,8 @@ import {
   generateEntityTypeReportData,
   generateProjectReportData,
   generateBundlePermissionsTable,
-  generateBundlePermissionsData
+  generateBundlePermissionsData,
+  generateFormDisplayData
 } from '../src/generators/reportGenerator.js';
 
 describe('Report Generator', () => {
@@ -498,6 +499,7 @@ describe('Report Generator', () => {
         name: 'field_title',
         label: 'Title',
         type: 'string',
+        widget: null,
         description: '',
         cardinality: 1,
         required: true,
@@ -1038,6 +1040,202 @@ describe('Report Generator', () => {
     test('no permissions section without roles', () => {
       const result = generateProjectReport(project);
       expect(result).not.toContain('#### Permissions');
+    });
+  });
+
+  // ============================================
+  // Form Display Data Tests
+  // ============================================
+
+  describe('generateFormDisplayData', () => {
+    test('returns null when no form display provided', () => {
+      expect(generateFormDisplayData(null)).toBeNull();
+      expect(generateFormDisplayData(undefined)).toBeNull();
+    });
+
+    test('returns correct structure with groups, fields, and hidden', () => {
+      const formDisplay = {
+        groups: [
+          {
+            name: 'group_main',
+            label: 'Main Content',
+            children: ['field_body', 'field_title'],
+            parentName: '',
+            weight: 0,
+            formatType: 'fieldset',
+            formatSettings: { description: '', required_fields: true },
+            region: 'content'
+          }
+        ],
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 1, region: 'content', settings: {}, thirdPartySettings: {} },
+          { name: 'field_title', type: 'string_textfield', weight: 0, region: 'content', settings: {}, thirdPartySettings: {} }
+        ],
+        hidden: ['created', 'status']
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0]).toEqual({
+        name: 'group_main',
+        label: 'Main Content',
+        parentName: '',
+        weight: 0,
+        formatType: 'fieldset',
+        formatSettings: { description: '', required_fields: true },
+        children: ['field_body', 'field_title']
+      });
+
+      expect(result.fields).toHaveLength(2);
+      expect(result.fields[0]).toEqual({
+        name: 'field_body',
+        widget: 'text_textarea',
+        weight: 1,
+        group: 'group_main',
+        widgetSettings: null
+      });
+      expect(result.fields[1]).toEqual({
+        name: 'field_title',
+        widget: 'string_textfield',
+        weight: 0,
+        group: 'group_main',
+        widgetSettings: null
+      });
+
+      expect(result.hidden).toEqual(['created', 'status']);
+    });
+
+    test('sets group to null for ungrouped fields', () => {
+      const formDisplay = {
+        groups: [
+          { name: 'group_main', label: 'Main', children: ['field_body'], parentName: '', weight: 0, formatType: 'fieldset', formatSettings: {} }
+        ],
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 0 },
+          { name: 'field_sidebar', type: 'string_textfield', weight: 1 }
+        ],
+        hidden: []
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+      const sidebarField = result.fields.find(f => f.name === 'field_sidebar');
+      expect(sidebarField.group).toBeNull();
+
+      const bodyField = result.fields.find(f => f.name === 'field_body');
+      expect(bodyField.group).toBe('group_main');
+    });
+
+    test('handles nested groups with parentName', () => {
+      const formDisplay = {
+        groups: [
+          { name: 'group_tabs', label: 'Tabs', children: ['group_content'], parentName: '', weight: 0, formatType: 'tabs', formatSettings: {} },
+          { name: 'group_content', label: 'Content', children: ['field_body'], parentName: 'group_tabs', weight: 0, formatType: 'tab', formatSettings: {} }
+        ],
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 0 }
+        ],
+        hidden: []
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+
+      expect(result.groups).toHaveLength(2);
+      expect(result.groups[0].parentName).toBe('');
+      expect(result.groups[0].children).toEqual(['group_content']);
+      expect(result.groups[1].parentName).toBe('group_tabs');
+      expect(result.groups[1].children).toEqual(['field_body']);
+
+      expect(result.fields[0].group).toBe('group_content');
+    });
+
+    test('handles empty groups and fields', () => {
+      const formDisplay = {
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+      expect(result.groups).toEqual([]);
+      expect(result.fields).toEqual([]);
+      expect(result.hidden).toEqual([]);
+    });
+
+    test('includes widgetSettings when field has non-empty settings', () => {
+      const formDisplay = {
+        groups: [],
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 0, settings: { rows: 5, placeholder: '' } },
+          { name: 'field_flag', type: 'boolean_checkbox', weight: 1, settings: {} }
+        ],
+        hidden: []
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+      expect(result.fields[0].widgetSettings).toEqual({ rows: 5, placeholder: '' });
+      expect(result.fields[1].widgetSettings).toBeNull();
+    });
+
+    test('handles form display with no groups property', () => {
+      const formDisplay = {
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 0 }
+        ],
+        hidden: []
+      };
+
+      const result = generateFormDisplayData(formDisplay);
+      expect(result.groups).toEqual([]);
+      expect(result.fields).toHaveLength(1);
+      expect(result.fields[0].group).toBeNull();
+    });
+  });
+
+  describe('generateBundleReportData with formDisplay', () => {
+    const bundle = {
+      id: 'page',
+      label: 'Page',
+      fields: {
+        field_body: {
+          name: 'field_body',
+          label: 'Body',
+          type: 'text_long',
+          required: false,
+          cardinality: 1
+        }
+      }
+    };
+
+    test('includes formDisplay when form display data is provided', () => {
+      const formDisplay = {
+        groups: [
+          { name: 'group_main', label: 'Main', children: ['field_body'], parentName: '', weight: 0, formatType: 'fieldset', formatSettings: {} }
+        ],
+        fields: [
+          { name: 'field_body', type: 'text_textarea', weight: 1 }
+        ],
+        hidden: ['status']
+      };
+
+      const result = generateBundleReportData(bundle, 'node', '', { formDisplay });
+      expect(result.formDisplay).not.toBeNull();
+      expect(result.formDisplay.groups).toHaveLength(1);
+      expect(result.formDisplay.groups[0].name).toBe('group_main');
+      expect(result.formDisplay.fields).toHaveLength(1);
+      expect(result.formDisplay.fields[0]).toEqual({
+        name: 'field_body',
+        widget: 'text_textarea',
+        weight: 1,
+        group: 'group_main',
+        widgetSettings: null
+      });
+      expect(result.formDisplay.hidden).toEqual(['status']);
+    });
+
+    test('sets formDisplay to null when no form display data', () => {
+      const result = generateBundleReportData(bundle, 'node');
+      expect(result.formDisplay).toBeNull();
     });
   });
 });

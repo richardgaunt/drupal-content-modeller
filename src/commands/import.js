@@ -9,6 +9,8 @@ import {
   getExistingFieldType
 } from '../generators/fieldGenerator.js';
 import { createBundle, createField } from './create.js';
+import { saveFormDisplay, createFormDisplay } from './formDisplay.js';
+import { formDisplayExists } from '../io/configReader.js';
 
 /**
  * Validate report data structure
@@ -229,6 +231,68 @@ export function auditImport(project, reportData) {
 }
 
 /**
+ * Build a form display object from report data, using a base form display for defaults.
+ * @param {object} baseFormDisplay - Base form display from createFormDisplay
+ * @param {object} reportFormDisplay - Form display data from JSON report
+ * @returns {object} - Modified form display
+ */
+export function buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay) {
+  const { groups: reportGroups, fields: reportFields, hidden: reportHidden } = reportFormDisplay;
+
+  // Build groups from report, preserving formatSettings
+  const groups = (reportGroups || []).map(g => ({
+    name: g.name,
+    label: g.label,
+    children: Array.isArray(g.children) ? g.children : [],
+    parentName: g.parentName || '',
+    weight: g.weight ?? 0,
+    formatType: g.formatType || 'fieldset',
+    formatSettings: g.formatSettings || {},
+    region: 'content'
+  }));
+
+  // Start with base fields, update from report data
+  const baseFieldMap = new Map(baseFormDisplay.fields.map(f => [f.name, f]));
+  const fields = [];
+
+  for (const rf of (reportFields || [])) {
+    const baseField = baseFieldMap.get(rf.name);
+    if (baseField) {
+      // Field exists in base — update widget, weight, and settings
+      fields.push({
+        ...baseField,
+        type: rf.widget || baseField.type,
+        weight: rf.weight ?? baseField.weight,
+        settings: rf.widgetSettings || baseField.settings
+      });
+      baseFieldMap.delete(rf.name);
+    } else {
+      // Field from report not in base (e.g. base fields not auto-added) — create entry
+      fields.push({
+        name: rf.name,
+        type: rf.widget || 'string_textfield',
+        weight: rf.weight ?? 0,
+        region: 'content',
+        settings: rf.widgetSettings || {},
+        thirdPartySettings: {}
+      });
+    }
+  }
+
+  // Append any base fields not in report (e.g. uid, path, moderation_state)
+  for (const [, baseField] of baseFieldMap) {
+    fields.push(baseField);
+  }
+
+  return {
+    ...baseFormDisplay,
+    groups,
+    fields,
+    hidden: reportHidden || baseFormDisplay.hidden || []
+  };
+}
+
+/**
  * Import content model into a project
  * @param {object} project - Project object
  * @param {object} reportData - Validated report data
@@ -323,6 +387,48 @@ export async function importContentModel(project, reportData, auditResult) {
         fieldName: reuse.fieldName,
         message: error.message
       });
+    }
+  }
+
+  // Import form displays for newly created bundles
+  const createdBundleKeys = new Set(
+    created.filter(c => c.kind === 'bundle').map(c => `${c.entityType}:${c.bundle}`)
+  );
+
+  for (const entityTypeData of reportData.entityTypes) {
+    for (const bundle of entityTypeData.bundles) {
+      if (!bundle.formDisplay) continue;
+      const key = `${entityTypeData.entityType}:${bundle.bundle}`;
+      if (!createdBundleKeys.has(key)) continue;
+
+      try {
+        // Skip if form display already exists (e.g. created by createBundle)
+        if (formDisplayExists(project.configDirectory, entityTypeData.entityType, bundle.bundle)) {
+          continue;
+        }
+
+        // Create base form display with correct defaults and dependencies
+        const baseFormDisplay = await createFormDisplay(project, entityTypeData.entityType, bundle.bundle);
+
+        // Apply report data (groups, weights, widgets, hidden)
+        const finalFormDisplay = buildFormDisplayFromReport(baseFormDisplay, bundle.formDisplay);
+
+        // Save the modified form display
+        await saveFormDisplay(project, finalFormDisplay);
+
+        created.push({
+          kind: 'formDisplay',
+          entityType: entityTypeData.entityType,
+          bundle: bundle.bundle
+        });
+      } catch (error) {
+        errors.push({
+          kind: 'formDisplay',
+          entityType: entityTypeData.entityType,
+          bundle: bundle.bundle,
+          message: error.message
+        });
+      }
     }
   }
 

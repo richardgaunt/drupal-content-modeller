@@ -11,6 +11,7 @@ import {
   getBundleAdminUrls
 } from '../constants/entityTypes.js';
 import { formatCardinality } from '../utils/slug.js';
+import { findFieldParentGroup } from '../parsers/formDisplayParser.js';
 
 // Re-export for backward compatibility
 export { getEntityTypeLabel, getEntityAdminPath, getBundleAdminUrls, formatCardinality };
@@ -144,6 +145,41 @@ export function generateBundlePermissionsData(roles, entityType, bundleId) {
 }
 
 /**
+ * Generate structured form display data for a bundle report
+ * @param {object|null} formDisplay - Parsed form display data
+ * @returns {object|null} - Form display report data or null
+ */
+export function generateFormDisplayData(formDisplay) {
+  if (!formDisplay) {
+    return null;
+  }
+
+  const groups = (formDisplay.groups || []).map(group => ({
+    name: group.name,
+    label: group.label,
+    parentName: group.parentName || '',
+    weight: group.weight ?? 0,
+    formatType: group.formatType || 'fieldset',
+    formatSettings: group.formatSettings || {},
+    children: group.children || []
+  }));
+
+  const fields = (formDisplay.fields || []).map(field => ({
+    name: field.name,
+    widget: field.type || null,
+    weight: field.weight ?? 0,
+    group: findFieldParentGroup(field.name, groups) || null,
+    widgetSettings: field.settings && Object.keys(field.settings).length > 0 ? field.settings : null
+  }));
+
+  return {
+    groups,
+    fields,
+    hidden: formDisplay.hidden || []
+  };
+}
+
+/**
  * Generate structured data for a single bundle
  * @param {object} bundle - Bundle object
  * @param {string} entityType - Entity type
@@ -151,12 +187,14 @@ export function generateBundlePermissionsData(roles, entityType, bundleId) {
  * @param {object} options - Options
  * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
  * @param {object[]} [options.roles] - Array of role objects for permissions
+ * @param {object} [options.formDisplay] - Parsed form display data for the bundle
  * @returns {object} - Structured bundle data
  */
 export function generateBundleReportData(bundle, entityType, baseUrl = '', options = {}) {
   const adminUrls = getBundleAdminUrls(entityType, bundle.id);
   const baseFieldOverrides = options.baseFieldOverrides || {};
   const baseFieldsConfig = getBaseFields(entityType);
+  const formDisplayFields = options.formDisplay?.fields || [];
 
   const fields = Object.values(bundle.fields || {});
   const sortedFields = [...fields].sort((a, b) =>
@@ -180,10 +218,12 @@ export function generateBundleReportData(bundle, entityType, baseUrl = '', optio
     })),
     fields: sortedFields.map(field => {
       const other = getFieldOtherInfo(field);
+      const formField = formDisplayFields.find(f => f.name === field.name);
       return {
         name: field.name,
         label: field.label || field.name,
         type: field.type,
+        widget: formField?.type || null,
         description: field.description || '',
         cardinality: field.cardinality || 1,
         required: !!field.required,
@@ -191,7 +231,8 @@ export function generateBundleReportData(bundle, entityType, baseUrl = '', optio
         settings: field.settings || {}
       };
     }),
-    permissions: generateBundlePermissionsData(options.roles || [], entityType, bundle.id)
+    permissions: generateBundlePermissionsData(options.roles || [], entityType, bundle.id),
+    formDisplay: generateFormDisplayData(options.formDisplay || null)
   };
 }
 
@@ -211,10 +252,15 @@ export function generateEntityTypeReportData(project, entityType, baseUrl = '', 
     (a.label || '').localeCompare(b.label || '')
   );
 
+  const formDisplays = options.formDisplays || {};
+
   return {
     entityType,
     label: getEntityTypeLabel(entityType),
-    bundles: sortedBundles.map(b => generateBundleReportData(b, entityType, baseUrl, options))
+    bundles: sortedBundles.map(b => generateBundleReportData(b, entityType, baseUrl, {
+      ...options,
+      formDisplay: formDisplays[b.id] || null
+    }))
   };
 }
 
@@ -227,13 +273,17 @@ export function generateEntityTypeReportData(project, entityType, baseUrl = '', 
  */
 export function generateProjectReportData(project, baseUrl = '', options = {}) {
   const resolvedBaseUrl = baseUrl || project.baseUrl || null;
+  const allFormDisplays = options.formDisplays || {};
 
   return {
     project: project.name,
     baseUrl: resolvedBaseUrl,
     entityTypes: ENTITY_ORDER
       .filter(et => Object.keys(project.entities[et] || {}).length > 0)
-      .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || '', options))
+      .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || '', {
+        ...options,
+        formDisplays: allFormDisplays[et] || {}
+      }))
   };
 }
 
@@ -245,11 +295,13 @@ export function generateProjectReportData(project, baseUrl = '', options = {}) {
  * @param {object} options - Options
  * @param {object} [options.baseFieldOverrides] - Base field override data keyed by field name
  * @param {object[]} [options.roles] - Array of role objects for permissions
+ * @param {object} [options.formDisplay] - Parsed form display data for the bundle
  * @returns {string} - Markdown content
  */
 export function generateBundleReport(bundle, entityType, baseUrl = '', options = {}) {
   const adminUrls = getBundleAdminUrls(entityType, bundle.id);
   const baseFieldOverrides = options.baseFieldOverrides || {};
+  const formDisplayFields = options.formDisplay?.fields || [];
 
   let md = `### ${bundle.label || bundle.id} (${entityType})\n\n`;
   md += `${bundle.description || '_No description_'}\n\n`;
@@ -298,8 +350,8 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     return md;
   }
 
-  md += '| Check | Field Name | Machine Name | Field Type | Description | Cardinality | Required | Other | URL |\n';
-  md += '|-------|------------|--------------|------------|-------------|-------------|----------|-------|-----|\n';
+  md += '| Check | Field Name | Machine Name | Field Type | Widget | Description | Cardinality | Required | Other | URL |\n';
+  md += '|-------|------------|--------------|------------|--------|-------------|-------------|----------|-------|-----|\n';
 
   // Sort fields by label
   const sortedFields = [...fields].sort((a, b) =>
@@ -309,11 +361,14 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
   for (const field of sortedFields) {
     const fieldPath = getFieldAdminPath(entityType, bundle.id, field.name);
     const fieldUrl = baseUrl ? `${baseUrl}${fieldPath}` : fieldPath;
+    const formField = formDisplayFields.find(f => f.name === field.name);
+    const widget = formField?.type || '-';
 
     md += `| <input type="checkbox"> `;
     md += `| ${field.label || field.name} `;
     md += `| \`${field.name}\` `;
     md += `| ${field.type} `;
+    md += `| ${widget} `;
     md += `| ${field.description || '-'} `;
     md += `| ${formatCardinality(field.cardinality || 1)} `;
     md += `| ${field.required ? 'Yes' : 'No'} `;
@@ -340,6 +395,7 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
  */
 export function generateEntityTypeReport(project, entityType, baseUrl = '', options = {}) {
   const bundles = project.entities[entityType] || {};
+  const formDisplays = options.formDisplays || {};
 
   let md = `# ${getEntityTypeLabel(entityType)} Report\n\n`;
   md += `**Project:** ${project.name}\n\n`;
@@ -358,7 +414,10 @@ export function generateEntityTypeReport(project, entityType, baseUrl = '', opti
   );
 
   for (const bundle of sortedBundles) {
-    md += generateBundleReport(bundle, entityType, baseUrl, options);
+    md += generateBundleReport(bundle, entityType, baseUrl, {
+      ...options,
+      formDisplay: formDisplays[bundle.id] || null
+    });
   }
 
   return md;
@@ -400,6 +459,7 @@ export function generateSingleBundleReport(project, entityType, bundleId, baseUr
  * @returns {string} - Markdown content
  */
 export function generateProjectReport(project, baseUrl = '', options = {}) {
+  const allFormDisplays = options.formDisplays || {};
   const displayUrl = baseUrl || project.baseUrl || '_Not set_';
 
   let md = `# Project: ${project.name}\n\n`;
@@ -443,8 +503,12 @@ export function generateProjectReport(project, baseUrl = '', options = {}) {
 
     md += `## ${getEntityTypeLabel(entityType)}\n\n`;
 
+    const entityFormDisplays = allFormDisplays[entityType] || {};
     for (const bundle of sortedBundles) {
-      md += generateBundleReport(bundle, entityType, baseUrl, options);
+      md += generateBundleReport(bundle, entityType, baseUrl, {
+        ...options,
+        formDisplay: entityFormDisplays[bundle.id] || null
+      });
     }
   }
 

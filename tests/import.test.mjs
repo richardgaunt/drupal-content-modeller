@@ -5,7 +5,8 @@
 import {
   validateReportData,
   translateFieldSettings,
-  auditImport
+  auditImport,
+  buildFormDisplayFromReport
 } from '../src/commands/import.js';
 
 describe('Import Commands', () => {
@@ -517,6 +518,210 @@ describe('Import Commands', () => {
       expect(result.toCreate).toHaveLength(2);
       expect(result.toCreate[0].entityType).toBe('node');
       expect(result.toCreate[1].entityType).toBe('paragraph');
+    });
+  });
+
+  describe('buildFormDisplayFromReport', () => {
+    const baseFormDisplay = {
+      entityType: 'node',
+      bundle: 'article',
+      mode: 'default',
+      groups: [],
+      fields: [
+        { name: 'title', type: 'string_textfield', weight: 0, region: 'content', settings: { size: 60, placeholder: '' }, thirdPartySettings: {} },
+        { name: 'field_n_body', type: 'text_textarea', weight: 1, region: 'content', settings: { rows: 5, placeholder: '' }, thirdPartySettings: {} },
+        { name: 'field_n_image', type: 'image_image', weight: 2, region: 'content', settings: {}, thirdPartySettings: {} },
+        { name: 'created', type: 'datetime_timestamp', weight: 3, region: 'content', settings: {}, thirdPartySettings: {} },
+        { name: 'uid', type: 'entity_reference_autocomplete', weight: 4, region: 'content', settings: { match_operator: 'CONTAINS', match_limit: 10, size: 60, placeholder: '' }, thirdPartySettings: {} },
+        { name: 'path', type: 'path', weight: 5, region: 'content', settings: {}, thirdPartySettings: {} }
+      ],
+      hidden: ['promote', 'status', 'sticky']
+    };
+
+    test('applies groups from report', () => {
+      const reportFormDisplay = {
+        groups: [
+          { name: 'group_main', label: 'Main Content', parentName: '', weight: 0, formatType: 'fieldset', formatSettings: { description: '' }, children: ['title', 'field_n_body'] }
+        ],
+        fields: [
+          { name: 'title', widget: 'string_textfield', weight: 0, group: 'group_main', widgetSettings: null },
+          { name: 'field_n_body', widget: 'text_textarea', weight: 1, group: 'group_main', widgetSettings: null },
+          { name: 'field_n_image', widget: 'image_image', weight: 2, group: null, widgetSettings: null }
+        ],
+        hidden: ['promote', 'status', 'sticky']
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].name).toBe('group_main');
+      expect(result.groups[0].label).toBe('Main Content');
+      expect(result.groups[0].children).toEqual(['title', 'field_n_body']);
+      expect(result.groups[0].formatType).toBe('fieldset');
+      expect(result.groups[0].formatSettings).toEqual({ description: '' });
+    });
+
+    test('applies field weights from report', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'field_n_body', widget: 'text_textarea', weight: 10, group: null, widgetSettings: null },
+          { name: 'title', widget: 'string_textfield', weight: 5, group: null, widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      const bodyField = result.fields.find(f => f.name === 'field_n_body');
+      const titleField = result.fields.find(f => f.name === 'title');
+      expect(bodyField.weight).toBe(10);
+      expect(titleField.weight).toBe(5);
+    });
+
+    test('applies widget type from report', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'field_n_body', widget: 'text_textarea_with_summary', weight: 1, group: null, widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      const bodyField = result.fields.find(f => f.name === 'field_n_body');
+      expect(bodyField.type).toBe('text_textarea_with_summary');
+    });
+
+    test('applies widgetSettings from report', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'field_n_body', widget: 'text_textarea', weight: 1, group: null, widgetSettings: { rows: 10, placeholder: 'Enter body' } }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      const bodyField = result.fields.find(f => f.name === 'field_n_body');
+      expect(bodyField.settings).toEqual({ rows: 10, placeholder: 'Enter body' });
+    });
+
+    test('keeps base field settings when widgetSettings is null', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'title', widget: 'string_textfield', weight: 0, group: null, widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      const titleField = result.fields.find(f => f.name === 'title');
+      expect(titleField.settings).toEqual({ size: 60, placeholder: '' });
+    });
+
+    test('preserves base fields not in report', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'title', widget: 'string_textfield', weight: 0, group: null, widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      // uid, path, created, field_n_body, field_n_image should still be present
+      const fieldNames = result.fields.map(f => f.name);
+      expect(fieldNames).toContain('uid');
+      expect(fieldNames).toContain('path');
+      expect(fieldNames).toContain('created');
+    });
+
+    test('applies hidden fields from report', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'title', widget: 'string_textfield', weight: 0, group: null, widgetSettings: null }
+        ],
+        hidden: ['created', 'status']
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      expect(result.hidden).toEqual(['created', 'status']);
+    });
+
+    test('handles nested groups', () => {
+      const reportFormDisplay = {
+        groups: [
+          { name: 'group_tabs', label: 'Tabs', parentName: '', weight: 0, formatType: 'tabs', formatSettings: {}, children: ['group_content'] },
+          { name: 'group_content', label: 'Content', parentName: 'group_tabs', weight: 0, formatType: 'tab', formatSettings: {}, children: ['title', 'field_n_body'] }
+        ],
+        fields: [
+          { name: 'title', widget: 'string_textfield', weight: 0, group: 'group_content', widgetSettings: null },
+          { name: 'field_n_body', widget: 'text_textarea', weight: 1, group: 'group_content', widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      expect(result.groups).toHaveLength(2);
+      expect(result.groups[0].children).toEqual(['group_content']);
+      expect(result.groups[1].parentName).toBe('group_tabs');
+      expect(result.groups[1].children).toEqual(['title', 'field_n_body']);
+    });
+
+    test('handles report field not in base (creates new entry)', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [
+          { name: 'field_n_extra', widget: 'options_select', weight: 5, group: null, widgetSettings: null }
+        ],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      const extraField = result.fields.find(f => f.name === 'field_n_extra');
+      expect(extraField).toBeDefined();
+      expect(extraField.type).toBe('options_select');
+      expect(extraField.weight).toBe(5);
+      expect(extraField.region).toBe('content');
+    });
+
+    test('handles empty report form display', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      // All base fields should be preserved
+      expect(result.fields).toHaveLength(baseFormDisplay.fields.length);
+      expect(result.groups).toEqual([]);
+      expect(result.hidden).toEqual([]);
+    });
+
+    test('preserves entityType, bundle, and mode from base', () => {
+      const reportFormDisplay = {
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+
+      const result = buildFormDisplayFromReport(baseFormDisplay, reportFormDisplay);
+
+      expect(result.entityType).toBe('node');
+      expect(result.bundle).toBe('article');
+      expect(result.mode).toBe('default');
     });
   });
 });

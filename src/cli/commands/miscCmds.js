@@ -9,6 +9,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { loadProject } from '../../commands/project.js';
+import { loadFormDisplay } from '../../commands/formDisplay.js';
 import { auditImport, importContentModel, validateReportData } from '../../commands/import.js';
 import { createEntityReport, createProjectReport } from '../../commands/report.js';
 import {
@@ -34,6 +35,21 @@ import {
 } from '../cliUtils.js';
 
 /**
+ * Load form displays for all bundles in an entity type
+ */
+async function loadFormDisplaysForEntityType(project, entityType) {
+  const bundles = project.entities[entityType] || {};
+  const formDisplays = {};
+  for (const bundleId of Object.keys(bundles)) {
+    const fd = await loadFormDisplay(project, entityType, bundleId);
+    if (fd) {
+      formDisplays[bundleId] = fd;
+    }
+  }
+  return formDisplays;
+}
+
+/**
  * Generate entity type report
  */
 export async function cmdReportEntity(options) {
@@ -57,7 +73,8 @@ export async function cmdReportEntity(options) {
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
     const roles = await listRoles(project);
-    const reportOptions = { roles };
+    const formDisplays = await loadFormDisplaysForEntityType(project, options.entityType);
+    const reportOptions = { roles, formDisplays };
 
     if (options.json) {
       const data = generateEntityTypeReportData(project, options.entityType, baseUrl, reportOptions);
@@ -90,7 +107,11 @@ export async function cmdReportProject(options) {
 
     const baseUrl = options.baseUrl || project.baseUrl || '';
     const roles = await listRoles(project);
-    const reportOptions = { roles };
+    const formDisplays = {};
+    for (const entityType of Object.keys(project.entities || {})) {
+      formDisplays[entityType] = await loadFormDisplaysForEntityType(project, entityType);
+    }
+    const reportOptions = { roles, formDisplays };
 
     if (options.json) {
       const data = generateProjectReportData(project, baseUrl, reportOptions);
@@ -163,8 +184,10 @@ export async function cmdImportModel(options) {
       console.log(chalk.green(`\nImport complete!`));
       const bundles = result.created.filter(c => c.kind === 'bundle');
       const fields = result.created.filter(c => c.kind === 'field');
-      console.log(chalk.cyan(`  Bundles created: ${bundles.length}`));
-      console.log(chalk.cyan(`  Fields created:  ${fields.length}`));
+      const formDisplays = result.created.filter(c => c.kind === 'formDisplay');
+      console.log(chalk.cyan(`  Bundles created:        ${bundles.length}`));
+      console.log(chalk.cyan(`  Fields created:         ${fields.length}`));
+      console.log(chalk.cyan(`  Form displays created:  ${formDisplays.length}`));
       if (audit.reused.length > 0) {
         console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
       }

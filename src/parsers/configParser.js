@@ -8,17 +8,33 @@ import yaml from 'js-yaml';
 import { ENTITY_TYPES } from '../constants/entityTypes.js';
 
 /**
- * Recommended modules for content modelling
- * These modules provide essential functionality for creating and managing content types
+ * Recommended core modules for content modelling
  */
-export const RECOMMENDED_MODULES = [
+export const RECOMMENDED_CORE_MODULES = [
   'node',
   'media',
   'taxonomy',
   'block_content',
-  'paragraphs',
   'content_moderation',
+  'options',
+  'datetime',
+  'datetime_range'
+];
+
+/**
+ * Recommended contrib modules for content modelling
+ */
+export const RECOMMENDED_CONTRIB_MODULES = [
+  'paragraphs',
   'field_group'
+];
+
+/**
+ * All recommended modules for content modelling (core + contrib)
+ */
+export const RECOMMENDED_MODULES = [
+  ...RECOMMENDED_CORE_MODULES,
+  ...RECOMMENDED_CONTRIB_MODULES
 ];
 
 /**

@@ -74,3 +74,59 @@ Implementation tickets are in `tickets/` with subdirectories for status:
 - `done/` — Completed
 
 Move ticket files between directories to update status.
+
+## Key Utility Functions & Registries
+
+**IMPORTANT: Always check these modules before creating new utility functions. Reuse existing functions rather than duplicating logic.**
+
+### Central Entity Types Registry — `src/constants/entityTypes.js`
+
+Single source of truth for all entity type configuration. Never hardcode entity type constants elsewhere.
+
+- `ENTITY_TYPES` — Full config object for each entity type (prefixes, modules, labels, admin paths)
+- `ENTITY_ORDER` — Canonical display order: `['node', 'media', 'paragraph', 'taxonomy_term', 'block_content']`
+- `getBundleConfigName(entityType, bundle)` — e.g. `('node', 'page')` → `'node.type.page'`
+- `getEntityModule(entityType)` — e.g. `'node'` → `'node'`, `'paragraph'` → `'paragraphs'`
+- `getEntityTypeLabel(entityType)` — Plural label, e.g. `'Content Types'`, `'Vocabularies'`
+- `getEntityTypeSingularLabel(entityType)` — Singular label, e.g. `'content type'`, `'vocabulary'`
+- `getEntityOverviewPage(entityType)` — Admin path description, e.g. `'Admin > Structure > Content types'`
+- `getFieldPrefix(entityType)` — e.g. `'field_n_'`, `'field_p_'`
+- `getEntityAdminPath(entityType, bundle)` — Full admin path for a bundle's field page
+- `getBundleAdminUrls(entityType, bundle)` — Array of admin URLs for a bundle
+
+### Shared Utilities — `src/utils/slug.js`
+
+- `generateMachineName(label)` — Converts a human label to a Drupal machine name
+- `validateMachineName(machineName)` — Validates machine name format
+- `formatCardinality(cardinality)` — `1` → `'Single'`, `-1` → `'Unlimited'`, else stringified
+
+### Project Utilities — `src/utils/project.js`
+
+- `validateProject(project)` — Throws if project is missing or has no `configDirectory`
+
+### CLI Utilities — `src/cli/cliUtils.js`
+
+- `VALID_ENTITY_TYPES`, `VALID_SOURCE_TYPES`, `VALID_FIELD_TYPES` — Validation constants
+- `isValidEntityType(type)`, `isValidFieldType(type)` — Validators
+- `output(data, json)` — Print data as JSON or plain text
+- `handleError(error)` — Print error and exit
+- `logSuccess(slug)`, `logFailure(slug, errorMessage)` — Command logging
+- `autoSyncProject(project)` — Silent project.json sync
+- `runSyncIfRequested(project, options)` — Drush sync when `--sync` flag is passed
+
+### Table Formatting — `src/commands/list.js`
+
+- `createTable(columns, rows)` — Generic text table builder. Columns: `{ header, minWidth?, getValue(row) }`
+
+### CLI File Structure
+
+Commands and menus are split by domain into sub-modules:
+
+```
+src/cli/commands/   # helpCmd.js, projectCmds.js, bundleFieldCmds.js,
+                    # formDisplayCmds.js, roleCmds.js, miscCmds.js
+src/cli/menus/      # mainMenu.js, syncMenus.js, contentMenus.js,
+                    # formDisplayMenus.js, roleMenus.js, storyMenus.js, reportMenus.js
+```
+
+Barrel files `src/cli/commands.js` and `src/cli/menus.js` re-export everything for backward compatibility.

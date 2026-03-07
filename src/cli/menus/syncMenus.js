@@ -3,10 +3,10 @@
  * Handles sync-related menu actions.
  */
 
-import { select, checkbox } from '@inquirer/prompts';
+import { select, checkbox, Separator } from '@inquirer/prompts';
 import chalk from 'chalk';
 
-import { syncProject, checkProjectModules, enableProjectModules, getRecommendedModules } from '../../commands/sync.js';
+import { syncProject, checkProjectModules, enableProjectModules, getRecommendedModulesBySource } from '../../commands/sync.js';
 
 /**
  * Handle sync configuration action
@@ -41,10 +41,26 @@ export async function checkAndPromptForModules(project) {
       return;
     }
 
+    const { core, contrib } = getRecommendedModulesBySource();
+    const missingCore = missingModules.filter(mod => core.includes(mod));
+    const missingContrib = missingModules.filter(mod => contrib.includes(mod));
+
     console.log();
     console.log(chalk.yellow('Some recommended modules are not enabled:'));
-    for (const mod of missingModules) {
-      console.log(chalk.yellow(`  - ${mod}`));
+    if (missingCore.length > 0) {
+      console.log(chalk.yellow('  Core modules:'));
+      for (const mod of missingCore) {
+        console.log(chalk.yellow(`    - ${mod}`));
+      }
+    }
+    if (missingContrib.length > 0) {
+      console.log(chalk.yellow('  Contrib modules (require download):'));
+      for (const mod of missingContrib) {
+        console.log(chalk.yellow(`    - ${mod}`));
+      }
+      console.log();
+      console.log(chalk.cyan('Install missing contrib modules with:'));
+      console.log(chalk.cyan(`  composer require ${missingContrib.map(mod => `drupal/${mod}`).join(' ')}`));
     }
     console.log();
     console.log(chalk.cyan('These modules are recommended for effective content modelling.'));
@@ -66,13 +82,18 @@ export async function checkAndPromptForModules(project) {
     if (enableNow === 'all') {
       modulesToEnable = missingModules;
     } else {
+      const choices = [];
+      if (missingCore.length > 0) {
+        choices.push(new Separator('── Core modules ──'));
+        choices.push(...missingCore.map(mod => ({ value: mod, name: mod, checked: true })));
+      }
+      if (missingContrib.length > 0) {
+        choices.push(new Separator('── Contrib modules (require download) ──'));
+        choices.push(...missingContrib.map(mod => ({ value: mod, name: mod, checked: true })));
+      }
       modulesToEnable = await checkbox({
         message: 'Select modules to enable:',
-        choices: missingModules.map(mod => ({
-          value: mod,
-          name: mod,
-          checked: true
-        }))
+        choices
       });
     }
 
@@ -96,16 +117,30 @@ export async function checkAndPromptForModules(project) {
 export async function handleEnableModules(project) {
   try {
     const { missingModules, enabledModules } = await checkProjectModules(project);
-    const recommended = getRecommendedModules();
+    const { core, contrib } = getRecommendedModulesBySource();
 
     console.log();
-    console.log(chalk.cyan('Recommended content modules:'));
-    for (const mod of recommended) {
+    console.log(chalk.cyan('Recommended core modules:'));
+    for (const mod of core) {
       if (enabledModules.includes(mod)) {
         console.log(chalk.green(`  ✓ ${mod}`));
       } else {
         console.log(chalk.yellow(`  ✗ ${mod}`));
       }
+    }
+    console.log(chalk.cyan('Recommended contrib modules (require download):'));
+    for (const mod of contrib) {
+      if (enabledModules.includes(mod)) {
+        console.log(chalk.green(`  ✓ ${mod}`));
+      } else {
+        console.log(chalk.yellow(`  ✗ ${mod}`));
+      }
+    }
+    const missingContrib = missingModules.filter(mod => contrib.includes(mod));
+    if (missingContrib.length > 0) {
+      console.log();
+      console.log(chalk.cyan('Install missing contrib modules with:'));
+      console.log(chalk.cyan(`  composer require ${missingContrib.map(mod => `drupal/${mod}`).join(' ')}`));
     }
     console.log();
 
@@ -131,13 +166,20 @@ export async function handleEnableModules(project) {
     if (enableNow === 'all') {
       modulesToEnable = missingModules;
     } else {
+      const missingCore = missingModules.filter(mod => core.includes(mod));
+      const missingContrib = missingModules.filter(mod => contrib.includes(mod));
+      const choices = [];
+      if (missingCore.length > 0) {
+        choices.push(new Separator('── Core modules ──'));
+        choices.push(...missingCore.map(mod => ({ value: mod, name: mod, checked: true })));
+      }
+      if (missingContrib.length > 0) {
+        choices.push(new Separator('── Contrib modules (require download) ──'));
+        choices.push(...missingContrib.map(mod => ({ value: mod, name: mod, checked: true })));
+      }
       modulesToEnable = await checkbox({
         message: 'Select modules to enable:',
-        choices: missingModules.map(mod => ({
-          value: mod,
-          name: mod,
-          checked: true
-        }))
+        choices
       });
     }
 

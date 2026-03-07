@@ -5,7 +5,7 @@
 
 import { parseConfigDirectory, checkRecommendedModules, enableModules } from '../io/configReader.js';
 import { saveProject } from './project.js';
-import { RECOMMENDED_MODULES } from '../parsers/configParser.js';
+import { RECOMMENDED_MODULES, RECOMMENDED_CORE_MODULES, RECOMMENDED_CONTRIB_MODULES } from '../parsers/configParser.js';
 import { validateProject } from '../utils/project.js';
 
 /**
@@ -87,6 +87,14 @@ export async function allRecommendedModulesEnabled(project) {
  */
 export function getRecommendedModules() {
   return RECOMMENDED_MODULES;
+}
+
+/**
+ * Get recommended modules split by source (core vs contrib)
+ * @returns {{ core: string[], contrib: string[] }}
+ */
+export function getRecommendedModulesBySource() {
+  return { core: RECOMMENDED_CORE_MODULES, contrib: RECOMMENDED_CONTRIB_MODULES };
 }
 
 /**

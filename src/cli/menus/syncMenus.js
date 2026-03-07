@@ -20,6 +20,9 @@ export async function handleSync(project) {
     const result = await syncProject(project);
     console.log(chalk.green('Sync complete!'));
     console.log(chalk.cyan(`Found ${result.bundlesFound} bundles and ${result.fieldsFound} fields`));
+    if (result.componentsFound > 0) {
+      console.log(chalk.cyan(`Found ${result.componentsFound} theme components`));
+    }
 
     // Check for missing recommended modules
     await checkAndPromptForModules(project);

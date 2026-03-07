@@ -174,6 +174,11 @@ export async function updateProject(project, updates) {
     drushCommand: (updates.drushCommand || 'drush').trim()
   };
 
+  // Update theme if provided (null means clear, undefined means no change)
+  if (updates.theme !== undefined) {
+    updatedProject.theme = updates.theme;
+  }
+
   // Handle slug change: rename directory
   if (slugChanged) {
     await renameProjectDirectory(project.slug, newSlug);

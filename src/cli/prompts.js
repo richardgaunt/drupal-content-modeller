@@ -4,6 +4,7 @@
  */
 
 import { access, readdir } from 'fs/promises';
+import { existsSync } from 'fs';
 import { projectExists } from '../io/fileSystem.js';
 import { generateSlug } from '../utils/slug.js';
 
@@ -17,30 +18,66 @@ export const MAIN_MENU_CHOICES = [
 ];
 
 /**
- * Project menu choices
+ * Project menu category choices (top-level select)
  */
-export const PROJECT_MENU_CHOICES = [
-  { value: 'sync', name: 'Sync configuration' },
-  { value: 'list-entities', name: 'List entity types' },
-  { value: 'list-entity-fields', name: 'List fields of entity' },
-  { value: 'list-bundle-fields', name: 'List fields of bundle' },
-  { value: 'create-bundle', name: 'Create a bundle' },
-  { value: 'create-field', name: 'Create a field' },
-  { value: 'edit-field', name: 'Edit field instance' },
-  { value: 'add-bundle-to-refs', name: 'Add bundle to entity reference fields' },
-  { value: 'edit-form-display', name: 'Edit form display' },
-  { value: 'edit-project', name: 'Edit project' },
-  { value: 'enable-modules', name: 'Enable required modules' },
-  { value: 'admin-links', name: 'Admin links for bundle' },
-  { value: 'report-bundle', name: 'Generate report for bundle' },
-  { value: 'report-entity', name: 'Generate report for entity type' },
-  { value: 'report-project', name: 'Generate report for project' },
-  { value: 'import-model', name: 'Import content model from JSON' },
-  { value: 'manage-roles', name: 'Manage roles' },
-  { value: 'manage-stories', name: 'Manage stories' },
-  { value: 'drush-sync', name: 'Sync with Drupal' },
+export const PROJECT_MENU_CATEGORIES = [
+  { value: 'content-modelling', name: 'Content Modelling' },
+  { value: 'browse-inspect', name: 'Browse & Inspect' },
+  { value: 'reports', name: 'Reports' },
+  { value: 'roles', name: 'Manage Roles' },
+  { value: 'project-sync', name: 'Project & Sync' },
   { value: 'back', name: 'Back to main menu' }
 ];
+
+/**
+ * Subcategory menu choices (searchable)
+ */
+export const PROJECT_SUBMENU_CHOICES = {
+  'content-modelling': [
+    { value: 'create-bundle', name: 'Create a bundle' },
+    { value: 'create-field', name: 'Create a field' },
+    { value: 'edit-field', name: 'Edit field instance' },
+    { value: 'add-bundle-to-refs', name: 'Add bundle to entity reference fields' },
+    { value: 'edit-form-display', name: 'Edit form display' },
+    { value: 'import-model', name: 'Import content model from JSON' },
+    { value: 'back', name: 'Back' }
+  ],
+  'browse-inspect': [
+    { value: 'list-entities', name: 'List entity types' },
+    { value: 'list-entity-fields', name: 'List fields of entity' },
+    { value: 'list-bundle-fields', name: 'List fields of bundle' },
+    { value: 'admin-links', name: 'Admin links for bundle' },
+    { value: 'back', name: 'Back' }
+  ],
+  'reports': [
+    { value: 'report-bundle', name: 'Generate report for bundle' },
+    { value: 'report-entity', name: 'Generate report for entity type' },
+    { value: 'report-project', name: 'Generate report for project' },
+    { value: 'back', name: 'Back' }
+  ],
+  'roles': [
+    { value: 'manage-roles', name: 'Manage roles' },
+    { value: 'back', name: 'Back' }
+  ],
+  'project-sync': [
+    { value: 'sync', name: 'Sync configuration' },
+    { value: 'drush-sync', name: 'Sync with Drupal' },
+    { value: 'enable-modules', name: 'Enable required modules' },
+    { value: 'edit-project', name: 'Edit project' },
+    { value: 'manage-stories', name: 'Manage stories' },
+    { value: 'back', name: 'Back' }
+  ]
+};
+
+/**
+ * Legacy flat project menu choices (kept for backward compatibility)
+ */
+export const PROJECT_MENU_CHOICES = Object.values(PROJECT_SUBMENU_CHOICES)
+  .flat()
+  .filter((choice, index, arr) =>
+    choice.value !== 'back' && arr.findIndex(c => c.value === choice.value) === index
+  )
+  .concat([{ value: 'back', name: 'Back to main menu' }]);
 
 /**
  * Get main menu choices
@@ -51,15 +88,24 @@ export function getMainMenuChoices() {
 }
 
 /**
- * Get project menu choices with project name in title
+ * Get project menu category choices with project name in title
  * @param {string} projectName - Name of the current project
  * @returns {object} Object with message and choices
  */
 export function getProjectMenuChoices(projectName) {
   return {
     message: `${projectName} - What would you like to do?`,
-    choices: PROJECT_MENU_CHOICES
+    choices: PROJECT_MENU_CATEGORIES
   };
+}
+
+/**
+ * Get submenu choices for a project menu category
+ * @param {string} category - Category value
+ * @returns {Array} Array of choice objects
+ */
+export function getSubmenuChoices(category) {
+  return PROJECT_SUBMENU_CHOICES[category] || [];
 }
 
 /**
@@ -154,4 +200,35 @@ export function validateBaseUrl(url) {
   } catch {
     return 'Please enter a valid URL (e.g., https://example.com)';
   }
+}
+
+/**
+ * Validate theme directory exists and contains an info.yml file
+ * @param {string} dirPath - Path to theme directory
+ * @returns {Promise<boolean|string>} true if valid (or empty), error message if invalid
+ */
+export async function validateThemeDirectory(dirPath) {
+  // Allow empty value - theme is optional
+  if (!dirPath || dirPath.trim() === '') {
+    return true;
+  }
+
+  const trimmedPath = dirPath.trim();
+
+  if (!existsSync(trimmedPath)) {
+    return `Directory does not exist: ${trimmedPath}`;
+  }
+
+  try {
+    const files = await readdir(trimmedPath);
+    const infoFiles = files.filter(f => f.endsWith('.info.yml'));
+
+    if (infoFiles.length === 0) {
+      return 'Directory does not contain a *.info.yml file';
+    }
+  } catch {
+    return `Cannot read directory: ${trimmedPath}`;
+  }
+
+  return true;
 }

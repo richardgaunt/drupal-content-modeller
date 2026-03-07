@@ -7,11 +7,14 @@ import { createProject } from '../src/commands/project';
 import {
   getMainMenuChoices,
   getProjectMenuChoices,
+  getSubmenuChoices,
   validateProjectName,
   validateProjectNameUnique,
   validateConfigDirectory,
   validateBaseUrl,
   MAIN_MENU_CHOICES,
+  PROJECT_MENU_CATEGORIES,
+  PROJECT_SUBMENU_CHOICES,
   PROJECT_MENU_CHOICES
 } from '../src/cli/prompts';
 import { generateSlug } from '../src/utils/slug';
@@ -45,31 +48,55 @@ describe('CLI Prompts', () => {
       expect(values).toContain('exit');
     });
 
-    test('getProjectMenuChoices returns correct options', () => {
+    test('getProjectMenuChoices returns category options', () => {
       const result = getProjectMenuChoices('My Test Project');
 
-      expect(result.choices).toEqual(PROJECT_MENU_CHOICES);
-      expect(result.choices.length).toBe(20);
+      expect(result.choices).toEqual(PROJECT_MENU_CATEGORIES);
+      expect(result.choices.length).toBe(6);
 
       const values = result.choices.map(c => c.value);
-      expect(values).toContain('sync');
-      expect(values).toContain('list-entities');
-      expect(values).toContain('list-entity-fields');
-      expect(values).toContain('list-bundle-fields');
-      expect(values).toContain('create-bundle');
-      expect(values).toContain('create-field');
-      expect(values).toContain('edit-field');
-      expect(values).toContain('add-bundle-to-refs');
-      expect(values).toContain('edit-form-display');
-      expect(values).toContain('edit-project');
-      expect(values).toContain('enable-modules');
-      expect(values).toContain('admin-links');
-      expect(values).toContain('report-entity');
-      expect(values).toContain('report-project');
-      expect(values).toContain('manage-roles');
-      expect(values).toContain('manage-stories');
-      expect(values).toContain('drush-sync');
+      expect(values).toContain('content-modelling');
+      expect(values).toContain('browse-inspect');
+      expect(values).toContain('reports');
+      expect(values).toContain('roles');
+      expect(values).toContain('project-sync');
       expect(values).toContain('back');
+    });
+
+    test('submenu choices contain all actions', () => {
+      const allActions = Object.values(PROJECT_SUBMENU_CHOICES)
+        .flat()
+        .filter(c => c.value !== 'back')
+        .map(c => c.value);
+
+      expect(allActions).toContain('sync');
+      expect(allActions).toContain('list-entities');
+      expect(allActions).toContain('list-entity-fields');
+      expect(allActions).toContain('list-bundle-fields');
+      expect(allActions).toContain('create-bundle');
+      expect(allActions).toContain('create-field');
+      expect(allActions).toContain('edit-field');
+      expect(allActions).toContain('add-bundle-to-refs');
+      expect(allActions).toContain('edit-form-display');
+      expect(allActions).toContain('edit-project');
+      expect(allActions).toContain('enable-modules');
+      expect(allActions).toContain('admin-links');
+      expect(allActions).toContain('report-entity');
+      expect(allActions).toContain('report-project');
+      expect(allActions).toContain('manage-roles');
+      expect(allActions).toContain('manage-stories');
+      expect(allActions).toContain('drush-sync');
+    });
+
+    test('getSubmenuChoices returns choices for valid category', () => {
+      const choices = getSubmenuChoices('content-modelling');
+      expect(choices.length).toBeGreaterThan(0);
+      expect(choices.some(c => c.value === 'create-bundle')).toBe(true);
+      expect(choices.some(c => c.value === 'back')).toBe(true);
+    });
+
+    test('getSubmenuChoices returns empty for invalid category', () => {
+      expect(getSubmenuChoices('nonexistent')).toEqual([]);
     });
 
     test('getProjectMenuChoices includes project name in message', () => {

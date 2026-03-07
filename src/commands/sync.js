@@ -7,6 +7,7 @@ import { parseConfigDirectory, checkRecommendedModules, enableModules } from '..
 import { saveProject } from './project.js';
 import { RECOMMENDED_MODULES, RECOMMENDED_CORE_MODULES, RECOMMENDED_CONTRIB_MODULES } from '../parsers/configParser.js';
 import { validateProject } from '../utils/project.js';
+import { resolveThemeChain } from '../io/themeReader.js';
 
 /**
  * Sync a project's configuration
@@ -39,12 +40,27 @@ export async function syncProject(project) {
   project.entities = entities;
   project.lastSync = new Date().toISOString();
 
+  // Rebuild theme component registry if theme is configured
+  let componentsFound = 0;
+  if (project.theme?.themes?.[0]?.directory) {
+    try {
+      const themeData = await resolveThemeChain(project.theme.themes[0].directory);
+      project.theme = themeData;
+      for (const theme of themeData.themes) {
+        componentsFound += Object.keys(theme.components || {}).length;
+      }
+    } catch {
+      // Theme rebuild failed - keep existing theme data
+    }
+  }
+
   // Save the updated project
   await saveProject(project);
 
   return {
     bundlesFound,
-    fieldsFound
+    fieldsFound,
+    componentsFound
   };
 }
 

@@ -10,11 +10,14 @@ import { setPermissionErrorHandler } from '../../io/fileSystem.js';
 import {
   getMainMenuChoices,
   getProjectMenuChoices,
+  getSubmenuChoices,
   validateProjectName,
   validateProjectNameUnique,
   validateConfigDirectory,
-  validateBaseUrl
+  validateBaseUrl,
+  validateThemeDirectory
 } from '../prompts.js';
+import { resolveThemeChain } from '../../io/themeReader.js';
 import { createProject, loadProject, listProjects } from '../../commands/project.js';
 import {
   formatLastSync,
@@ -138,9 +141,31 @@ async function handleCreateProject() {
       });
     }
 
+    const themeDir = await input({
+      message: 'Active theme directory (optional, path to sub-theme)?',
+      default: '',
+      validate: validateThemeDirectory
+    });
+
+    let theme = null;
+    if (themeDir.trim()) {
+      try {
+        theme = await resolveThemeChain(themeDir.trim());
+        console.log();
+        console.log(chalk.cyan('Theme chain discovered:'));
+        for (const t of theme.themes) {
+          console.log(chalk.white(`  ${t.name} (${t.machine_name}) → ${t.directory}`));
+        }
+        console.log();
+      } catch (err) {
+        console.log(chalk.yellow(`Warning: Could not resolve theme chain: ${err.message}`));
+      }
+    }
+
     const project = await createProject(name, configDir, baseUrl, {
       drupalRoot: drupalRoot.trim(),
-      drushCommand: drushCommand.trim() || 'drush'
+      drushCommand: drushCommand.trim() || 'drush',
+      theme
     });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
@@ -201,84 +226,20 @@ async function showProjectMenu(project) {
 
   while (true) {
     try {
-      const action = await search({
+      const category = await select({
         message: menuConfig.message,
-        source: async (input) => {
-          const searchTerm = (input || '').toLowerCase();
-          return menuConfig.choices.filter(c =>
-            c.name.toLowerCase().includes(searchTerm) ||
-            c.value.toLowerCase().includes(searchTerm)
-          );
-        }
+        choices: menuConfig.choices
       });
 
-      switch (action) {
-        case 'sync':
-          await handleSync(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'list-entities':
-          handleListEntities(project);
-          break;
-        case 'list-entity-fields':
-          await handleListEntityFields(project);
-          break;
-        case 'list-bundle-fields':
-          await handleListBundleFields(project);
-          break;
-        case 'create-bundle':
-          await handleCreateBundle(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'create-field':
-          await handleCreateField(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'edit-field':
-          await handleEditField(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'add-bundle-to-refs':
-          await handleAddBundleToRefs(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'edit-form-display':
-          await handleEditFormDisplay(project);
-          break;
-        case 'edit-project':
-          project = await handleEditProject(project);
-          break;
-        case 'enable-modules':
-          await handleEnableModules(project);
-          break;
-        case 'report-bundle':
-          await handleBundleReport(project);
-          break;
-        case 'report-entity':
-          await handleEntityReport(project);
-          break;
-        case 'report-project':
-          await handleProjectReport(project);
-          break;
-        case 'import-model':
-          await handleImportModel(project);
-          project = await loadProject(project.slug);
-          break;
-        case 'admin-links':
-          await handleAdminLinks(project);
-          break;
-        case 'manage-roles':
-          await handleManageRoles(project);
-          break;
-        case 'manage-stories':
-          await handleManageStories(project);
-          break;
-        case 'drush-sync':
-          await handleDrushSync(project);
-          break;
-        case 'back':
-          return;
+      if (category === 'back') return;
+
+      // Roles category has only one action — go directly to it
+      if (category === 'roles') {
+        await handleManageRoles(project);
+        continue;
       }
+
+      project = await showSubmenu(project, category);
     } catch (error) {
       if (error.name === 'ExitPromptError') {
         return;
@@ -286,6 +247,115 @@ async function showProjectMenu(project) {
       console.log(chalk.red(`Error: ${error.message}`));
     }
   }
+}
+
+/**
+ * Display a submenu for a project menu category
+ * @param {object} project - The current project
+ * @param {string} category - The category key
+ * @returns {Promise<object>} - Updated project
+ */
+async function showSubmenu(project, category) {
+  const choices = getSubmenuChoices(category);
+
+  while (true) {
+    try {
+      const action = await search({
+        message: `${project.name} - Select action:`,
+        source: async (input) => {
+          const searchTerm = (input || '').toLowerCase();
+          return choices.filter(c =>
+            c.name.toLowerCase().includes(searchTerm) ||
+            c.value.toLowerCase().includes(searchTerm)
+          );
+        }
+      });
+
+      if (action === 'back') return project;
+
+      project = await handleAction(project, action);
+    } catch (error) {
+      if (error.name === 'ExitPromptError') {
+        return project;
+      }
+      console.log(chalk.red(`Error: ${error.message}`));
+    }
+  }
+}
+
+/**
+ * Handle a single project menu action
+ * @param {object} project - The current project
+ * @param {string} action - The action value
+ * @returns {Promise<object>} - Updated project
+ */
+async function handleAction(project, action) {
+  switch (action) {
+    case 'sync':
+      await handleSync(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'list-entities':
+      handleListEntities(project);
+      break;
+    case 'list-entity-fields':
+      await handleListEntityFields(project);
+      break;
+    case 'list-bundle-fields':
+      await handleListBundleFields(project);
+      break;
+    case 'create-bundle':
+      await handleCreateBundle(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'create-field':
+      await handleCreateField(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'edit-field':
+      await handleEditField(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'add-bundle-to-refs':
+      await handleAddBundleToRefs(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'edit-form-display':
+      await handleEditFormDisplay(project);
+      break;
+    case 'edit-project':
+      project = await handleEditProject(project);
+      break;
+    case 'enable-modules':
+      await handleEnableModules(project);
+      break;
+    case 'report-bundle':
+      await handleBundleReport(project);
+      break;
+    case 'report-entity':
+      await handleEntityReport(project);
+      break;
+    case 'report-project':
+      await handleProjectReport(project);
+      break;
+    case 'import-model':
+      await handleImportModel(project);
+      project = await loadProject(project.slug);
+      break;
+    case 'admin-links':
+      await handleAdminLinks(project);
+      break;
+    case 'manage-roles':
+      await handleManageRoles(project);
+      break;
+    case 'manage-stories':
+      await handleManageStories(project);
+      break;
+    case 'drush-sync':
+      await handleDrushSync(project);
+      break;
+  }
+  return project;
 }
 
 /**

@@ -26,7 +26,7 @@ export function validateProject(project) {
  * @returns {object} - Project object
  */
 export function createProjectObject(name, slug, configDirectory, baseUrl = '', options = {}) {
-  const { drupalRoot = '', drushCommand = 'drush' } = options;
+  const { drupalRoot = '', drushCommand = 'drush', theme = null } = options;
 
   return {
     name,
@@ -35,6 +35,7 @@ export function createProjectObject(name, slug, configDirectory, baseUrl = '', o
     baseUrl,
     drupalRoot,
     drushCommand,
+    theme,
     lastSync: null,
     entities: {
       node: {},

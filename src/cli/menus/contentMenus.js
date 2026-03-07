@@ -15,8 +15,9 @@ import {
   findEntityReferenceFieldsTargeting
 } from '../../commands/list.js';
 import { createBundle, validateBundleMachineName, createField, validateFieldMachineName, getReusableFields, updateField } from '../../commands/create.js';
-import { validateConfigDirectory, validateBaseUrl } from '../prompts.js';
+import { validateConfigDirectory, validateBaseUrl, validateThemeDirectory } from '../prompts.js';
 import { updateProject } from '../../commands/project.js';
+import { resolveThemeChain } from '../../io/themeReader.js';
 import { generateMachineName } from '../../generators/bundleGenerator.js';
 import { generateFieldName, FIELD_TYPES } from '../../generators/fieldGenerator.js';
 
@@ -763,12 +764,44 @@ export async function handleEditProject(project) {
       default: project.drushCommand || 'drush'
     });
 
+    // Show current theme if configured
+    const currentThemeDir = project.theme?.themes?.[0]?.directory || '';
+    if (currentThemeDir) {
+      console.log(chalk.cyan(`Current active theme: ${project.theme.activeTheme} (${currentThemeDir})`));
+    }
+
+    const themeDir = await input({
+      message: 'Active theme directory (leave empty to skip):',
+      default: currentThemeDir,
+      validate: validateThemeDirectory
+    });
+
+    let theme = undefined; // undefined = no change
+    if (themeDir.trim()) {
+      try {
+        theme = await resolveThemeChain(themeDir.trim());
+        console.log();
+        console.log(chalk.cyan('Theme chain discovered:'));
+        for (const t of theme.themes) {
+          console.log(chalk.white(`  ${t.name} (${t.machine_name}) → ${t.directory}`));
+        }
+        console.log();
+      } catch (err) {
+        console.log(chalk.yellow(`Warning: Could not resolve theme chain: ${err.message}`));
+        theme = undefined;
+      }
+    } else if (currentThemeDir && !themeDir.trim()) {
+      // User cleared the theme directory - remove theme config
+      theme = null;
+    }
+
     const updates = {
       name: name.trim(),
       configDirectory: configDirectory.trim(),
       baseUrl: baseUrl.trim(),
       drupalRoot: drupalRoot.trim(),
-      drushCommand: drushCommand.trim() || 'drush'
+      drushCommand: drushCommand.trim() || 'drush',
+      theme
     };
 
     const updatedProject = await updateProject(project, updates);

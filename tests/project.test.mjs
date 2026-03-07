@@ -97,6 +97,7 @@ describe('Project Utilities (Pure)', () => {
         baseUrl: '',
         drupalRoot: '',
         drushCommand: 'drush',
+        theme: null,
         lastSync: null,
         entities: {
           node: {},

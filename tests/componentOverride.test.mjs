@@ -8,7 +8,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { existsSync } from 'fs';
 import { generateOverrideComponentYml, generateComponentYml } from '../src/generators/componentGenerator.js';
-import { getComponentSubdirectories, createComponentOverride, updateComponentYml } from '../src/io/componentWriter.js';
+import { getComponentSubdirectories, createComponentOverride, updateComponentYml, createNewComponent } from '../src/io/componentWriter.js';
 import yaml from 'js-yaml';
 
 // --- Pure generator tests ---
@@ -416,5 +416,108 @@ props:
     const content = await readFile(ymlPath, 'utf-8');
     const parsed = yaml.load(content);
     expect(parsed.props.properties.subtitle.type).toEqual(['string', 'null']);
+  });
+});
+
+describe('createNewComponent', () => {
+  let tmpDir;
+  let activeThemeDir;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'comp-create-'));
+    activeThemeDir = join(tmpDir, 'active_theme');
+    await mkdir(join(activeThemeDir, 'components', '01-atoms'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true });
+  });
+
+  it('should create component directory with yml, twig, and css', async () => {
+    const { directory, files } = await createNewComponent({
+      activeThemeDir,
+      subdirectory: '01-atoms',
+      machineName: 'my_card',
+      config: {
+        name: 'My Card',
+        status: 'stable',
+        description: 'A custom card'
+      }
+    });
+
+    expect(existsSync(directory)).toBe(true);
+    expect(files).toHaveLength(3);
+    expect(files.some(f => f.endsWith('my_card.component.yml'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.twig'))).toBe(true);
+    expect(files.some(f => f.endsWith('my_card.css'))).toBe(true);
+
+    const ymlContent = await readFile(join(directory, 'my_card.component.yml'), 'utf-8');
+    const parsed = yaml.load(ymlContent);
+    expect(parsed.name).toBe('My Card');
+    expect(parsed.description).toBe('A custom card');
+    expect(parsed.status).toBe('stable');
+  });
+
+  it('should create component with props and slots', async () => {
+    const { directory } = await createNewComponent({
+      activeThemeDir,
+      subdirectory: '01-atoms',
+      machineName: 'badge',
+      config: {
+        name: 'Badge',
+        status: 'stable',
+        description: 'A badge component',
+        props: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', title: 'Label' },
+            theme: { type: 'string', title: 'Theme', enum: ['light', 'dark'] }
+          }
+        },
+        slots: {
+          content: { title: 'Content', description: 'Badge content' }
+        }
+      }
+    });
+
+    const ymlContent = await readFile(join(directory, 'badge.component.yml'), 'utf-8');
+    const parsed = yaml.load(ymlContent);
+    expect(parsed.props.properties.label.type).toBe('string');
+    expect(parsed.props.properties.theme.enum).toEqual(['light', 'dark']);
+    expect(parsed.slots.content.title).toBe('Content');
+  });
+
+  it('should create component with empty props', async () => {
+    const { directory } = await createNewComponent({
+      activeThemeDir,
+      subdirectory: '01-atoms',
+      machineName: 'spacer',
+      config: {
+        name: 'Spacer',
+        status: 'stable',
+        description: 'A spacer component'
+      }
+    });
+
+    const ymlContent = await readFile(join(directory, 'spacer.component.yml'), 'utf-8');
+    const parsed = yaml.load(ymlContent);
+    expect(parsed.name).toBe('Spacer');
+    expect(parsed.props).toBeUndefined();
+    expect(parsed.slots).toBeUndefined();
+  });
+
+  it('should create empty twig and css files', async () => {
+    const { directory } = await createNewComponent({
+      activeThemeDir,
+      subdirectory: '01-atoms',
+      machineName: 'divider',
+      config: { name: 'Divider', status: 'stable', description: '' }
+    });
+
+    const twigContent = await readFile(join(directory, 'divider.twig'), 'utf-8');
+    expect(twigContent).toBe('');
+
+    const cssContent = await readFile(join(directory, 'divider.css'), 'utf-8');
+    expect(cssContent).toBe('');
   });
 });

@@ -90,3 +90,30 @@ export async function updateComponentYml(componentYmlPath, updatedConfig) {
   const ymlContent = generateComponentYml(updatedConfig);
   await writeFile(componentYmlPath, ymlContent, 'utf-8');
 }
+
+/**
+ * Create a new custom component in the active theme.
+ * @param {object} options
+ * @param {string} options.activeThemeDir - Path to the active theme directory
+ * @param {string} options.subdirectory - Component subdirectory (e.g. "01-atoms")
+ * @param {string} options.machineName - Component machine name
+ * @param {object} options.config - Component config object (name, description, props, slots)
+ * @returns {Promise<{directory: string, files: string[]}>} - Created directory path and list of created file paths
+ */
+export async function createNewComponent(options) {
+  const { activeThemeDir, subdirectory, machineName, config } = options;
+
+  const componentDir = join(activeThemeDir, 'components', subdirectory, machineName);
+  await mkdir(componentDir, { recursive: true });
+
+  const ymlPath = join(componentDir, `${machineName}.component.yml`);
+  await writeFile(ymlPath, generateComponentYml(config), 'utf-8');
+
+  const twigPath = join(componentDir, `${machineName}.twig`);
+  await writeFile(twigPath, '', 'utf-8');
+
+  const cssPath = join(componentDir, `${machineName}.css`);
+  await writeFile(cssPath, '', 'utf-8');
+
+  return { directory: componentDir, files: [ymlPath, twigPath, cssPath] };
+}

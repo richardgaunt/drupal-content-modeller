@@ -3,13 +3,13 @@
  * Handles theme browsing and component listing actions.
  */
 
-import { search, select, confirm, input } from '@inquirer/prompts';
+import { search, select, confirm, input, checkbox } from '@inquirer/prompts';
 import chalk from 'chalk';
 
 import { syncProject } from '../../commands/sync.js';
 import { loadProject } from '../../commands/project.js';
 import { createTable } from '../../commands/list.js';
-import { getComponentSubdirectories, createComponentOverride, updateComponentYml } from '../../io/componentWriter.js';
+import { getComponentSubdirectories, createComponentOverride, updateComponentYml, createNewComponent } from '../../io/componentWriter.js';
 import { readComponentDetail } from '../../io/componentReader.js';
 import { generateMachineName } from '../../utils/slug.js';
 import {
@@ -872,6 +872,177 @@ async function handleEditComponent(project) {
 }
 
 /**
+ * Handle "Create custom component" action.
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Updated project
+ */
+async function handleCreateComponent(project) {
+  if (!project.theme?.themes?.length) {
+    console.log(chalk.yellow('No theme configured.'));
+    return project;
+  }
+
+  const activeTheme = project.theme.themes[0];
+
+  // Component name and machine name
+  const name = await input({ message: 'Name of component:' });
+  const suggestedName = generateMachineName(name);
+  const machineName = await input({
+    message: 'Machine name:',
+    default: suggestedName,
+    validate: (value) => {
+      if (!isValidPropName(value)) return 'Must be snake_case (lowercase letters, numbers, underscores, starting with a letter)';
+      // Check if component already exists in active theme
+      if (activeTheme.components?.[value]) return 'A component with this name already exists in the active theme';
+      return true;
+    }
+  });
+  const description = await input({ message: 'Description:' });
+
+  const SDC_SCHEMA = 'https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json';
+  let config = {
+    $schema: SDC_SCHEMA,
+    name,
+    status: 'stable',
+    description
+  };
+
+  // Base on another component?
+  const baseOnExisting = await confirm({
+    message: 'Base this on another component\'s properties?',
+    default: false
+  });
+
+  if (baseOnExisting) {
+    const allComponents = getAllComponents(project);
+    if (allComponents.length === 0) {
+      console.log(chalk.yellow('No existing components to base on.'));
+    } else {
+      const selectedId = await search({
+        message: 'Select component to base on:',
+        source: async (searchInput) => {
+          const term = (searchInput || '').toLowerCase();
+          return allComponents
+            .filter(c =>
+              c.id.toLowerCase().includes(term) ||
+              c.name.toLowerCase().includes(term)
+            )
+            .map(c => ({
+              value: c.id,
+              name: `${c.id} - ${c.name}`,
+              description: c.description || ''
+            }));
+        }
+      });
+
+      const selected = allComponents.find(c => c.id === selectedId);
+      if (selected) {
+        const detail = await readComponentDetail(selected.component_config_path);
+        if (detail.props) config.props = detail.props;
+        if (detail.slots) config.slots = detail.slots;
+        console.log(chalk.cyan(`Copied props and slots from ${selected.id}`));
+      }
+    }
+  }
+
+  // Select which props to keep
+  if (config.props?.properties && Object.keys(config.props.properties).length > 0) {
+    const propChoices = Object.entries(config.props.properties).map(([key, prop]) => ({
+      value: key,
+      name: `${prop.title || key} (${key})`,
+      checked: true
+    }));
+
+    const propsToKeep = await checkbox({
+      message: 'Select props to include:',
+      choices: propChoices
+    });
+
+    const allPropKeys = Object.keys(config.props.properties);
+    for (const key of allPropKeys) {
+      if (!propsToKeep.includes(key)) {
+        config.props = removePropFromSchema(config.props, key);
+      }
+    }
+  }
+
+  // Select which slots to keep
+  if (config.slots && Object.keys(config.slots).length > 0) {
+    const slotChoices = Object.entries(config.slots).map(([key, slot]) => ({
+      value: key,
+      name: `${slot.title || key} (${key})`,
+      checked: true
+    }));
+
+    const slotsToKeep = await checkbox({
+      message: 'Select slots to include:',
+      choices: slotChoices
+    });
+
+    const allSlotKeys = Object.keys(config.slots);
+    for (const key of allSlotKeys) {
+      if (!slotsToKeep.includes(key)) {
+        config.slots = removeSlotFromSchema(config.slots, key);
+      }
+    }
+  }
+
+  // Add props
+  const wantAdd = await confirm({ message: 'Do you want to add properties?', default: false });
+  if (wantAdd) {
+    let addMore = true;
+    while (addMore) {
+      const existingNames = getExistingNames({ props: config.props, slots: config.slots });
+      const { machineName: propName, ...propDef } = await promptForPropDefinition(existingNames);
+      config.props = addPropToSchema(config.props, propName, propDef);
+      console.log(chalk.green(`Prop "${propName}" added.`));
+      addMore = await confirm({ message: 'Add another property?', default: false });
+    }
+  }
+
+  // Select subdirectory
+  const subdirs = await getComponentSubdirectories(activeTheme.directory);
+  let subdirectory = machineName;
+
+  if (subdirs.length > 0) {
+    subdirectory = await select({
+      message: 'Select component subdirectory:',
+      choices: subdirs.map(d => ({ value: d, name: d }))
+    });
+  }
+
+  // Create the component
+  const { directory: componentDir, files: createdFiles } = await createNewComponent({
+    activeThemeDir: activeTheme.directory,
+    subdirectory,
+    machineName,
+    config
+  });
+
+  console.log();
+  console.log(chalk.green(`Component created: ${componentDir}`));
+  console.log(chalk.cyan('Files created:'));
+  for (const file of createdFiles) {
+    console.log(chalk.white(`  ${file}`));
+  }
+  console.log();
+
+  // Re-sync
+  try {
+    const result = await syncProject(project);
+    project = await loadProject(project.slug);
+    console.log(chalk.green('Sync complete!'));
+    if (result.componentsFound > 0) {
+      console.log(chalk.cyan(`Found ${result.componentsFound} theme components`));
+    }
+  } catch (error) {
+    console.log(chalk.yellow(`Sync warning: ${error.message}`));
+  }
+
+  return project;
+}
+
+/**
  * Theme & Components submenu
  * @param {object} project - Project object
  * @returns {Promise<object>} - Updated project
@@ -880,13 +1051,14 @@ export async function handleThemeMenu(project) {
   printThemeSummary(project);
 
   const choices = [
+    { value: 'edit-component', name: 'Edit component (add/remove props & slots)' },
+    { value: 'create-component', name: 'Create custom component' },
+    { value: 'override-component', name: 'Override a component' },
     { value: 'sync-components', name: 'Sync components' },
+    { value: 'inspect-component', name: 'Inspect component (props & slots)' },
     { value: 'list-components', name: 'List components' },
     { value: 'list-custom', name: 'List custom components' },
     { value: 'list-overridden', name: 'List overridden components' },
-    { value: 'inspect-component', name: 'Inspect component (props & slots)' },
-    { value: 'edit-component', name: 'Edit component (add/remove props & slots)' },
-    { value: 'override-component', name: 'Override a component' },
     { value: 'back', name: 'Back' }
   ];
 
@@ -903,44 +1075,56 @@ export async function handleThemeMenu(project) {
         }
       });
 
-      switch (action) {
-        case 'sync-components':
-          console.log(chalk.cyan('Syncing configuration...'));
-          try {
-            const result = await syncProject(project);
-            project = await loadProject(project.slug);
-            console.log(chalk.green('Sync complete!'));
-            console.log(chalk.cyan(`Found ${result.bundlesFound} bundles and ${result.fieldsFound} fields`));
-            if (result.componentsFound > 0) {
-              console.log(chalk.cyan(`Found ${result.componentsFound} theme components`));
+      if (action === 'back') return project;
+
+      try {
+        switch (action) {
+          case 'sync-components':
+            console.log(chalk.cyan('Syncing configuration...'));
+            try {
+              const result = await syncProject(project);
+              project = await loadProject(project.slug);
+              console.log(chalk.green('Sync complete!'));
+              console.log(chalk.cyan(`Found ${result.bundlesFound} bundles and ${result.fieldsFound} fields`));
+              if (result.componentsFound > 0) {
+                console.log(chalk.cyan(`Found ${result.componentsFound} theme components`));
+              }
+            } catch (error) {
+              console.log(chalk.red(`Sync failed: ${error.message}`));
             }
-          } catch (error) {
-            console.log(chalk.red(`Sync failed: ${error.message}`));
-          }
-          break;
-        case 'list-components':
-          handleListComponents(project);
-          break;
-        case 'list-custom':
-          handleListCustomComponents(project);
-          break;
-        case 'list-overridden':
-          handleListOverriddenComponents(project);
-          break;
-        case 'inspect-component':
-          await handleInspectComponent(project);
-          break;
-        case 'edit-component':
-          project = await handleEditComponent(project);
-          break;
-        case 'override-component':
-          project = await handleOverrideComponent(project);
-          break;
-        case 'back':
-          return project;
+            break;
+          case 'list-components':
+            handleListComponents(project);
+            break;
+          case 'list-custom':
+            handleListCustomComponents(project);
+            break;
+          case 'list-overridden':
+            handleListOverriddenComponents(project);
+            break;
+          case 'inspect-component':
+            await handleInspectComponent(project);
+            break;
+          case 'create-component':
+            project = await handleCreateComponent(project);
+            break;
+          case 'edit-component':
+            project = await handleEditComponent(project);
+            break;
+          case 'override-component':
+            project = await handleOverrideComponent(project);
+            break;
+        }
+      } catch (innerError) {
+        if (innerError.name === 'ExitPromptError') {
+          // Ctrl-C in a sub-handler returns to theme menu
+          continue;
+        }
+        console.log(chalk.red(`Error: ${innerError.message}`));
       }
     } catch (error) {
       if (error.name === 'ExitPromptError') {
+        // Ctrl-C on the theme menu itself returns to project menu
         return project;
       }
       console.log(chalk.red(`Error: ${error.message}`));

@@ -278,6 +278,7 @@ export function generateProjectReportData(project, baseUrl = '', options = {}) {
   return {
     project: project.name,
     baseUrl: resolvedBaseUrl,
+    theme: generateThemeReportData(project, resolvedBaseUrl || ''),
     entityTypes: ENTITY_ORDER
       .filter(et => Object.keys(project.entities[et] || {}).length > 0)
       .map(et => generateEntityTypeReportData(project, et, resolvedBaseUrl || '', {
@@ -452,6 +453,152 @@ export function generateSingleBundleReport(project, entityType, bundleId, baseUr
 }
 
 /**
+ * Generate Markdown for the theme section of a project report
+ * @param {object} project - Project object
+ * @param {string} baseUrl - Base URL for links
+ * @returns {string} - Markdown content or empty string if no theme
+ */
+export function generateThemeSection(project, baseUrl = '') {
+  if (!project.theme?.themes?.length) return '';
+
+  const activeTheme = project.theme.themes[0];
+  const baseThemes = project.theme.themes.slice(1);
+
+  let md = `## Theme\n\n`;
+  md += `Active theme: ${activeTheme.name} (${activeTheme.machine_name})\n\n`;
+
+  if (baseThemes.length > 0) {
+    md += `Base Themes:\n`;
+    for (const theme of baseThemes) {
+      md += `- ${theme.name} (${theme.machine_name})\n`;
+    }
+    md += `\n`;
+  }
+
+  if (baseUrl) {
+    md += `**Admin Links:**\n`;
+    md += `- [Theme Settings](${baseUrl}/admin/appearance)\n`;
+    md += `- [${activeTheme.name} settings](${baseUrl}/admin/appearance/settings/${activeTheme.machine_name})\n`;
+    md += `\n`;
+  }
+
+  // All components across all themes
+  const allComponents = [];
+  for (const theme of project.theme.themes) {
+    for (const comp of Object.values(theme.components || {})) {
+      allComponents.push({
+        id: `${theme.machine_name}:${comp.machine_name}`,
+        name: comp.name,
+        description: comp.description || '',
+        replaces: comp.replaces || ''
+      });
+    }
+  }
+
+  if (allComponents.length > 0) {
+    md += `### Components\n\n`;
+    md += `| ID | Name | Description | Overrides |\n`;
+    md += `|----|------|-------------|-----------|\n`;
+    for (const comp of allComponents) {
+      md += `| ${comp.id} | ${comp.name} | ${comp.description} | ${comp.replaces} |\n`;
+    }
+    md += `\n`;
+  }
+
+  // Overridden components (active theme only, with replaces)
+  const overridden = Object.values(activeTheme.components || {})
+    .filter(c => c.replaces);
+
+  if (overridden.length > 0) {
+    md += `### Overridden Components\n\n`;
+    md += `| ID | Name | Description | Overrides |\n`;
+    md += `|----|------|-------------|-----------|\n`;
+    for (const comp of overridden) {
+      md += `| ${activeTheme.machine_name}:${comp.machine_name} | ${comp.name} | ${comp.description || ''} | ${comp.replaces} |\n`;
+    }
+    md += `\n`;
+  }
+
+  // Custom components (active theme only, without replaces)
+  const custom = Object.values(activeTheme.components || {})
+    .filter(c => !c.replaces);
+
+  if (custom.length > 0) {
+    md += `### Custom Components\n\n`;
+    md += `| ID | Name | Description |\n`;
+    md += `|----|------|-------------|\n`;
+    for (const comp of custom) {
+      md += `| ${activeTheme.machine_name}:${comp.machine_name} | ${comp.name} | ${comp.description || ''} |\n`;
+    }
+    md += `\n`;
+  }
+
+  return md;
+}
+
+/**
+ * Generate structured theme data for a project report
+ * @param {object} project - Project object
+ * @param {string} baseUrl - Base URL for links
+ * @returns {object|null} - Structured theme data or null if no theme
+ */
+export function generateThemeReportData(project, baseUrl = '') {
+  if (!project.theme?.themes?.length) return null;
+
+  const activeTheme = project.theme.themes[0];
+  const baseThemes = project.theme.themes.slice(1);
+
+  const allComponents = [];
+  for (const theme of project.theme.themes) {
+    for (const comp of Object.values(theme.components || {})) {
+      allComponents.push({
+        id: `${theme.machine_name}:${comp.machine_name}`,
+        name: comp.name,
+        description: comp.description || '',
+        replaces: comp.replaces || null
+      });
+    }
+  }
+
+  const overriddenComponents = Object.values(activeTheme.components || {})
+    .filter(c => c.replaces)
+    .map(c => ({
+      id: `${activeTheme.machine_name}:${c.machine_name}`,
+      name: c.name,
+      description: c.description || '',
+      replaces: c.replaces
+    }));
+
+  const customComponents = Object.values(activeTheme.components || {})
+    .filter(c => !c.replaces)
+    .map(c => ({
+      id: `${activeTheme.machine_name}:${c.machine_name}`,
+      name: c.name,
+      description: c.description || ''
+    }));
+
+  const adminLinks = baseUrl ? [
+    { name: 'Theme Settings', url: `${baseUrl}/admin/appearance` },
+    { name: `${activeTheme.name} settings`, url: `${baseUrl}/admin/appearance/settings/${activeTheme.machine_name}` }
+  ] : [];
+
+  return {
+    activeTheme: {
+      name: activeTheme.name,
+      machine_name: activeTheme.machine_name
+    },
+    baseThemes: baseThemes.map(t => ({
+      name: t.name,
+      machine_name: t.machine_name
+    })),
+    adminLinks,
+    components: allComponents,
+    overriddenComponents,
+    customComponents
+  };
+}
+
+/**
  * Generate a full project report with table of contents
  * @param {object} project - Project object
  * @param {string} baseUrl - Base URL for links
@@ -462,10 +609,19 @@ export function generateProjectReport(project, baseUrl = '', options = {}) {
   const allFormDisplays = options.formDisplays || {};
   const displayUrl = baseUrl || project.baseUrl || '_Not set_';
 
+  const resolvedBaseUrl = baseUrl || project.baseUrl || '';
+  const hasTheme = project.theme?.themes?.length > 0;
+
   let md = `# Project: ${project.name}\n\n`;
   md += `**URL:** ${displayUrl}\n\n`;
   md += `---\n\n`;
+
   md += `## Table of Contents\n\n`;
+
+  // Theme link in TOC
+  if (hasTheme) {
+    md += `- [Theme & Components](#theme)\n\n`;
+  }
 
   // Generate TOC
   for (const entityType of ENTITY_ORDER) {
@@ -488,6 +644,9 @@ export function generateProjectReport(project, baseUrl = '', options = {}) {
   }
 
   md += `---\n\n`;
+
+  // Theme section after TOC
+  md += generateThemeSection(project, resolvedBaseUrl);
 
   // Generate full content
   for (const entityType of ENTITY_ORDER) {

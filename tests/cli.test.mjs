@@ -52,12 +52,13 @@ describe('CLI Prompts', () => {
       const result = getProjectMenuChoices('My Test Project');
 
       expect(result.choices).toEqual(PROJECT_MENU_CATEGORIES);
-      expect(result.choices.length).toBe(6);
+      expect(result.choices.length).toBe(7);
 
       const values = result.choices.map(c => c.value);
       expect(values).toContain('content-modelling');
       expect(values).toContain('browse-inspect');
       expect(values).toContain('reports');
+      expect(values).toContain('theme-components');
       expect(values).toContain('roles');
       expect(values).toContain('project-sync');
       expect(values).toContain('back');

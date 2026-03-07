@@ -40,6 +40,7 @@ import {
 import { handleEditFormDisplay } from './formDisplayMenus.js';
 import { handleManageRoles } from './roleMenus.js';
 import { handleManageStories } from './storyMenus.js';
+import { handleThemeMenu } from './themeMenus.js';
 import {
   handleBundleReport,
   handleEntityReport,
@@ -236,6 +237,12 @@ async function showProjectMenu(project) {
       // Roles category has only one action — go directly to it
       if (category === 'roles') {
         await handleManageRoles(project);
+        continue;
+      }
+
+      // Theme & Components has its own menu handler
+      if (category === 'theme-components') {
+        project = await handleThemeMenu(project);
         continue;
       }
 

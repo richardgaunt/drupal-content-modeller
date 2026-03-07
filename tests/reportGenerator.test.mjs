@@ -14,7 +14,9 @@ import {
   generateProjectReportData,
   generateBundlePermissionsTable,
   generateBundlePermissionsData,
-  generateFormDisplayData
+  generateFormDisplayData,
+  generateThemeSection,
+  generateThemeReportData
 } from '../src/generators/reportGenerator.js';
 
 describe('Report Generator', () => {
@@ -1236,6 +1238,249 @@ describe('Report Generator', () => {
     test('sets formDisplay to null when no form display data', () => {
       const result = generateBundleReportData(bundle, 'node');
       expect(result.formDisplay).toBeNull();
+    });
+  });
+
+  describe('generateThemeSection', () => {
+    const projectWithTheme = {
+      name: 'Test Project',
+      baseUrl: 'https://example.com',
+      theme: {
+        activeTheme: 'my_subtheme',
+        themes: [
+          {
+            name: 'My Sub Theme',
+            machine_name: 'my_subtheme',
+            directory: '/path/to/my_subtheme',
+            components: {
+              'table': {
+                name: 'Table',
+                machine_name: 'table',
+                description: 'Table component',
+                replaces: 'civictheme:table'
+              },
+              'hero': {
+                name: 'Hero',
+                machine_name: 'hero',
+                description: 'Custom hero component',
+                replaces: null
+              }
+            }
+          },
+          {
+            name: 'CivicTheme',
+            machine_name: 'civictheme',
+            directory: '/path/to/civictheme',
+            components: {
+              'table': {
+                name: 'Table',
+                machine_name: 'table',
+                description: 'Table component',
+                replaces: null
+              },
+              'button': {
+                name: 'Button',
+                machine_name: 'button',
+                description: 'Button component',
+                replaces: null
+              }
+            }
+          }
+        ]
+      },
+      entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+    };
+
+    test('returns empty string when no theme', () => {
+      const result = generateThemeSection({ entities: {} });
+      expect(result).toBe('');
+    });
+
+    test('includes active theme', () => {
+      const result = generateThemeSection(projectWithTheme, 'https://example.com');
+      expect(result).toContain('Active theme: My Sub Theme (my_subtheme)');
+    });
+
+    test('includes base themes', () => {
+      const result = generateThemeSection(projectWithTheme);
+      expect(result).toContain('- CivicTheme (civictheme)');
+    });
+
+    test('includes admin links when baseUrl provided', () => {
+      const result = generateThemeSection(projectWithTheme, 'https://example.com');
+      expect(result).toContain('[Theme Settings](https://example.com/admin/appearance)');
+      expect(result).toContain('[My Sub Theme settings](https://example.com/admin/appearance/settings/my_subtheme)');
+    });
+
+    test('omits admin links when no baseUrl', () => {
+      const result = generateThemeSection(projectWithTheme);
+      expect(result).not.toContain('Admin Links');
+    });
+
+    test('includes all components from all themes', () => {
+      const result = generateThemeSection(projectWithTheme);
+      expect(result).toContain('### Components');
+      expect(result).toContain('my_subtheme:table');
+      expect(result).toContain('my_subtheme:hero');
+      expect(result).toContain('civictheme:table');
+      expect(result).toContain('civictheme:button');
+    });
+
+    test('includes overridden components section', () => {
+      const result = generateThemeSection(projectWithTheme);
+      expect(result).toContain('### Overridden Components');
+      expect(result).toContain('my_subtheme:table');
+      expect(result).toContain('civictheme:table');
+    });
+
+    test('includes custom components section', () => {
+      const result = generateThemeSection(projectWithTheme);
+      expect(result).toContain('### Custom Components');
+      expect(result).toContain('my_subtheme:hero');
+    });
+
+    test('custom components table has no Overrides column', () => {
+      const result = generateThemeSection(projectWithTheme);
+      const customSection = result.split('### Custom Components')[1];
+      const headerLine = customSection.split('\n').find(l => l.startsWith('|') && l.includes('ID'));
+      expect(headerLine).not.toContain('Overrides');
+    });
+  });
+
+  describe('generateThemeReportData', () => {
+    const projectWithTheme = {
+      name: 'Test',
+      theme: {
+        activeTheme: 'sub',
+        themes: [
+          {
+            name: 'Sub', machine_name: 'sub', directory: '/sub',
+            components: {
+              'table': { name: 'Table', machine_name: 'table', description: 'A table', replaces: 'base:table' },
+              'hero': { name: 'Hero', machine_name: 'hero', description: 'Custom', replaces: null }
+            }
+          },
+          {
+            name: 'Base', machine_name: 'base', directory: '/base',
+            components: {
+              'table': { name: 'Table', machine_name: 'table', description: 'A table', replaces: null }
+            }
+          }
+        ]
+      },
+      entities: {}
+    };
+
+    test('returns null when no theme', () => {
+      expect(generateThemeReportData({ entities: {} })).toBeNull();
+    });
+
+    test('includes active theme info', () => {
+      const result = generateThemeReportData(projectWithTheme);
+      expect(result.activeTheme.machine_name).toBe('sub');
+    });
+
+    test('includes base themes', () => {
+      const result = generateThemeReportData(projectWithTheme);
+      expect(result.baseThemes).toHaveLength(1);
+      expect(result.baseThemes[0].machine_name).toBe('base');
+    });
+
+    test('includes all components', () => {
+      const result = generateThemeReportData(projectWithTheme);
+      expect(result.components).toHaveLength(3);
+    });
+
+    test('separates overridden and custom components', () => {
+      const result = generateThemeReportData(projectWithTheme);
+      expect(result.overriddenComponents).toHaveLength(1);
+      expect(result.overriddenComponents[0].replaces).toBe('base:table');
+      expect(result.customComponents).toHaveLength(1);
+      expect(result.customComponents[0].id).toBe('sub:hero');
+    });
+
+    test('includes admin links when baseUrl provided', () => {
+      const result = generateThemeReportData(projectWithTheme, 'https://site.com');
+      expect(result.adminLinks).toHaveLength(2);
+      expect(result.adminLinks[0].url).toBe('https://site.com/admin/appearance');
+    });
+
+    test('no admin links without baseUrl', () => {
+      const result = generateThemeReportData(projectWithTheme);
+      expect(result.adminLinks).toHaveLength(0);
+    });
+  });
+
+  describe('generateProjectReport includes theme', () => {
+    const projectWithTheme = {
+      name: 'Test',
+      baseUrl: 'https://example.com',
+      theme: {
+        activeTheme: 'mytheme',
+        themes: [{
+          name: 'My Theme', machine_name: 'mytheme', directory: '/theme',
+          components: { btn: { name: 'Button', machine_name: 'btn', description: 'A btn', replaces: null } }
+        }]
+      },
+      entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+    };
+
+    test('includes theme section when theme configured', () => {
+      const result = generateProjectReport(projectWithTheme);
+      expect(result).toContain('## Theme');
+      expect(result).toContain('Active theme: My Theme (mytheme)');
+      expect(result).toContain('mytheme:btn');
+    });
+
+    test('TOC contains theme link', () => {
+      const result = generateProjectReport(projectWithTheme);
+      expect(result).toContain('- [Theme & Components](#theme)');
+    });
+
+    test('theme section appears after TOC', () => {
+      const result = generateProjectReport(projectWithTheme);
+      const tocIndex = result.indexOf('## Table of Contents');
+      const themeIndex = result.indexOf('## Theme');
+      expect(tocIndex).toBeLessThan(themeIndex);
+    });
+
+    test('omits theme section and TOC link when no theme', () => {
+      const project = {
+        name: 'Test',
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+      const result = generateProjectReport(project);
+      expect(result).not.toContain('## Theme');
+      expect(result).not.toContain('Theme & Components');
+    });
+  });
+
+  describe('generateProjectReportData includes theme', () => {
+    test('includes theme data when configured', () => {
+      const project = {
+        name: 'Test',
+        baseUrl: 'https://example.com',
+        theme: {
+          activeTheme: 'mytheme',
+          themes: [{
+            name: 'My Theme', machine_name: 'mytheme', directory: '/theme',
+            components: {}
+          }]
+        },
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+      const result = generateProjectReportData(project);
+      expect(result.theme).toBeDefined();
+      expect(result.theme.activeTheme.machine_name).toBe('mytheme');
+    });
+
+    test('theme is null when not configured', () => {
+      const project = {
+        name: 'Test',
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+      const result = generateProjectReportData(project);
+      expect(result.theme).toBeNull();
     });
   });
 });

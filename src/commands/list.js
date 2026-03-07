@@ -114,7 +114,7 @@ export function getBundleSummary(project) {
  * @param {object[]} rows - Data rows
  * @returns {string} - Formatted table string
  */
-function createTable(columns, rows) {
+export function createTable(columns, rows) {
   // Calculate column widths from header and data
   const widths = columns.map(col => {
     const dataMax = rows.length > 0

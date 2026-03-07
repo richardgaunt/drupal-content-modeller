@@ -3,14 +3,24 @@
  * Handles theme browsing and component listing actions.
  */
 
-import { search, select, confirm } from '@inquirer/prompts';
+import { search, select, confirm, input } from '@inquirer/prompts';
 import chalk from 'chalk';
 
 import { syncProject } from '../../commands/sync.js';
 import { loadProject } from '../../commands/project.js';
 import { createTable } from '../../commands/list.js';
-import { getComponentSubdirectories, createComponentOverride } from '../../io/componentWriter.js';
+import { getComponentSubdirectories, createComponentOverride, updateComponentYml } from '../../io/componentWriter.js';
 import { readComponentDetail } from '../../io/componentReader.js';
+import { generateMachineName } from '../../utils/slug.js';
+import {
+  PROP_TYPES,
+  isValidPropName,
+  buildPropSchema,
+  addPropToSchema,
+  removePropFromSchema,
+  addSlotToSchema,
+  removeSlotFromSchema
+} from '../../utils/propSchema.js';
 
 /**
  * Get all components across all themes as a flat array with theme context
@@ -454,6 +464,414 @@ async function handleOverrideComponent(project) {
 }
 
 /**
+ * Prompt for object properties (recursive).
+ * @param {string[]} existingNames - Already-used names at this level
+ * @returns {Promise<object>} - Properties map
+ */
+async function promptForObjectProperties(existingNames = []) {
+  console.log(chalk.cyan('Add properties to object:'));
+  const properties = {};
+  let addMore = true;
+
+  while (addMore) {
+    const allUsed = [...existingNames, ...Object.keys(properties)];
+    const { machineName, ...propDef } = await promptForPropDefinition(allUsed);
+    properties[machineName] = propDef;
+    addMore = await confirm({ message: 'Add another property?', default: false });
+  }
+
+  return properties;
+}
+
+/**
+ * Prompt for a single prop definition (recursive for object/array types).
+ * @param {string[]} existingNames - Names already in use
+ * @returns {Promise<object>} - { machineName, ...propSchema }
+ */
+async function promptForPropDefinition(existingNames = []) {
+  const title = await input({ message: 'Property label:' });
+  const suggestedName = generateMachineName(title);
+  const machineName = await input({
+    message: 'Machine name:',
+    default: suggestedName,
+    validate: (value) => {
+      if (!isValidPropName(value)) return 'Must be snake_case (lowercase letters, numbers, underscores, starting with a letter)';
+      if (existingNames.includes(value)) return 'A prop/slot with this name already exists';
+      return true;
+    }
+  });
+  const description = await input({ message: 'Description:' });
+  const type = await select({
+    message: 'Type:',
+    choices: PROP_TYPES.map(t => ({ value: t, name: t }))
+  });
+  const required = await confirm({ message: 'Is this prop required?', default: false });
+
+  let items, properties, enumValues, defaultValue;
+
+  if (type === 'array') {
+    const itemType = await select({
+      message: 'Array item type:',
+      choices: PROP_TYPES.filter(t => t !== 'array').map(t => ({ value: t, name: t }))
+    });
+
+    if (itemType === 'object') {
+      const objProps = await promptForObjectProperties();
+      items = { type: 'object', properties: objProps };
+    } else {
+      items = { type: itemType };
+    }
+  }
+
+  if (type === 'object') {
+    const wantProperties = await confirm({ message: 'Do you want to add properties?', default: false });
+    if (wantProperties) {
+      properties = await promptForObjectProperties();
+    }
+  }
+
+  if (['string', 'integer'].includes(type)) {
+    const hasEnum = await confirm({ message: 'Restrict to specific values (enum)?', default: false });
+    if (hasEnum) {
+      const values = await input({ message: 'Allowed values (comma-separated):' });
+      enumValues = values.split(',').map(v => v.trim()).filter(Boolean);
+      if (type === 'integer') {
+        enumValues = enumValues.map(v => parseInt(v, 10)).filter(v => !isNaN(v));
+      }
+    }
+  }
+
+  const wantsDefault = await confirm({ message: 'Set a default value?', default: false });
+  if (wantsDefault) {
+    const rawDefault = await input({ message: 'Default value:' });
+    if (type === 'boolean') {
+      defaultValue = rawDefault.toLowerCase() === 'true';
+    } else if (type === 'integer') {
+      defaultValue = parseInt(rawDefault, 10);
+    } else if (type === 'number') {
+      defaultValue = parseFloat(rawDefault);
+    } else {
+      defaultValue = rawDefault;
+    }
+  }
+
+  const propSchema = buildPropSchema({ type, title, description, required, enumValues, defaultValue, items, properties });
+  return { machineName, ...propSchema };
+}
+
+/**
+ * Print the twig file path hint after a component modification.
+ * @param {object} detail - Component detail object
+ */
+function printTwigHint(detail) {
+  if (detail.component_config_path) {
+    const twigPath = detail.component_config_path.replace('.component.yml', '.twig');
+    const assets = detail.assets || [];
+    const hasTwig = assets.some(a => a.endsWith('.twig'));
+
+    if (hasTwig) {
+      console.log(chalk.yellow(`Update the template: ${twigPath}`));
+    } else {
+      console.log(chalk.yellow(`No twig template found. Create one at: ${twigPath}`));
+    }
+  }
+}
+
+/**
+ * Get all existing prop and slot names for a component.
+ * @param {object} detail - Component detail from readComponentDetail
+ * @returns {string[]} - Array of existing names
+ */
+function getExistingNames(detail) {
+  const names = [];
+  if (detail.props?.properties) {
+    names.push(...Object.keys(detail.props.properties));
+  }
+  if (detail.slots) {
+    names.push(...Object.keys(detail.slots));
+  }
+  return names;
+}
+
+/**
+ * Handle "Edit component" action - add/remove props and slots.
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Updated project
+ */
+async function handleEditComponent(project) {
+  if (!project.theme?.themes?.length) {
+    console.log(chalk.yellow('No theme configured.'));
+    return project;
+  }
+
+  const allComponents = getAllComponents(project);
+  if (allComponents.length === 0) {
+    console.log(chalk.yellow('No components found.'));
+    return project;
+  }
+
+  // Filter out components that have been overridden (show originals only, not duplicates)
+  const activeTheme = project.theme.themes[0];
+  const overriddenIds = new Set(
+    Object.values(activeTheme.components || {})
+      .filter(c => c.replaces)
+      .map(c => c.replaces)
+  );
+
+  const editableComponents = allComponents.filter(c => !overriddenIds.has(c.id));
+
+  const selectedId = await search({
+    message: 'Select component to edit:',
+    source: async (searchInput) => {
+      const term = (searchInput || '').toLowerCase();
+      return editableComponents
+        .filter(c =>
+          c.id.toLowerCase().includes(term) ||
+          c.name.toLowerCase().includes(term)
+        )
+        .map(c => ({
+          value: c.id,
+          name: `${c.id} - ${c.name}`,
+          description: c.description || ''
+        }));
+    }
+  });
+
+  let selected = editableComponents.find(c => c.id === selectedId);
+  if (!selected) return project;
+
+  // Check if this is a base theme component and editableBaseTheme is false
+  const isBaseThemeComponent = selected.theme_machine_name !== activeTheme.machine_name;
+  if (isBaseThemeComponent && !project.editableBaseTheme) {
+    const shouldOverride = await confirm({
+      message: 'This is a base theme component. Override it in your active theme first?',
+      default: true
+    });
+
+    if (!shouldOverride) return project;
+
+    // Run the override flow
+    const copyFiles = await confirm({
+      message: 'Copy files from the source component?',
+      default: true
+    });
+
+    const subdirs = await getComponentSubdirectories(activeTheme.directory);
+    let subdirectory = selected.machine_name;
+
+    if (subdirs.length > 0) {
+      subdirectory = await select({
+        message: 'Select component subdirectory:',
+        choices: subdirs.map(d => ({ value: d, name: d }))
+      });
+    }
+
+    const { directory: componentDir, files: createdFiles } = await createComponentOverride({
+      activeThemeDir: activeTheme.directory,
+      subdirectory,
+      machineName: selected.machine_name,
+      sourceConfigPath: selected.component_config_path,
+      replacesId: selectedId,
+      copyFiles
+    });
+
+    console.log();
+    console.log(chalk.green(`Component override created: ${componentDir}`));
+    console.log(chalk.cyan('Files created:'));
+    for (const file of createdFiles) {
+      console.log(chalk.white(`  ${file}`));
+    }
+    console.log();
+
+    // Re-sync to pick up new component
+    try {
+      const result = await syncProject(project);
+      project = await loadProject(project.slug);
+      console.log(chalk.green('Sync complete!'));
+      if (result.componentsFound > 0) {
+        console.log(chalk.cyan(`Found ${result.componentsFound} theme components`));
+      }
+    } catch (error) {
+      console.log(chalk.yellow(`Sync warning: ${error.message}`));
+    }
+
+    // Use the newly created override as the target
+    const updatedActiveTheme = project.theme.themes[0];
+    const overrideComp = Object.values(updatedActiveTheme.components || {})
+      .find(c => c.machine_name === selected.machine_name && c.replaces);
+
+    if (!overrideComp) {
+      console.log(chalk.red('Could not find the new override component after sync.'));
+      return project;
+    }
+
+    selected = {
+      ...overrideComp,
+      theme_machine_name: updatedActiveTheme.machine_name,
+      id: `${updatedActiveTheme.machine_name}:${overrideComp.machine_name}`
+    };
+  }
+
+  // Load full detail
+  let detail = await readComponentDetail(selected.component_config_path);
+
+  // Edit loop
+  while (true) {
+    // Show current state
+    console.log();
+    console.log(chalk.cyan(`Editing: ${detail.name} (${selected.id})`));
+    console.log(chalk.white(`Path: ${detail.directory}`));
+
+    const propCount = detail.props?.properties ? Object.keys(detail.props.properties).length : 0;
+    const slotCount = detail.slots ? Object.keys(detail.slots).length : 0;
+    console.log(chalk.white(`Props: ${propCount}, Slots: ${slotCount}`));
+    console.log();
+
+    const action = await select({
+      message: 'What would you like to do?',
+      choices: [
+        { value: 'add-prop', name: 'Add a prop' },
+        { value: 'add-slot', name: 'Add a slot' },
+        { value: 'remove', name: 'Remove a prop/slot' },
+        { value: 'back', name: 'Back' }
+      ]
+    });
+
+    if (action === 'back') break;
+
+    if (action === 'add-prop') {
+      const existingNames = getExistingNames(detail);
+      const { machineName, ...propDef } = await promptForPropDefinition(existingNames);
+
+      // Read the raw config, update, and write back
+      const { readFile: readF } = await import('fs/promises');
+      const { default: yaml } = await import('js-yaml');
+      const rawContent = await readF(selected.component_config_path, 'utf-8');
+      const config = yaml.load(rawContent);
+
+      config.props = addPropToSchema(config.props, machineName, propDef);
+      await updateComponentYml(selected.component_config_path, config);
+
+      detail = await readComponentDetail(selected.component_config_path);
+      console.log();
+      console.log(chalk.green(`Prop "${machineName}" added.`));
+      printTwigHint(detail);
+      console.log();
+    }
+
+    if (action === 'add-slot') {
+      const existingNames = getExistingNames(detail);
+
+      const slotTitle = await input({ message: 'Slot label:' });
+      const suggestedName = generateMachineName(slotTitle);
+      const slotMachineName = await input({
+        message: 'Machine name:',
+        default: suggestedName,
+        validate: (value) => {
+          if (!isValidPropName(value)) return 'Must be snake_case (lowercase letters, numbers, underscores, starting with a letter)';
+          if (existingNames.includes(value)) return 'A prop/slot with this name already exists';
+          return true;
+        }
+      });
+      const slotDescription = await input({ message: 'Description:' });
+
+      const { readFile: readF } = await import('fs/promises');
+      const { default: yaml } = await import('js-yaml');
+      const rawContent = await readF(selected.component_config_path, 'utf-8');
+      const config = yaml.load(rawContent);
+
+      config.slots = addSlotToSchema(config.slots, slotMachineName, {
+        title: slotTitle,
+        description: slotDescription
+      });
+      await updateComponentYml(selected.component_config_path, config);
+
+      detail = await readComponentDetail(selected.component_config_path);
+      console.log();
+      console.log(chalk.green(`Slot "${slotMachineName}" added.`));
+      printTwigHint(detail);
+      console.log();
+    }
+
+    if (action === 'remove') {
+      const removeChoices = [];
+
+      if (detail.props?.properties) {
+        for (const [key, prop] of Object.entries(detail.props.properties)) {
+          removeChoices.push({
+            value: `prop:${key}`,
+            name: `[Prop] ${prop.title || key} (${key})`
+          });
+        }
+      }
+
+      if (detail.slots) {
+        for (const [key, slot] of Object.entries(detail.slots)) {
+          removeChoices.push({
+            value: `slot:${key}`,
+            name: `[Slot] ${slot.title || key} (${key})`
+          });
+        }
+      }
+
+      if (removeChoices.length === 0) {
+        console.log(chalk.yellow('No props or slots to remove.'));
+        continue;
+      }
+
+      const toRemove = await search({
+        message: 'Select prop/slot to remove:',
+        source: async (searchInput) => {
+          const term = (searchInput || '').toLowerCase();
+          return removeChoices.filter(c => c.name.toLowerCase().includes(term));
+        }
+      });
+
+      const [kind, name] = toRemove.split(':');
+
+      const shouldRemove = await confirm({
+        message: `Remove ${kind} "${name}"?`,
+        default: false
+      });
+
+      if (!shouldRemove) continue;
+
+      const { readFile: readF } = await import('fs/promises');
+      const { default: yaml } = await import('js-yaml');
+      const rawContent = await readF(selected.component_config_path, 'utf-8');
+      const config = yaml.load(rawContent);
+
+      if (kind === 'prop') {
+        config.props = removePropFromSchema(config.props, name);
+      } else {
+        config.slots = removeSlotFromSchema(config.slots, name);
+      }
+
+      await updateComponentYml(selected.component_config_path, config);
+
+      detail = await readComponentDetail(selected.component_config_path);
+      console.log();
+      console.log(chalk.green(`${kind === 'prop' ? 'Prop' : 'Slot'} "${name}" removed.`));
+      printTwigHint(detail);
+      console.log();
+    }
+  }
+
+  // Re-sync after edits
+  try {
+    const result = await syncProject(project);
+    project = await loadProject(project.slug);
+    if (result.componentsFound > 0) {
+      console.log(chalk.cyan(`Synced: ${result.componentsFound} theme components`));
+    }
+  } catch (error) {
+    console.log(chalk.yellow(`Sync warning: ${error.message}`));
+  }
+
+  return project;
+}
+
+/**
  * Theme & Components submenu
  * @param {object} project - Project object
  * @returns {Promise<object>} - Updated project
@@ -467,6 +885,7 @@ export async function handleThemeMenu(project) {
     { value: 'list-custom', name: 'List custom components' },
     { value: 'list-overridden', name: 'List overridden components' },
     { value: 'inspect-component', name: 'Inspect component (props & slots)' },
+    { value: 'edit-component', name: 'Edit component (add/remove props & slots)' },
     { value: 'override-component', name: 'Override a component' },
     { value: 'back', name: 'Back' }
   ];
@@ -510,6 +929,9 @@ export async function handleThemeMenu(project) {
           break;
         case 'inspect-component':
           await handleInspectComponent(project);
+          break;
+        case 'edit-component':
+          project = await handleEditComponent(project);
           break;
         case 'override-component':
           project = await handleOverrideComponent(project);

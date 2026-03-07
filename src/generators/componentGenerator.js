@@ -38,3 +38,35 @@ export function generateOverrideComponentYml(sourceConfig, replacesId) {
     sortKeys: false
   });
 }
+
+/**
+ * Generate the YAML content for a full component config.
+ * Preserves all existing fields while allowing props/slots updates.
+ * @param {object} config - Full component config object
+ * @returns {string} - YAML string for the component.yml
+ */
+export function generateComponentYml(config) {
+  const output = {};
+
+  if (config.$schema) output.$schema = config.$schema;
+  if (config.name) output.name = config.name;
+  if (config.status) output.status = config.status;
+  if (config.description) output.description = config.description;
+  if (config.replaces) output.replaces = config.replaces;
+
+  if (config.props) {
+    output.props = config.props;
+  }
+
+  if (config.slots) {
+    output.slots = config.slots;
+  }
+
+  return yaml.dump(output, {
+    lineWidth: -1,
+    noRefs: true,
+    quotingType: "'",
+    forceQuotes: false,
+    sortKeys: false
+  });
+}

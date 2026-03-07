@@ -22,9 +22,9 @@ export const MAIN_MENU_CHOICES = [
  */
 export const PROJECT_MENU_CATEGORIES = [
   { value: 'content-modelling', name: 'Content Modelling' },
+  { value: 'theme-components', name: 'Theme & Components' },
   { value: 'browse-inspect', name: 'Browse & Inspect' },
   { value: 'reports', name: 'Reports' },
-  { value: 'theme-components', name: 'Theme & Components' },
   { value: 'roles', name: 'Manage Roles' },
   { value: 'project-sync', name: 'Project & Sync' },
   { value: 'back', name: 'Back to main menu' }

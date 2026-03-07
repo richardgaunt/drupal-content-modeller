@@ -7,8 +7,9 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { existsSync } from 'fs';
-import { generateOverrideComponentYml } from '../src/generators/componentGenerator.js';
-import { getComponentSubdirectories, createComponentOverride } from '../src/io/componentWriter.js';
+import { generateOverrideComponentYml, generateComponentYml } from '../src/generators/componentGenerator.js';
+import { getComponentSubdirectories, createComponentOverride, updateComponentYml } from '../src/io/componentWriter.js';
+import yaml from 'js-yaml';
 
 // --- Pure generator tests ---
 
@@ -63,6 +64,143 @@ describe('generateOverrideComponentYml', () => {
     const result = generateOverrideComponentYml({ name: 'Test' }, 'base:test');
     expect(result).toContain('$schema:');
     expect(result).toContain('metadata.schema.json');
+  });
+});
+
+describe('generateComponentYml', () => {
+  it('should generate full component YAML', () => {
+    const config = {
+      $schema: 'https://example.com/schema.json',
+      name: 'Card',
+      status: 'stable',
+      description: 'A card component',
+      props: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', title: 'Title' },
+          is_active: { type: 'boolean', title: 'Active' }
+        }
+      },
+      slots: {
+        content: { title: 'Content', description: 'Card content' }
+      }
+    };
+
+    const result = generateComponentYml(config);
+    expect(result).toContain('$schema:');
+    expect(result).toContain('name: Card');
+    expect(result).toContain('status: stable');
+    expect(result).toContain('description: A card component');
+    expect(result).toContain('props:');
+    expect(result).toContain('title:');
+    expect(result).toContain('slots:');
+    expect(result).toContain('content:');
+  });
+
+  it('should preserve replaces field', () => {
+    const config = {
+      name: 'Card',
+      replaces: 'base:card'
+    };
+
+    const result = generateComponentYml(config);
+    expect(result).toContain('replaces: base:card');
+  });
+
+  it('should omit empty fields', () => {
+    const config = { name: 'Simple' };
+
+    const result = generateComponentYml(config);
+    expect(result).toContain('name: Simple');
+    expect(result).not.toContain('props:');
+    expect(result).not.toContain('slots:');
+    expect(result).not.toContain('replaces:');
+  });
+
+  it('should handle nullable type arrays', () => {
+    const config = {
+      name: 'Test',
+      props: {
+        type: 'object',
+        properties: {
+          title: { type: ['string', 'null'], title: 'Title' }
+        }
+      }
+    };
+
+    const result = generateComponentYml(config);
+    const parsed = yaml.load(result);
+    expect(parsed.props.properties.title.type).toEqual(['string', 'null']);
+  });
+
+  it('should handle nested object properties', () => {
+    const config = {
+      name: 'Complex',
+      props: {
+        type: 'object',
+        properties: {
+          image: {
+            type: 'object',
+            title: 'Image',
+            properties: {
+              url: { type: 'string', title: 'URL' },
+              alt: { type: 'string', title: 'Alt' }
+            }
+          }
+        }
+      }
+    };
+
+    const result = generateComponentYml(config);
+    const parsed = yaml.load(result);
+    expect(parsed.props.properties.image.properties.url.type).toBe('string');
+    expect(parsed.props.properties.image.properties.alt.type).toBe('string');
+  });
+
+  it('should handle array with object items', () => {
+    const config = {
+      name: 'List',
+      props: {
+        type: 'object',
+        properties: {
+          links: {
+            type: 'array',
+            title: 'Links',
+            items: {
+              type: 'object',
+              properties: {
+                text: { type: 'string' },
+                url: { type: 'string' }
+              }
+            }
+          }
+        }
+      }
+    };
+
+    const result = generateComponentYml(config);
+    const parsed = yaml.load(result);
+    expect(parsed.props.properties.links.items.properties.text.type).toBe('string');
+  });
+
+  it('should handle enum values', () => {
+    const config = {
+      name: 'Themed',
+      props: {
+        type: 'object',
+        properties: {
+          theme: {
+            type: 'string',
+            title: 'Theme',
+            enum: ['light', 'dark']
+          }
+        }
+      }
+    };
+
+    const result = generateComponentYml(config);
+    const parsed = yaml.load(result);
+    expect(parsed.props.properties.theme.enum).toEqual(['light', 'dark']);
   });
 });
 
@@ -171,7 +309,7 @@ props:
     expect(files.some(f => f.endsWith('table.scss'))).toBe(true);
   });
 
-  it('should create override with empty files when copyFiles is false', async () => {
+  it('should create override with empty files when copyFiles false', async () => {
     const { directory, files } = await createComponentOverride({
       activeThemeDir,
       subdirectory: '01-atoms',
@@ -194,5 +332,89 @@ props:
 
     // Check returned files list
     expect(files).toHaveLength(3);
+  });
+});
+
+describe('updateComponentYml', () => {
+  let tmpDir;
+  let ymlPath;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'comp-update-'));
+    ymlPath = join(tmpDir, 'test.component.yml');
+    await writeFile(ymlPath, `name: Test
+status: stable
+props:
+  type: object
+  properties:
+    title:
+      type: string
+      title: Title
+`);
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true });
+  });
+
+  it('should write updated config to file', async () => {
+    const config = {
+      name: 'Test',
+      status: 'stable',
+      props: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', title: 'Title' },
+          theme: { type: 'string', title: 'Theme', enum: ['light', 'dark'] }
+        }
+      }
+    };
+
+    await updateComponentYml(ymlPath, config);
+
+    const content = await readFile(ymlPath, 'utf-8');
+    const parsed = yaml.load(content);
+    expect(parsed.props.properties.theme.enum).toEqual(['light', 'dark']);
+    expect(parsed.props.properties.title.type).toBe('string');
+  });
+
+  it('should add slots to a component without slots', async () => {
+    const config = {
+      name: 'Test',
+      status: 'stable',
+      props: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', title: 'Title' }
+        }
+      },
+      slots: {
+        content: { title: 'Content', description: 'Main content area' }
+      }
+    };
+
+    await updateComponentYml(ymlPath, config);
+
+    const content = await readFile(ymlPath, 'utf-8');
+    const parsed = yaml.load(content);
+    expect(parsed.slots.content.title).toBe('Content');
+  });
+
+  it('should handle nullable types', async () => {
+    const config = {
+      name: 'Test',
+      props: {
+        type: 'object',
+        properties: {
+          subtitle: { type: ['string', 'null'], title: 'Subtitle' }
+        }
+      }
+    };
+
+    await updateComponentYml(ymlPath, config);
+
+    const content = await readFile(ymlPath, 'utf-8');
+    const parsed = yaml.load(content);
+    expect(parsed.props.properties.subtitle.type).toEqual(['string', 'null']);
   });
 });

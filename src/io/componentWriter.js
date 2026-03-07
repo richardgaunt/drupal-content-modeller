@@ -6,7 +6,7 @@ import { readdir, readFile, writeFile, mkdir, copyFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import yaml from 'js-yaml';
-import { generateOverrideComponentYml } from '../generators/componentGenerator.js';
+import { generateOverrideComponentYml, generateComponentYml } from '../generators/componentGenerator.js';
 
 /**
  * Get the subdirectory names under a theme's components/ directory.
@@ -78,4 +78,15 @@ export async function createComponentOverride(options) {
   }
 
   return { directory: componentDir, files: createdFiles };
+}
+
+/**
+ * Read, update, and write back a component.yml file.
+ * @param {string} componentYmlPath - Absolute path to the component.yml file
+ * @param {object} updatedConfig - Updated config to write (full config object)
+ * @returns {Promise<void>}
+ */
+export async function updateComponentYml(componentYmlPath, updatedConfig) {
+  const ymlContent = generateComponentYml(updatedConfig);
+  await writeFile(componentYmlPath, ymlContent, 'utf-8');
 }

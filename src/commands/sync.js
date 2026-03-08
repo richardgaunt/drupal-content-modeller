@@ -3,7 +3,7 @@
  * Analyzes the config directory and updates the project's entity/field index.
  */
 
-import { parseConfigDirectory, checkRecommendedModules, enableModules } from '../io/configReader.js';
+import { parseConfigDirectory, checkRecommendedModules, enableModules, parseViewModes } from '../io/configReader.js';
 import { saveProject } from './project.js';
 import { RECOMMENDED_MODULES, RECOMMENDED_CORE_MODULES, RECOMMENDED_CONTRIB_MODULES } from '../parsers/configParser.js';
 import { validateProject } from '../utils/project.js';
@@ -36,8 +36,13 @@ export async function syncProject(project) {
     }
   }
 
-  // Update project with synced entities
+  // Parse view modes
+  const viewModes = await parseViewModes(project.configDirectory);
+  const viewModesFound = viewModes.length;
+
+  // Update project with synced entities and view modes
   project.entities = entities;
+  project.viewModes = viewModes;
   project.lastSync = new Date().toISOString();
 
   // Rebuild theme component registry if theme is configured
@@ -60,7 +65,8 @@ export async function syncProject(project) {
   return {
     bundlesFound,
     fieldsFound,
-    componentsFound
+    componentsFound,
+    viewModesFound
   };
 }
 

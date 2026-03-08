@@ -11,7 +11,11 @@ import { loadProject } from '../../commands/project.js';
 import { createTable } from '../../commands/list.js';
 import { getComponentSubdirectories, createComponentOverride, updateComponentYml, createNewComponent } from '../../io/componentWriter.js';
 import { readComponentDetail } from '../../io/componentReader.js';
-import { generateMachineName } from '../../utils/slug.js';
+import { generateMachineName, validateMachineName } from '../../utils/slug.js';
+import { writeViewMode, viewModeExists, deleteViewMode } from '../../io/configReader.js';
+import { generateViewMode } from '../../generators/viewModeGenerator.js';
+import { ENTITY_ORDER, getEntityTypeLabel, getEntityTypeSingularLabel } from '../../constants/entityTypes.js';
+import { getBundleThemeSuggestions, getFieldThemeSuggestions } from '../../utils/themeSuggestions.js';
 import {
   PROP_TYPES,
   isValidPropName,
@@ -1064,6 +1068,400 @@ async function handleCreateComponent(project) {
 }
 
 /**
+ * List all entity view modes
+ * @param {object} project - Project object
+ */
+function handleListViewModes(project) {
+  const viewModes = project.viewModes || [];
+
+  if (viewModes.length === 0) {
+    console.log(chalk.yellow('No entity view modes found. Run sync first.'));
+    return;
+  }
+
+  // Sort by entity type then label
+  const sorted = [...viewModes].sort((a, b) => {
+    const typeOrder = ENTITY_ORDER.indexOf(a.entityType) - ENTITY_ORDER.indexOf(b.entityType);
+    if (typeOrder !== 0) return typeOrder;
+    return (a.label || '').localeCompare(b.label || '');
+  });
+
+  const table = createTable(
+    [
+      { header: 'Entity Type', minWidth: 15, getValue: v => getEntityTypeLabel(v.entityType) },
+      { header: 'Name', minWidth: 20, getValue: v => v.label },
+      { header: 'Machine Name', minWidth: 25, getValue: v => v.viewModeName }
+    ],
+    sorted
+  );
+
+  console.log();
+  console.log(table);
+  console.log();
+  console.log(chalk.cyan(`Total: ${viewModes.length} view modes`));
+  console.log();
+}
+
+/**
+ * List view modes filtered by a selected entity type
+ * @param {object} project - Project object
+ */
+async function handleListViewModesByEntityType(project) {
+  const viewModes = project.viewModes || [];
+
+  if (viewModes.length === 0) {
+    console.log(chalk.yellow('No entity view modes found. Run sync first.'));
+    return;
+  }
+
+  // Only show entity types that have view modes
+  const typesWithModes = ENTITY_ORDER.filter(et =>
+    viewModes.some(v => v.entityType === et)
+  );
+
+  if (typesWithModes.length === 0) {
+    console.log(chalk.yellow('No entity view modes found.'));
+    return;
+  }
+
+  const entityType = await select({
+    message: 'Select entity type:',
+    choices: typesWithModes.map(et => {
+      const count = viewModes.filter(v => v.entityType === et).length;
+      return {
+        value: et,
+        name: `${getEntityTypeLabel(et)} (${count})`
+      };
+    })
+  });
+
+  const filtered = viewModes
+    .filter(v => v.entityType === entityType)
+    .sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+
+  const table = createTable(
+    [
+      { header: 'Name', minWidth: 20, getValue: v => v.label },
+      { header: 'Machine Name', minWidth: 25, getValue: v => v.viewModeName }
+    ],
+    filtered
+  );
+
+  console.log();
+  console.log(chalk.cyan(`${getEntityTypeLabel(entityType)} View Modes:`));
+  console.log(table);
+  console.log();
+  console.log(chalk.cyan(`Total: ${filtered.length} view modes`));
+  console.log();
+}
+
+/**
+ * Add a new entity view mode
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Updated project
+ */
+async function handleAddViewMode(project) {
+  // Select entity type
+  const entityType = await select({
+    message: 'Select entity type:',
+    choices: ENTITY_ORDER.map(et => ({
+      value: et,
+      name: getEntityTypeLabel(et)
+    }))
+  });
+
+  // Get label
+  const label = await input({
+    message: `${getEntityTypeSingularLabel(entityType)} view mode label:`,
+    validate: (value) => value.trim() ? true : 'Label is required'
+  });
+
+  // Get machine name
+  const suggestedName = generateMachineName(label);
+  const viewModeName = await input({
+    message: 'Machine name:',
+    default: suggestedName,
+    validate: (value) => {
+      if (!validateMachineName(value)) return 'Must be lowercase letters, numbers, and underscores';
+      if (viewModeExists(project.configDirectory, entityType, value)) {
+        return 'A view mode with this name already exists';
+      }
+      return true;
+    }
+  });
+
+  const description = await input({ message: 'Description (optional):' });
+
+  // Generate and write
+  const yamlContent = generateViewMode({
+    entityType,
+    viewModeName,
+    label,
+    description
+  });
+
+  await writeViewMode(project.configDirectory, entityType, viewModeName, yamlContent);
+
+  console.log();
+  console.log(chalk.green(`View mode "${label}" created for ${getEntityTypeSingularLabel(entityType)}.`));
+  console.log(chalk.cyan(`File: core.entity_view_mode.${entityType}.${viewModeName}.yml`));
+  console.log();
+
+  // Re-sync
+  try {
+    const result = await syncProject(project);
+    project = await loadProject(project.slug);
+    console.log(chalk.green('Sync complete!'));
+  } catch (error) {
+    console.log(chalk.yellow(`Sync warning: ${error.message}`));
+  }
+
+  return project;
+}
+
+/**
+ * Remove an entity view mode
+ * @param {object} project - Project object
+ * @returns {Promise<object>} - Updated project
+ */
+async function handleRemoveViewMode(project) {
+  const viewModes = project.viewModes || [];
+
+  if (viewModes.length === 0) {
+    console.log(chalk.yellow('No entity view modes found.'));
+    return project;
+  }
+
+  // Sort for display
+  const sorted = [...viewModes].sort((a, b) => {
+    const typeOrder = ENTITY_ORDER.indexOf(a.entityType) - ENTITY_ORDER.indexOf(b.entityType);
+    if (typeOrder !== 0) return typeOrder;
+    return (a.label || '').localeCompare(b.label || '');
+  });
+
+  const selectedId = await search({
+    message: 'Select view mode to remove:',
+    source: async (searchInput) => {
+      const term = (searchInput || '').toLowerCase();
+      return sorted
+        .filter(v =>
+          v.label.toLowerCase().includes(term) ||
+          v.viewModeName.toLowerCase().includes(term) ||
+          v.entityType.toLowerCase().includes(term)
+        )
+        .map(v => ({
+          value: v.id,
+          name: `${getEntityTypeLabel(v.entityType)} - ${v.label} (${v.viewModeName})`
+        }));
+    }
+  });
+
+  const selected = sorted.find(v => v.id === selectedId);
+  if (!selected) return project;
+
+  const shouldRemove = await confirm({
+    message: `Remove view mode "${selected.label}" (${selected.entityType}.${selected.viewModeName})?`,
+    default: false
+  });
+
+  if (!shouldRemove) return project;
+
+  const deleted = await deleteViewMode(project.configDirectory, selected.entityType, selected.viewModeName);
+
+  if (deleted) {
+    console.log();
+    console.log(chalk.green(`View mode "${selected.label}" removed.`));
+    console.log();
+
+    // Re-sync
+    try {
+      const result = await syncProject(project);
+      project = await loadProject(project.slug);
+      console.log(chalk.green('Sync complete!'));
+    } catch (error) {
+      console.log(chalk.yellow(`Sync warning: ${error.message}`));
+    }
+  } else {
+    console.log(chalk.red('Could not delete view mode file.'));
+  }
+
+  return project;
+}
+
+/**
+ * Helper to select an entity type that has bundles
+ * @param {object} project - Project object
+ * @param {string} message - Prompt message
+ * @returns {Promise<string|null>} - Selected entity type or null
+ */
+async function selectEntityTypeWithBundles(project, message) {
+  if (!project.entities) {
+    console.log(chalk.yellow('No entities found. Run sync first.'));
+    return null;
+  }
+
+  const typesWithBundles = ENTITY_ORDER.filter(et =>
+    project.entities[et] && Object.keys(project.entities[et]).length > 0
+  );
+
+  if (typesWithBundles.length === 0) {
+    console.log(chalk.yellow('No bundles found. Run sync first.'));
+    return null;
+  }
+
+  return select({
+    message,
+    choices: typesWithBundles.map(et => ({
+      value: et,
+      name: getEntityTypeLabel(et)
+    }))
+  });
+}
+
+/**
+ * Helper to select a bundle for a given entity type
+ * @param {object} project - Project object
+ * @param {string} entityType - Entity type
+ * @returns {Promise<string>} - Selected bundle machine name
+ */
+async function selectBundle(project, entityType) {
+  const bundles = Object.values(project.entities[entityType]);
+  return search({
+    message: `Select ${getEntityTypeSingularLabel(entityType)}:`,
+    source: async (input) => {
+      const term = (input || '').toLowerCase();
+      return bundles
+        .filter(b =>
+          b.id.toLowerCase().includes(term) ||
+          b.label.toLowerCase().includes(term)
+        )
+        .map(b => ({
+          value: b.id,
+          name: `${b.label} (${b.id})`
+        }));
+    }
+  });
+}
+
+/**
+ * Get the active theme machine name from the project
+ * @param {object} project - Project object
+ * @returns {string} - Theme machine name or 'mytheme' as fallback
+ */
+function getActiveThemeName(project) {
+  return project.theme?.themes?.[0]?.machine_name || 'mytheme';
+}
+
+/**
+ * Print theme suggestions as preprocess function names
+ * @param {string[]} suggestions - Array of theme suggestion strings
+ * @param {string} themeName - Active theme machine name
+ */
+function printThemeSuggestions(suggestions, themeName) {
+  console.log();
+  console.log(chalk.cyan('Preprocess functions (lowest to highest priority):'));
+  console.log();
+  for (const suggestion of suggestions) {
+    const twig = suggestion.replace(/__/g, '--') + '.html.twig';
+    console.log(chalk.white(`  ${themeName}_preprocess_${suggestion}()`));
+    console.log(chalk.gray(`  ${twig}`));
+    console.log();
+  }
+}
+
+/**
+ * Handle "List theme suggestions for bundle"
+ * @param {object} project - Project object
+ */
+async function handleBundleThemeSuggestions(project) {
+  const entityType = await selectEntityTypeWithBundles(project, 'Select entity type:');
+  if (!entityType) return;
+
+  const bundle = await selectBundle(project, entityType);
+
+  // Optionally select view mode
+  const viewModes = (project.viewModes || []).filter(v => v.entityType === entityType);
+  let viewMode = null;
+
+  if (viewModes.length > 0) {
+    const viewModeChoices = [
+      { value: '__none__', name: 'Default (no view mode)' },
+      ...viewModes.map(v => ({
+        value: v.viewModeName,
+        name: `${v.label} (${v.viewModeName})`
+      }))
+    ];
+
+    const selected = await select({
+      message: 'Select view mode:',
+      choices: viewModeChoices
+    });
+
+    if (selected !== '__none__') {
+      viewMode = selected;
+    }
+  }
+
+  const suggestions = getBundleThemeSuggestions(entityType, bundle, viewMode);
+  const themeName = getActiveThemeName(project);
+
+  const bundleData = project.entities[entityType][bundle];
+  console.log();
+  console.log(chalk.cyan(`Bundle: ${bundleData.label} (${entityType}.${bundle})`));
+  if (viewMode) {
+    console.log(chalk.cyan(`View Mode: ${viewMode}`));
+  }
+
+  printThemeSuggestions(suggestions, themeName);
+}
+
+/**
+ * Handle "List theme suggestions for field"
+ * @param {object} project - Project object
+ */
+async function handleFieldThemeSuggestions(project) {
+  const entityType = await selectEntityTypeWithBundles(project, 'Select entity type:');
+  if (!entityType) return;
+
+  const bundle = await selectBundle(project, entityType);
+
+  const bundleData = project.entities[entityType][bundle];
+  const fields = Object.values(bundleData.fields || {});
+
+  if (fields.length === 0) {
+    console.log(chalk.yellow('No fields found for this bundle.'));
+    return;
+  }
+
+  const fieldName = await search({
+    message: 'Select field:',
+    source: async (input) => {
+      const term = (input || '').toLowerCase();
+      return fields
+        .filter(f =>
+          f.name.toLowerCase().includes(term) ||
+          f.label.toLowerCase().includes(term)
+        )
+        .map(f => ({
+          value: f.name,
+          name: `${f.label} (${f.name}) [${f.type}]`
+        }));
+    }
+  });
+
+  const field = fields.find(f => f.name === fieldName);
+  const suggestions = getFieldThemeSuggestions(entityType, bundle, field.name, field.type);
+  const themeName = getActiveThemeName(project);
+
+  console.log();
+  console.log(chalk.cyan(`Field: ${field.label} (${field.name})`));
+  console.log(chalk.cyan(`Type: ${field.type}`));
+  console.log(chalk.cyan(`Bundle: ${entityType}.${bundle}`));
+
+  printThemeSuggestions(suggestions, themeName);
+}
+
+/**
  * Theme & Components submenu
  * @param {object} project - Project object
  * @returns {Promise<object>} - Updated project
@@ -1080,6 +1478,12 @@ export async function handleThemeMenu(project) {
     { value: 'list-components', name: 'List components' },
     { value: 'list-custom', name: 'List custom components' },
     { value: 'list-overridden', name: 'List overridden components' },
+    { value: 'list-view-modes', name: 'List entity view modes' },
+    { value: 'list-view-modes-by-type', name: 'List view modes by entity type' },
+    { value: 'add-view-mode', name: 'Add entity view mode' },
+    { value: 'remove-view-mode', name: 'Remove entity view mode' },
+    { value: 'bundle-suggestions', name: 'List theme suggestions for bundle' },
+    { value: 'field-suggestions', name: 'List theme suggestions for field' },
     { value: 'back', name: 'Back' }
   ];
 
@@ -1134,6 +1538,24 @@ export async function handleThemeMenu(project) {
             break;
           case 'override-component':
             project = await handleOverrideComponent(project);
+            break;
+          case 'list-view-modes':
+            handleListViewModes(project);
+            break;
+          case 'list-view-modes-by-type':
+            await handleListViewModesByEntityType(project);
+            break;
+          case 'add-view-mode':
+            project = await handleAddViewMode(project);
+            break;
+          case 'remove-view-mode':
+            project = await handleRemoveViewMode(project);
+            break;
+          case 'bundle-suggestions':
+            await handleBundleThemeSuggestions(project);
+            break;
+          case 'field-suggestions':
+            await handleFieldThemeSuggestions(project);
             break;
         }
       } catch (innerError) {

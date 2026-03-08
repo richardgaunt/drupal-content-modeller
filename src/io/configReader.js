@@ -30,6 +30,12 @@ import {
   isRoleFile,
   extractRoleIdFromFilename
 } from '../parsers/roleParser.js';
+import {
+  filterViewModeFiles,
+  extractViewModeFromFilename,
+  parseViewMode,
+  getViewModeFilename
+} from '../parsers/viewModeParser.js';
 
 /**
  * Parse bundle configs from a config directory
@@ -546,6 +552,103 @@ export async function writeRole(configPath, roleId, yamlContent) {
  */
 export async function deleteRoleFile(configPath, roleId) {
   const filePath = getRolePath(configPath, roleId);
+
+  if (!existsSync(filePath)) {
+    return false;
+  }
+
+  const { unlink } = await import('fs/promises');
+  await unlink(filePath);
+  return true;
+}
+
+// ============================================
+// View Mode Functions
+// ============================================
+
+/**
+ * Parse all entity view modes from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of view mode objects with entityType and viewModeName
+ */
+export async function parseViewModes(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const viewModeFiles = filterViewModeFiles(files);
+  const viewModes = [];
+
+  for (const filename of viewModeFiles) {
+    try {
+      const meta = extractViewModeFromFilename(filename);
+      if (!meta) continue;
+
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (!config) continue;
+
+      const parsed = parseViewMode(config);
+      if (parsed) {
+        viewModes.push({
+          ...parsed,
+          entityType: meta.entityType,
+          viewModeName: meta.viewModeName
+        });
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return viewModes;
+}
+
+/**
+ * Get the path to a view mode config file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} viewModeName - View mode machine name
+ * @returns {string} - Full file path
+ */
+export function getViewModePath(configPath, entityType, viewModeName) {
+  return join(configPath, getViewModeFilename(entityType, viewModeName));
+}
+
+/**
+ * Check if a view mode config file exists
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} viewModeName - View mode machine name
+ * @returns {boolean}
+ */
+export function viewModeExists(configPath, entityType, viewModeName) {
+  return existsSync(getViewModePath(configPath, entityType, viewModeName));
+}
+
+/**
+ * Write a view mode config file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} viewModeName - View mode machine name
+ * @param {string} yamlContent - YAML content
+ * @returns {Promise<void>}
+ */
+export async function writeViewMode(configPath, entityType, viewModeName, yamlContent) {
+  const filePath = getViewModePath(configPath, entityType, viewModeName);
+  await writeYamlFile(filePath, yamlContent);
+}
+
+/**
+ * Delete a view mode config file
+ * @param {string} configPath - Path to config directory
+ * @param {string} entityType - Entity type
+ * @param {string} viewModeName - View mode machine name
+ * @returns {Promise<boolean>} - True if deleted
+ */
+export async function deleteViewMode(configPath, entityType, viewModeName) {
+  const filePath = getViewModePath(configPath, entityType, viewModeName);
 
   if (!existsSync(filePath)) {
     return false;

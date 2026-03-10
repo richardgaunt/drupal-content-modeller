@@ -4,6 +4,7 @@
  */
 
 import { ENTITY_TYPES } from '../constants/entityTypes.js';
+import { FIELD_GROUP_FORMATS } from './formDisplayGenerator.js';
 
 const VALID_ENTITY_TYPES = Object.keys(ENTITY_TYPES);
 
@@ -19,6 +20,11 @@ const LINK_TYPES = ['internal', 'external', 'both'];
 const TITLE_OPTIONS = ['disabled', 'optional', 'required'];
 const CARDINALITY_OPTIONS = ['1', '-1', '2', '3', '4', '5'];
 const YES_NO = ['Yes', 'No'];
+const ITEM_TYPES = ['group', 'field', 'hidden'];
+const GROUP_FORMAT_TYPES = FIELD_GROUP_FORMATS.map(f => f.value);
+const COMPONENT_STATUSES = ['stable', 'experimental', 'deprecated', 'obsolete'];
+const PROP_SLOT_TYPES = ['prop', 'slot'];
+const PROP_DATA_TYPES = ['string', 'number', 'integer', 'boolean', 'array', 'object'];
 
 /**
  * Header style for worksheet headers
@@ -108,14 +114,57 @@ function formatTitleOption(title) {
 }
 
 /**
+ * Serialize format settings object to a semicolon-delimited string.
+ * Skips empty string values and 'classes'/'id' if empty.
+ * @param {object} settings - Format settings object
+ * @returns {string}
+ */
+export function serializeFormatSettings(settings) {
+  if (!settings || typeof settings !== 'object') return '';
+  const parts = [];
+  for (const [key, value] of Object.entries(settings)) {
+    if (value === '' || value === null || value === undefined) continue;
+    parts.push(`${key}=${value}`);
+  }
+  return parts.join('; ');
+}
+
+/**
+ * Parse a serialized format settings string back to an object.
+ * @param {string} str - Semicolon-delimited key=value string
+ * @returns {object}
+ */
+export function parseFormatSettings(str) {
+  if (!str || typeof str !== 'string' || str.trim() === '') return {};
+  const result = {};
+  for (const part of str.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = trimmed.substring(0, eqIndex).trim();
+    let value = trimmed.substring(eqIndex + 1).trim();
+    // Parse booleans and numbers
+    if (value === 'true') value = true;
+    else if (value === 'false') value = false;
+    else if (/^\d+$/.test(value)) value = parseInt(value, 10);
+    if (key) result[key] = value;
+  }
+  return result;
+}
+
+/**
  * Generate workbook structure from project data.
  * Returns an object describing sheets and their data, which the IO layer
  * uses to build the actual ExcelJS workbook.
  *
  * @param {object} project - Project object with entities
+ * @param {object} [options] - Optional pre-loaded data
+ * @param {object} [options.formDisplays] - Pre-loaded form displays keyed by "entityType:bundle"
+ * @param {object} [options.components] - Pre-loaded component details keyed by machine name
  * @returns {object} - Workbook descriptor
  */
-export function generateSpreadsheetData(project) {
+export function generateSpreadsheetData(project, options = {}) {
   const entities = project.entities || {};
   const bundles = [];
   const fields = [];
@@ -268,6 +317,118 @@ export function generateSpreadsheetData(project) {
     }
   }
 
+  // Build form display items from pre-loaded data
+  const formDisplayItems = [];
+  const formDisplays = options.formDisplays || {};
+
+  for (const entityType of VALID_ENTITY_TYPES) {
+    const typeBundles = entities[entityType] || {};
+    for (const bundleId of Object.keys(typeBundles)) {
+      const key = `${entityType}:${bundleId}`;
+      const fd = formDisplays[key];
+      if (!fd) continue;
+
+      // Add groups
+      for (const group of fd.groups || []) {
+        formDisplayItems.push({
+          'Entity Type': entityType,
+          'Bundle': bundleId,
+          'Item Name': group.name,
+          'Item Type': 'group',
+          'Label': group.label || '',
+          'Parent Group': group.parentName || '',
+          'Weight': group.weight ?? 0,
+          'Widget/Format Type': group.formatType || 'fieldset',
+          'Format Settings': serializeFormatSettings(group.formatSettings)
+        });
+      }
+
+      // Add fields
+      for (const field of fd.fields || []) {
+        const parentGroup = fd.groups
+          ? (fd.groups.find(g => (g.children || []).includes(field.name))?.name || '')
+          : '';
+        formDisplayItems.push({
+          'Entity Type': entityType,
+          'Bundle': bundleId,
+          'Item Name': field.name,
+          'Item Type': 'field',
+          'Label': '',
+          'Parent Group': parentGroup,
+          'Weight': field.weight ?? 0,
+          'Widget/Format Type': field.type || '',
+          'Format Settings': ''
+        });
+      }
+
+      // Add hidden fields
+      for (const hiddenName of fd.hidden || []) {
+        formDisplayItems.push({
+          'Entity Type': entityType,
+          'Bundle': bundleId,
+          'Item Name': hiddenName,
+          'Item Type': 'hidden',
+          'Label': '',
+          'Parent Group': '',
+          'Weight': 0,
+          'Widget/Format Type': '',
+          'Format Settings': ''
+        });
+      }
+    }
+  }
+
+  // Build components data from pre-loaded data
+  const componentItems = [];
+  const componentPropsSlots = [];
+  const components = options.components || {};
+
+  for (const [machineName, comp] of Object.entries(components)) {
+    componentItems.push({
+      'Machine Name': machineName,
+      'Name': comp.name || machineName,
+      'Description': comp.description || '',
+      'Status': comp.status || '',
+      'Replaces': comp.replaces || ''
+    });
+
+    // Props
+    const props = comp.props;
+    if (props && props.properties) {
+      const requiredSet = new Set(props.required || []);
+      for (const [propName, propDef] of Object.entries(props.properties)) {
+        componentPropsSlots.push({
+          'Component': machineName,
+          'Type': 'prop',
+          'Machine Name': propName,
+          'Title': propDef.title || '',
+          'Description': propDef.description || '',
+          'Data Type': propDef.type || '',
+          'Required': requiredSet.has(propName) ? 'Yes' : 'No',
+          'Default': propDef.default !== undefined ? String(propDef.default) : '',
+          'Enum Values': Array.isArray(propDef.enum) ? propDef.enum.join(', ') : ''
+        });
+      }
+    }
+
+    // Slots
+    if (comp.slots) {
+      for (const [slotName, slotDef] of Object.entries(comp.slots)) {
+        componentPropsSlots.push({
+          'Component': machineName,
+          'Type': 'slot',
+          'Machine Name': slotName,
+          'Title': slotDef?.title || '',
+          'Description': slotDef?.description || '',
+          'Data Type': '',
+          'Required': '',
+          'Default': '',
+          'Enum Values': ''
+        });
+      }
+    }
+  }
+
   return {
     bundles,
     fields,
@@ -278,7 +439,10 @@ export function generateSpreadsheetData(project) {
     entityRefTargets,
     linkSettings,
     imageSettings,
-    fileSettings
+    fileSettings,
+    formDisplayItems,
+    componentItems,
+    componentPropsSlots
   };
 }
 
@@ -286,10 +450,11 @@ export function generateSpreadsheetData(project) {
  * Build an ExcelJS workbook from project data.
  * @param {object} ExcelJS - The ExcelJS module (injected for testability)
  * @param {object} project - Project object with entities
+ * @param {object} [options] - Optional pre-loaded data (formDisplays, components)
  * @returns {object} - ExcelJS Workbook instance
  */
-export function buildWorkbook(ExcelJS, project) {
-  const data = generateSpreadsheetData(project);
+export function buildWorkbook(ExcelJS, project, options = {}) {
+  const data = generateSpreadsheetData(project, options);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Drupal Content Modeller';
   workbook.created = new Date();
@@ -428,7 +593,63 @@ export function buildWorkbook(ExcelJS, project) {
   for (const row of data.fileSettings) fileSheet.addRow(row);
   styleHeaders(fileSheet);
 
-  // 11. Data sheet (reference lists)
+  // 11. Form Display sheet
+  const formDisplaySheet = workbook.addWorksheet('Form Display');
+  formDisplaySheet.columns = [
+    { header: 'Entity Type', key: 'Entity Type', width: 20 },
+    { header: 'Bundle', key: 'Bundle', width: 25 },
+    { header: 'Item Name', key: 'Item Name', width: 30 },
+    { header: 'Item Type', key: 'Item Type', width: 12 },
+    { header: 'Label', key: 'Label', width: 25 },
+    { header: 'Parent Group', key: 'Parent Group', width: 25 },
+    { header: 'Weight', key: 'Weight', width: 10 },
+    { header: 'Widget/Format Type', key: 'Widget/Format Type', width: 35 },
+    { header: 'Format Settings', key: 'Format Settings', width: 50 }
+  ];
+  for (const row of data.formDisplayItems) {
+    formDisplaySheet.addRow(row);
+  }
+  styleHeaders(formDisplaySheet);
+  addDropdown(formDisplaySheet, 'A', VALID_ENTITY_TYPES);
+  addDropdown(formDisplaySheet, 'D', ITEM_TYPES);
+
+  // 12. Components sheet
+  const componentsSheet = workbook.addWorksheet('Components');
+  componentsSheet.columns = [
+    { header: 'Machine Name', key: 'Machine Name', width: 30 },
+    { header: 'Name', key: 'Name', width: 30 },
+    { header: 'Description', key: 'Description', width: 50 },
+    { header: 'Status', key: 'Status', width: 15 },
+    { header: 'Replaces', key: 'Replaces', width: 30 }
+  ];
+  for (const row of data.componentItems) {
+    componentsSheet.addRow(row);
+  }
+  styleHeaders(componentsSheet);
+  addDropdown(componentsSheet, 'D', COMPONENT_STATUSES);
+
+  // 13. Component Props & Slots sheet
+  const propsSheet = workbook.addWorksheet('Component Props & Slots');
+  propsSheet.columns = [
+    { header: 'Component', key: 'Component', width: 25 },
+    { header: 'Type', key: 'Type', width: 10 },
+    { header: 'Machine Name', key: 'Machine Name', width: 25 },
+    { header: 'Title', key: 'Title', width: 25 },
+    { header: 'Description', key: 'Description', width: 40 },
+    { header: 'Data Type', key: 'Data Type', width: 15 },
+    { header: 'Required', key: 'Required', width: 12 },
+    { header: 'Default', key: 'Default', width: 20 },
+    { header: 'Enum Values', key: 'Enum Values', width: 40 }
+  ];
+  for (const row of data.componentPropsSlots) {
+    propsSheet.addRow(row);
+  }
+  styleHeaders(propsSheet);
+  addDropdown(propsSheet, 'B', PROP_SLOT_TYPES);
+  addDropdown(propsSheet, 'F', PROP_DATA_TYPES);
+  addDropdown(propsSheet, 'G', YES_NO);
+
+  // 14. Data sheet (reference lists)
   const dataSheet = workbook.addWorksheet('Data');
   dataSheet.columns = [
     { header: 'Entity Types', key: 'entityTypes', width: 25 },
@@ -437,13 +658,19 @@ export function buildWorkbook(ExcelJS, project) {
     { header: 'Cardinality', key: 'cardinality', width: 14 },
     { header: 'DateTime Types', key: 'datetimeTypes', width: 16 },
     { header: 'Link Types', key: 'linkTypes', width: 14 },
-    { header: 'Title Options', key: 'titleOptions', width: 14 }
+    { header: 'Title Options', key: 'titleOptions', width: 14 },
+    { header: 'Item Types', key: 'itemTypes', width: 14 },
+    { header: 'Group Formats', key: 'groupFormats', width: 18 },
+    { header: 'Prop/Slot Types', key: 'propSlotTypes', width: 16 },
+    { header: 'Prop Data Types', key: 'propDataTypes', width: 16 },
+    { header: 'Component Statuses', key: 'componentStatuses', width: 18 }
   ];
 
   const maxRows = Math.max(
     VALID_ENTITY_TYPES.length, FIELD_TYPES.length, YES_NO.length,
     CARDINALITY_OPTIONS.length, DATETIME_TYPES.length, LINK_TYPES.length,
-    TITLE_OPTIONS.length
+    TITLE_OPTIONS.length, ITEM_TYPES.length, GROUP_FORMAT_TYPES.length,
+    PROP_SLOT_TYPES.length, PROP_DATA_TYPES.length, COMPONENT_STATUSES.length
   );
   for (let i = 0; i < maxRows; i++) {
     dataSheet.addRow({
@@ -453,7 +680,12 @@ export function buildWorkbook(ExcelJS, project) {
       cardinality: CARDINALITY_OPTIONS[i] || '',
       datetimeTypes: DATETIME_TYPES[i] || '',
       linkTypes: LINK_TYPES[i] || '',
-      titleOptions: TITLE_OPTIONS[i] || ''
+      titleOptions: TITLE_OPTIONS[i] || '',
+      itemTypes: ITEM_TYPES[i] || '',
+      groupFormats: GROUP_FORMAT_TYPES[i] || '',
+      propSlotTypes: PROP_SLOT_TYPES[i] || '',
+      propDataTypes: PROP_DATA_TYPES[i] || '',
+      componentStatuses: COMPONENT_STATUSES[i] || ''
     });
   }
   styleHeaders(dataSheet);

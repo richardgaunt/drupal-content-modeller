@@ -11,7 +11,8 @@ import {
   importSpreadsheet,
   exportSpreadsheet,
   executeDeletions,
-  executeCreations
+  executeCreations,
+  applyFormDisplays
 } from '../../commands/spreadsheet.js';
 import { getReportsDir } from '../../io/fileSystem.js';
 import {
@@ -70,7 +71,7 @@ export async function cmdImportSpreadsheet(options) {
       throw new Error('Project has not been synced. Run "dcm project sync" first.');
     }
 
-    const { parseErrors, diff, data } = await importSpreadsheet(project, options.file);
+    const { parseErrors, diff, data, formDisplayData } = await importSpreadsheet(project, options.file);
 
     if (parseErrors && parseErrors.length > 0) {
       console.log(chalk.yellow('\nParse warnings:'));
@@ -144,12 +145,19 @@ export async function cmdImportSpreadsheet(options) {
       creationResult = await executeCreations(project, data, diff.toCreate);
     }
 
+    // Apply form display changes
+    let formDisplayResult = { saved: [], errors: [] };
+    if (formDisplayData) {
+      formDisplayResult = await applyFormDisplays(project, formDisplayData);
+    }
+
     if (options.json) {
       output({
         success: true,
         created: creationResult.created,
         deleted: deletionResult.deleted,
-        errors: [...deletionResult.errors, ...creationResult.errors]
+        formDisplays: formDisplayResult.saved,
+        errors: [...deletionResult.errors, ...creationResult.errors, ...formDisplayResult.errors]
       }, true);
     } else {
       console.log(chalk.green('\nSync complete!'));
@@ -165,8 +173,11 @@ export async function cmdImportSpreadsheet(options) {
         if (cBundles > 0) console.log(chalk.cyan(`  Bundles created: ${cBundles}`));
         if (cFields > 0) console.log(chalk.cyan(`  Fields created:  ${cFields}`));
       }
+      if (formDisplayResult.saved.length > 0) {
+        console.log(chalk.cyan(`  Form displays updated: ${formDisplayResult.saved.length}`));
+      }
 
-      const allErrors = [...deletionResult.errors, ...creationResult.errors];
+      const allErrors = [...deletionResult.errors, ...creationResult.errors, ...formDisplayResult.errors];
       if (allErrors.length > 0) {
         console.log(chalk.red(`\n  Errors: ${allErrors.length}`));
         for (const err of allErrors) {

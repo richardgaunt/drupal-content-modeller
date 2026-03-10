@@ -6,12 +6,14 @@ import {
   parseAllowedValues,
   parseSpreadsheet,
   resolveFieldSettings,
-  findSharedFields
+  findSharedFields,
+  parseFormDisplaySheet
 } from '../src/parsers/spreadsheetParser.js';
 
 import {
   generateSpreadsheetData,
-  buildWorkbook
+  serializeFormatSettings,
+  parseFormatSettings
 } from '../src/generators/spreadsheetGenerator.js';
 
 import {
@@ -379,13 +381,190 @@ describe('Spreadsheet Parser', () => {
             'Field Name': 'field_n_body', 'Label': 'Body',
             'Field Type': 'text_long', 'Required': 'No', 'Cardinality': ''
           }
+        ],
+        'Entity Reference Settings': [
+          { 'Field Name': 'field_n_tags', 'Target Type': 'taxonomy_term' }
+        ],
+        'Entity Reference Targets': [
+          { 'Field Name': 'field_n_tags', 'Target Bundle': 'tags' }
         ]
       };
 
       const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(0);
       const fields = result.data.entityTypes[0].bundles[0].fields;
       expect(fields[0].cardinality).toBe(-1);
       expect(fields[1].cardinality).toBe(1); // Default
+    });
+
+    test('rejects list_string field with no List Settings entry', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_color', 'Label': 'Color',
+            'Field Type': 'list_string', 'Required': 'No', 'Cardinality': '1'
+          }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('list_string');
+      expect(result.errors[0]).toContain('field_n_color');
+      expect(result.errors[0]).toContain('List Settings');
+      // Field should be skipped
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('rejects list_integer field with no List Settings entry', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_count', 'Label': 'Count',
+            'Field Type': 'list_integer', 'Required': 'No', 'Cardinality': '1'
+          }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('list_integer');
+      expect(result.errors[0]).toContain('List Settings');
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('rejects datetime field with no DateTime Settings entry', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_date', 'Label': 'Date',
+            'Field Type': 'datetime', 'Required': 'No', 'Cardinality': '1'
+          }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('datetime');
+      expect(result.errors[0]).toContain('DateTime Settings');
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('rejects entity_reference field with no settings', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_ref', 'Label': 'Reference',
+            'Field Type': 'entity_reference', 'Required': 'No', 'Cardinality': '1'
+          }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(2);
+      expect(result.errors[0]).toContain('Entity Reference Settings');
+      expect(result.errors[1]).toContain('Entity Reference Targets');
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('rejects entity_reference with target type but no target bundles', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_ref', 'Label': 'Reference',
+            'Field Type': 'entity_reference', 'Required': 'No', 'Cardinality': '1'
+          }
+        ],
+        'Entity Reference Settings': [
+          { 'Field Name': 'field_n_ref', 'Target Type': 'node' }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('Entity Reference Targets');
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('rejects entity_reference_revisions field with no target bundles', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_paras', 'Label': 'Paragraphs',
+            'Field Type': 'entity_reference_revisions', 'Required': 'No', 'Cardinality': '-1'
+          }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('entity_reference_revisions');
+      expect(result.errors[0]).toContain('Entity Reference Targets');
+      expect(result.data.entityTypes[0].bundles[0].fields).toHaveLength(0);
+    });
+
+    test('does not reject when all required settings are present', () => {
+      const sheets = {
+        'Bundles': [
+          { 'Entity Type': 'node', 'Machine Name': 'article', 'Label': 'Article' }
+        ],
+        'Fields': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_color', 'Label': 'Color',
+            'Field Type': 'list_string', 'Required': 'No', 'Cardinality': '1'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_date', 'Label': 'Date',
+            'Field Type': 'datetime', 'Required': 'No', 'Cardinality': '1'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Field Name': 'field_n_ref', 'Label': 'Ref',
+            'Field Type': 'entity_reference', 'Required': 'No', 'Cardinality': '1'
+          }
+        ],
+        'List Settings': [
+          { 'Field Name': 'field_n_color', 'Allowed Values': 'red|Red, blue|Blue' }
+        ],
+        'DateTime Settings': [
+          { 'Field Name': 'field_n_date', 'DateTime Type': 'date' }
+        ],
+        'Entity Reference Settings': [
+          { 'Field Name': 'field_n_ref', 'Target Type': 'node' }
+        ],
+        'Entity Reference Targets': [
+          { 'Field Name': 'field_n_ref', 'Target Bundle': 'page' }
+        ]
+      };
+
+      const result = parseSpreadsheet(sheets);
+      expect(result.errors).toHaveLength(0);
     });
   });
 
@@ -1298,5 +1477,448 @@ describe('Roundtrip: generate → parse', () => {
       { value: 'red', label: 'Red' },
       { value: 'blue', label: 'Blue' }
     ]);
+  });
+});
+
+describe('Phase 2: Format Settings Serialization', () => {
+  describe('serializeFormatSettings', () => {
+    test('serializes object to semicolon-delimited string', () => {
+      const result = serializeFormatSettings({ direction: 'horizontal', open: false });
+      expect(result).toBe('direction=horizontal; open=false');
+    });
+
+    test('skips empty string values', () => {
+      const result = serializeFormatSettings({ classes: '', direction: 'horizontal', id: '' });
+      expect(result).toBe('direction=horizontal');
+    });
+
+    test('returns empty string for null/undefined', () => {
+      expect(serializeFormatSettings(null)).toBe('');
+      expect(serializeFormatSettings(undefined)).toBe('');
+    });
+
+    test('returns empty string for empty object', () => {
+      expect(serializeFormatSettings({})).toBe('');
+    });
+
+    test('handles boolean and number values', () => {
+      const result = serializeFormatSettings({ required_fields: true, weight: 5 });
+      expect(result).toBe('required_fields=true; weight=5');
+    });
+  });
+
+  describe('parseFormatSettings', () => {
+    test('parses semicolon-delimited string to object', () => {
+      const result = parseFormatSettings('direction=horizontal; open=false');
+      expect(result).toEqual({ direction: 'horizontal', open: false });
+    });
+
+    test('parses boolean values', () => {
+      const result = parseFormatSettings('required_fields=true; show_empty_fields=false');
+      expect(result).toEqual({ required_fields: true, show_empty_fields: false });
+    });
+
+    test('parses integer values', () => {
+      const result = parseFormatSettings('weight=5');
+      expect(result).toEqual({ weight: 5 });
+    });
+
+    test('returns empty object for empty string', () => {
+      expect(parseFormatSettings('')).toEqual({});
+      expect(parseFormatSettings(null)).toEqual({});
+    });
+
+    test('roundtrips correctly', () => {
+      const original = { direction: 'horizontal', required_fields: true };
+      const serialized = serializeFormatSettings(original);
+      const parsed = parseFormatSettings(serialized);
+      expect(parsed).toEqual(original);
+    });
+  });
+});
+
+describe('Phase 2: Form Display Sheet', () => {
+  describe('generateSpreadsheetData with form displays', () => {
+    test('generates form display items from pre-loaded data', () => {
+      const project = {
+        entities: {
+          node: {
+            article: {
+              id: 'article',
+              label: 'Article',
+              fields: { field_n_body: { type: 'text_long', label: 'Body' } }
+            }
+          },
+          media: {}, paragraph: {}, taxonomy_term: {}, block_content: {}
+        }
+      };
+
+      const options = {
+        formDisplays: {
+          'node:article': {
+            entityType: 'node',
+            bundle: 'article',
+            groups: [
+              {
+                name: 'group_content',
+                label: 'Content',
+                parentName: '',
+                weight: 0,
+                formatType: 'tabs',
+                formatSettings: { direction: 'horizontal' },
+                children: ['group_main']
+              },
+              {
+                name: 'group_main',
+                label: 'Main',
+                parentName: 'group_content',
+                weight: 1,
+                formatType: 'tab',
+                formatSettings: { formatter: 'closed' },
+                children: ['field_n_body']
+              }
+            ],
+            fields: [
+              { name: 'field_n_body', type: 'text_textarea', weight: 2, settings: {} }
+            ],
+            hidden: ['promote']
+          }
+        }
+      };
+
+      const data = generateSpreadsheetData(project, options);
+      expect(data.formDisplayItems).toHaveLength(4); // 2 groups + 1 field + 1 hidden
+
+      const groups = data.formDisplayItems.filter(i => i['Item Type'] === 'group');
+      expect(groups).toHaveLength(2);
+      expect(groups[0]['Item Name']).toBe('group_content');
+      expect(groups[0]['Widget/Format Type']).toBe('tabs');
+      expect(groups[0]['Format Settings']).toBe('direction=horizontal');
+
+      const fields = data.formDisplayItems.filter(i => i['Item Type'] === 'field');
+      expect(fields).toHaveLength(1);
+      expect(fields[0]['Item Name']).toBe('field_n_body');
+      expect(fields[0]['Widget/Format Type']).toBe('text_textarea');
+      expect(fields[0]['Parent Group']).toBe('group_main');
+
+      const hidden = data.formDisplayItems.filter(i => i['Item Type'] === 'hidden');
+      expect(hidden).toHaveLength(1);
+      expect(hidden[0]['Item Name']).toBe('promote');
+    });
+
+    test('generates empty form display items when no form displays provided', () => {
+      const project = {
+        entities: {
+          node: {
+            article: { id: 'article', label: 'Article', fields: {} }
+          },
+          media: {}, paragraph: {}, taxonomy_term: {}, block_content: {}
+        }
+      };
+
+      const data = generateSpreadsheetData(project);
+      expect(data.formDisplayItems).toHaveLength(0);
+    });
+  });
+
+  describe('parseFormDisplaySheet', () => {
+    test('parses groups, fields, and hidden items', () => {
+      const sheets = {
+        'Form Display': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'group_content', 'Item Type': 'group',
+            'Label': 'Content', 'Parent Group': '',
+            'Weight': '0', 'Widget/Format Type': 'tabs',
+            'Format Settings': 'direction=horizontal'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'group_main', 'Item Type': 'group',
+            'Label': 'Main', 'Parent Group': 'group_content',
+            'Weight': '1', 'Widget/Format Type': 'tab',
+            'Format Settings': 'formatter=closed'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'field_n_body', 'Item Type': 'field',
+            'Label': '', 'Parent Group': 'group_main',
+            'Weight': '2', 'Widget/Format Type': 'text_textarea',
+            'Format Settings': ''
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'promote', 'Item Type': 'hidden',
+            'Label': '', 'Parent Group': '',
+            'Weight': '0', 'Widget/Format Type': '',
+            'Format Settings': ''
+          }
+        ]
+      };
+
+      const { formDisplays, errors } = parseFormDisplaySheet(sheets);
+      expect(errors).toHaveLength(0);
+
+      const fd = formDisplays['node:article'];
+      expect(fd).toBeDefined();
+      expect(fd.entityType).toBe('node');
+      expect(fd.bundle).toBe('article');
+
+      // Groups
+      expect(fd.groups).toHaveLength(2);
+      expect(fd.groups[0].name).toBe('group_content');
+      expect(fd.groups[0].formatType).toBe('tabs');
+      expect(fd.groups[0].formatSettings).toEqual({ direction: 'horizontal' });
+      expect(fd.groups[0].children).toContain('group_main');
+
+      expect(fd.groups[1].name).toBe('group_main');
+      expect(fd.groups[1].parentName).toBe('group_content');
+      expect(fd.groups[1].children).toContain('field_n_body');
+
+      // Fields
+      expect(fd.fields).toHaveLength(1);
+      expect(fd.fields[0].name).toBe('field_n_body');
+      expect(fd.fields[0].type).toBe('text_textarea');
+      expect(fd.fields[0].weight).toBe(2);
+
+      // Hidden
+      expect(fd.hidden).toEqual(['promote']);
+    });
+
+    test('returns errors for invalid rows', () => {
+      const sheets = {
+        'Form Display': [
+          {
+            'Entity Type': '', 'Bundle': 'article',
+            'Item Name': 'field_n_body', 'Item Type': 'field'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'field_n_body', 'Item Type': 'invalid'
+          }
+        ]
+      };
+
+      const { errors } = parseFormDisplaySheet(sheets);
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toContain('missing Entity Type');
+      expect(errors[1]).toContain('invalid Item Type');
+    });
+
+    test('handles empty Form Display sheet', () => {
+      const { formDisplays, errors } = parseFormDisplaySheet({});
+      expect(errors).toHaveLength(0);
+      expect(Object.keys(formDisplays)).toHaveLength(0);
+    });
+
+    test('handles multiple bundles in same sheet', () => {
+      const sheets = {
+        'Form Display': [
+          {
+            'Entity Type': 'node', 'Bundle': 'article',
+            'Item Name': 'field_n_body', 'Item Type': 'field',
+            'Weight': '0', 'Widget/Format Type': 'text_textarea'
+          },
+          {
+            'Entity Type': 'node', 'Bundle': 'page',
+            'Item Name': 'field_n_title', 'Item Type': 'field',
+            'Weight': '0', 'Widget/Format Type': 'string_textfield'
+          }
+        ]
+      };
+
+      const { formDisplays, errors } = parseFormDisplaySheet(sheets);
+      expect(errors).toHaveLength(0);
+      expect(Object.keys(formDisplays)).toHaveLength(2);
+      expect(formDisplays['node:article']).toBeDefined();
+      expect(formDisplays['node:page']).toBeDefined();
+    });
+  });
+});
+
+describe('Phase 2: Components & Props/Slots Sheets', () => {
+  describe('generateSpreadsheetData with components', () => {
+    test('generates component items from pre-loaded data', () => {
+      const project = {
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+
+      const options = {
+        components: {
+          'card': {
+            name: 'Card',
+            machine_name: 'card',
+            description: 'A card component',
+            status: 'stable',
+            replaces: null,
+            props: {
+              type: 'object',
+              properties: {
+                title: { type: 'string', title: 'Title', description: 'Card title' },
+                variant: {
+                  type: 'string',
+                  title: 'Variant',
+                  enum: ['default', 'large', 'small'],
+                  default: 'default'
+                }
+              },
+              required: ['title']
+            },
+            slots: {
+              content: { title: 'Content', description: 'Main content area' }
+            }
+          }
+        }
+      };
+
+      const data = generateSpreadsheetData(project, options);
+
+      // Components sheet
+      expect(data.componentItems).toHaveLength(1);
+      expect(data.componentItems[0]['Machine Name']).toBe('card');
+      expect(data.componentItems[0]['Name']).toBe('Card');
+      expect(data.componentItems[0]['Status']).toBe('stable');
+
+      // Props & Slots sheet
+      expect(data.componentPropsSlots).toHaveLength(3); // 2 props + 1 slot
+
+      const props = data.componentPropsSlots.filter(i => i['Type'] === 'prop');
+      expect(props).toHaveLength(2);
+
+      const titleProp = props.find(p => p['Machine Name'] === 'title');
+      expect(titleProp['Data Type']).toBe('string');
+      expect(titleProp['Required']).toBe('Yes');
+
+      const variantProp = props.find(p => p['Machine Name'] === 'variant');
+      expect(variantProp['Default']).toBe('default');
+      expect(variantProp['Enum Values']).toBe('default, large, small');
+
+      const slots = data.componentPropsSlots.filter(i => i['Type'] === 'slot');
+      expect(slots).toHaveLength(1);
+      expect(slots[0]['Machine Name']).toBe('content');
+      expect(slots[0]['Title']).toBe('Content');
+    });
+
+    test('generates empty component data when no components provided', () => {
+      const project = {
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+
+      const data = generateSpreadsheetData(project);
+      expect(data.componentItems).toHaveLength(0);
+      expect(data.componentPropsSlots).toHaveLength(0);
+    });
+
+    test('handles component without props or slots', () => {
+      const project = {
+        entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {}, block_content: {} }
+      };
+
+      const options = {
+        components: {
+          'separator': {
+            name: 'Separator',
+            machine_name: 'separator',
+            description: 'A horizontal line',
+            status: 'stable'
+          }
+        }
+      };
+
+      const data = generateSpreadsheetData(project, options);
+      expect(data.componentItems).toHaveLength(1);
+      expect(data.componentPropsSlots).toHaveLength(0);
+    });
+  });
+});
+
+describe('Phase 2: Form Display Roundtrip', () => {
+  test('form display data survives generate → parse roundtrip', () => {
+    const project = {
+      entities: {
+        node: {
+          article: {
+            id: 'article',
+            label: 'Article',
+            fields: { field_n_body: { type: 'text_long', label: 'Body' } }
+          }
+        },
+        media: {}, paragraph: {}, taxonomy_term: {}, block_content: {}
+      }
+    };
+
+    const options = {
+      formDisplays: {
+        'node:article': {
+          entityType: 'node',
+          bundle: 'article',
+          groups: [
+            {
+              name: 'group_tabs',
+              label: 'Tabs',
+              parentName: '',
+              weight: 0,
+              formatType: 'tabs',
+              formatSettings: { direction: 'horizontal' },
+              children: ['group_main', 'group_sidebar']
+            },
+            {
+              name: 'group_main',
+              label: 'Main',
+              parentName: 'group_tabs',
+              weight: 1,
+              formatType: 'tab',
+              formatSettings: { formatter: 'closed' },
+              children: ['field_n_body']
+            },
+            {
+              name: 'group_sidebar',
+              label: 'Sidebar',
+              parentName: 'group_tabs',
+              weight: 2,
+              formatType: 'tab',
+              formatSettings: { formatter: 'closed' },
+              children: []
+            }
+          ],
+          fields: [
+            { name: 'field_n_body', type: 'text_textarea', weight: 3, settings: {} }
+          ],
+          hidden: ['promote', 'sticky']
+        }
+      }
+    };
+
+    // Generate
+    const data = generateSpreadsheetData(project, options);
+
+    // Parse back
+    const sheets = { 'Form Display': data.formDisplayItems };
+    const { formDisplays, errors } = parseFormDisplaySheet(sheets);
+
+    expect(errors).toHaveLength(0);
+
+    const fd = formDisplays['node:article'];
+    expect(fd).toBeDefined();
+
+    // Groups roundtrip
+    expect(fd.groups).toHaveLength(3);
+    const tabsGroup = fd.groups.find(g => g.name === 'group_tabs');
+    expect(tabsGroup.formatType).toBe('tabs');
+    expect(tabsGroup.formatSettings.direction).toBe('horizontal');
+    expect(tabsGroup.children).toContain('group_main');
+    expect(tabsGroup.children).toContain('group_sidebar');
+
+    const mainGroup = fd.groups.find(g => g.name === 'group_main');
+    expect(mainGroup.parentName).toBe('group_tabs');
+    expect(mainGroup.children).toContain('field_n_body');
+
+    // Fields roundtrip
+    expect(fd.fields).toHaveLength(1);
+    expect(fd.fields[0].name).toBe('field_n_body');
+    expect(fd.fields[0].type).toBe('text_textarea');
+
+    // Hidden roundtrip
+    expect(fd.hidden).toEqual(['promote', 'sticky']);
   });
 });

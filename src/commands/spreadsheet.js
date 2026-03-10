@@ -6,7 +6,7 @@
 import { join } from 'path';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { readSpreadsheet, writeSpreadsheet } from '../io/spreadsheetIO.js';
-import { parseSpreadsheet } from '../parsers/spreadsheetParser.js';
+import { parseSpreadsheet, parseFormDisplaySheet } from '../parsers/spreadsheetParser.js';
 import {
   validateReportData,
   translateFieldSettings
@@ -640,16 +640,94 @@ export async function importSpreadsheet(project, filePath) {
   // Build diff
   const diff = buildSyncDiff(project, data);
 
-  return { parseErrors, diff, data };
+  // Parse form display sheet if present
+  let formDisplayData = null;
+  if (sheets['Form Display'] && sheets['Form Display'].length > 0) {
+    const { formDisplays, errors: fdErrors } = parseFormDisplaySheet(sheets);
+    if (fdErrors.length > 0) {
+      parseErrors.push(...fdErrors);
+    }
+    if (Object.keys(formDisplays).length > 0) {
+      formDisplayData = formDisplays;
+    }
+  }
+
+  return { parseErrors, diff, data, formDisplayData };
+}
+
+/**
+ * Apply form display changes from spreadsheet import.
+ *
+ * @param {object} project - Project object
+ * @param {object} formDisplayData - Form displays keyed by "entityType:bundle"
+ * @returns {Promise<{saved: string[], errors: Array}>}
+ */
+export async function applyFormDisplays(project, formDisplayData) {
+  const { saveFormDisplay } = await import('./formDisplay.js');
+  const saved = [];
+  const errors = [];
+
+  for (const [key, fd] of Object.entries(formDisplayData)) {
+    try {
+      await saveFormDisplay(project, fd);
+      saved.push(key);
+    } catch (error) {
+      errors.push({ key, message: error.message });
+    }
+  }
+
+  return { saved, errors };
 }
 
 /**
  * Export project to xlsx spreadsheet.
+ * Pre-loads form displays and component details for inclusion in the export.
  *
  * @param {object} project - Project object
  * @param {string} filePath - Output file path
  * @returns {Promise<void>}
  */
 export async function exportSpreadsheet(project, filePath) {
-  await writeSpreadsheet(filePath, project);
+  const options = {};
+  const entities = project.entities || {};
+
+  // Pre-load form displays for all bundles
+  try {
+    const { loadFormDisplay } = await import('./formDisplay.js');
+    const formDisplays = {};
+    for (const [entityType, bundles] of Object.entries(entities)) {
+      for (const bundleId of Object.keys(bundles)) {
+        const fd = await loadFormDisplay(project, entityType, bundleId);
+        if (fd) {
+          formDisplays[`${entityType}:${bundleId}`] = fd;
+        }
+      }
+    }
+    options.formDisplays = formDisplays;
+  } catch {
+    // Form display loading is optional — skip if unavailable
+  }
+
+  // Pre-load component details if theme is configured
+  try {
+    const themes = project.theme?.themes || [];
+    if (themes.length > 0) {
+      const { findComponentFiles, readComponentDetail } = await import('../io/componentReader.js');
+      const components = {};
+      for (const theme of themes) {
+        const themeDir = theme.path || theme.directory;
+        if (!themeDir) continue;
+        const files = await findComponentFiles(themeDir);
+        for (const filePath of files) {
+          const detail = await readComponentDetail(filePath);
+          components[detail.machine_name] = detail;
+        }
+      }
+      options.components = components;
+    }
+  } catch {
+    // Component loading is optional — skip if unavailable
+  }
+
+  await writeSpreadsheet(filePath, project, options);
 }

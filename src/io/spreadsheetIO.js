@@ -72,9 +72,10 @@ export async function readSpreadsheet(filePath) {
  *
  * @param {string} filePath - Output file path
  * @param {object} project - Project object with entities
+ * @param {object} [options] - Optional pre-loaded data (formDisplays, components)
  * @returns {Promise<void>}
  */
-export async function writeSpreadsheet(filePath, project) {
-  const workbook = buildWorkbook(ExcelJS, project);
+export async function writeSpreadsheet(filePath, project, options = {}) {
+  const workbook = buildWorkbook(ExcelJS, project, options);
   await workbook.xlsx.writeFile(filePath);
 }

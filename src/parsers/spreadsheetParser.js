@@ -330,6 +330,43 @@ export function parseSpreadsheet(sheets) {
 
     const settings = resolveFieldSettings(fieldType, fieldName, settingsSheets);
 
+    // Validate required settings per field type — missing settings are blocking
+    let settingsValid = true;
+    switch (fieldType) {
+      case 'list_string':
+      case 'list_integer':
+        if (!settings.allowed_values || settings.allowed_values.length === 0) {
+          errors.push(`Fields row ${i + 2}: ${fieldType} field "${fieldName}" requires allowed values in List Settings sheet`);
+          settingsValid = false;
+        }
+        break;
+      case 'datetime':
+      case 'daterange':
+        if (!settings.datetime_type) {
+          errors.push(`Fields row ${i + 2}: ${fieldType} field "${fieldName}" requires a datetime type in DateTime Settings sheet`);
+          settingsValid = false;
+        }
+        break;
+      case 'entity_reference':
+        if (!settings.target_type) {
+          errors.push(`Fields row ${i + 2}: entity_reference field "${fieldName}" requires a target type in Entity Reference Settings sheet`);
+          settingsValid = false;
+        }
+        if (!settings.handler_settings?.target_bundles || Object.keys(settings.handler_settings.target_bundles).length === 0) {
+          errors.push(`Fields row ${i + 2}: entity_reference field "${fieldName}" requires at least one target bundle in Entity Reference Targets sheet`);
+          settingsValid = false;
+        }
+        break;
+      case 'entity_reference_revisions':
+        if (!settings.handler_settings?.target_bundles || Object.keys(settings.handler_settings.target_bundles).length === 0) {
+          errors.push(`Fields row ${i + 2}: entity_reference_revisions field "${fieldName}" requires at least one target bundle in Entity Reference Targets sheet`);
+          settingsValid = false;
+        }
+        break;
+    }
+
+    if (!settingsValid) continue;
+
     bundleMap.get(bundle).fields.push({
       name: fieldName,
       type: fieldType,
@@ -349,6 +386,131 @@ export function parseSpreadsheet(sheets) {
   }
 
   return { data: { entityTypes }, errors };
+}
+
+/**
+ * Parse the Form Display sheet into structured form display objects.
+ * Returns one form display object per entityType:bundle combination.
+ *
+ * @param {object} sheets - Object keyed by sheet name
+ * @returns {{formDisplays: Object<string, object>, errors: string[]}}
+ */
+export function parseFormDisplaySheet(sheets) {
+  const rows = sheets['Form Display'] || [];
+  const errors = [];
+  const formDisplays = {};
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const entityType = cell(row['Entity Type']);
+    const bundle = cell(row['Bundle']);
+    const itemName = cell(row['Item Name']);
+    const itemType = cell(row['Item Type']).toLowerCase();
+
+    if (!entityType || !bundle || !itemName) {
+      errors.push(`Form Display row ${i + 2}: missing Entity Type, Bundle, or Item Name`);
+      continue;
+    }
+
+    if (!['group', 'field', 'hidden'].includes(itemType)) {
+      errors.push(`Form Display row ${i + 2}: invalid Item Type "${itemType}" (must be group, field, or hidden)`);
+      continue;
+    }
+
+    const key = `${entityType}:${bundle}`;
+    if (!formDisplays[key]) {
+      formDisplays[key] = {
+        entityType,
+        bundle,
+        mode: 'default',
+        groups: [],
+        fields: [],
+        hidden: []
+      };
+    }
+
+    const fd = formDisplays[key];
+
+    if (itemType === 'group') {
+      const label = cell(row['Label']);
+      const parentName = cell(row['Parent Group']);
+      const weight = parseInt(cell(row['Weight']), 10) || 0;
+      const formatType = cell(row['Widget/Format Type']) || 'fieldset';
+      const formatSettingsStr = cell(row['Format Settings']);
+
+      // Import parseFormatSettings from generator
+      const formatSettings = {};
+      if (formatSettingsStr) {
+        for (const part of formatSettingsStr.split(';')) {
+          const trimmed = part.trim();
+          if (!trimmed) continue;
+          const eqIndex = trimmed.indexOf('=');
+          if (eqIndex === -1) continue;
+          const k = trimmed.substring(0, eqIndex).trim();
+          let v = trimmed.substring(eqIndex + 1).trim();
+          if (v === 'true') v = true;
+          else if (v === 'false') v = false;
+          else if (/^\d+$/.test(v)) v = parseInt(v, 10);
+          if (k) formatSettings[k] = v;
+        }
+      }
+
+      fd.groups.push({
+        name: itemName,
+        label: label || itemName,
+        children: [],
+        parentName,
+        weight,
+        formatType,
+        formatSettings,
+        region: 'content'
+      });
+    } else if (itemType === 'field') {
+      const parentGroup = cell(row['Parent Group']);
+      const weight = parseInt(cell(row['Weight']), 10) || 0;
+      const widgetType = cell(row['Widget/Format Type']);
+
+      fd.fields.push({
+        name: itemName,
+        type: widgetType || '',
+        weight,
+        region: 'content',
+        settings: {},
+        thirdPartySettings: {}
+      });
+
+      // Track parent group for children array reconstruction
+      if (parentGroup) {
+        fd.fields[fd.fields.length - 1]._parentGroup = parentGroup;
+      }
+    } else if (itemType === 'hidden') {
+      fd.hidden.push(itemName);
+    }
+  }
+
+  // Reconstruct group children arrays from parent references
+  for (const fd of Object.values(formDisplays)) {
+    const groupMap = new Map(fd.groups.map(g => [g.name, g]));
+
+    for (const field of fd.fields) {
+      if (field._parentGroup && groupMap.has(field._parentGroup)) {
+        groupMap.get(field._parentGroup).children.push(field.name);
+      }
+      delete field._parentGroup;
+    }
+
+    // Also set group parent-child relationships in children arrays
+    for (const group of fd.groups) {
+      if (group.parentName && groupMap.has(group.parentName)) {
+        const parent = groupMap.get(group.parentName);
+        if (!parent.children.includes(group.name)) {
+          parent.children.push(group.name);
+        }
+      }
+    }
+  }
+
+  return { formDisplays, errors };
 }
 
 /**

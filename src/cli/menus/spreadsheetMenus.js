@@ -12,7 +12,8 @@ import {
   importSpreadsheet,
   exportSpreadsheet,
   executeDeletions,
-  executeCreations
+  executeCreations,
+  applyFormDisplays
 } from '../../commands/spreadsheet.js';
 import { loadProject } from '../../commands/project.js';
 import { syncProject } from '../../commands/sync.js';
@@ -72,7 +73,7 @@ export async function handleImportSpreadsheet(project) {
 
     console.log(chalk.cyan('\nParsing spreadsheet...'));
 
-    const { parseErrors, diff, data } = await importSpreadsheet(project, filePath.trim());
+    const { parseErrors, diff, data, formDisplayData } = await importSpreadsheet(project, filePath.trim());
 
     if (parseErrors && parseErrors.length > 0) {
       console.log(chalk.yellow('\nParse warnings:'));
@@ -165,6 +166,13 @@ export async function handleImportSpreadsheet(project) {
       creationResult = await executeCreations(project, data, diff.toCreate);
     }
 
+    // Apply form display changes
+    let formDisplayResult = { saved: [], errors: [] };
+    if (formDisplayData) {
+      console.log(chalk.cyan('Applying form display changes...'));
+      formDisplayResult = await applyFormDisplays(project, formDisplayData);
+    }
+
     // Show results
     console.log(chalk.green('\nSync complete!'));
     if (deletionResult.deleted.length > 0) {
@@ -179,8 +187,11 @@ export async function handleImportSpreadsheet(project) {
       if (cBundles > 0) console.log(chalk.cyan(`  Bundles created: ${cBundles}`));
       if (cFields > 0) console.log(chalk.cyan(`  Fields created:  ${cFields}`));
     }
+    if (formDisplayResult.saved.length > 0) {
+      console.log(chalk.cyan(`  Form displays updated: ${formDisplayResult.saved.length}`));
+    }
 
-    const allErrors = [...deletionResult.errors, ...creationResult.errors];
+    const allErrors = [...deletionResult.errors, ...creationResult.errors, ...formDisplayResult.errors];
     if (allErrors.length > 0) {
       console.log(chalk.red(`\n  Errors: ${allErrors.length}`));
       for (const err of allErrors) {

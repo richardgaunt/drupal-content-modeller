@@ -239,6 +239,7 @@ describe('Import Commands', () => {
 
       expect(result.hasBlockers).toBe(false);
       expect(result.blocked).toHaveLength(0);
+      expect(result.skipped).toHaveLength(0);
       expect(result.reused).toHaveLength(0);
       expect(result.toCreate).toHaveLength(3); // 1 bundle + 2 fields
       expect(result.toCreate[0].kind).toBe('bundle');
@@ -249,7 +250,7 @@ describe('Import Commands', () => {
       expect(result.toCreate[2].fieldName).toBe('field_n_body');
     });
 
-    test('bundle collision blocks entire bundle', () => {
+    test('bundle collision skips bundle without blocking', () => {
       const project = {
         entities: {
           node: {
@@ -277,11 +278,12 @@ describe('Import Commands', () => {
 
       const result = auditImport(project, reportData);
 
-      expect(result.hasBlockers).toBe(true);
-      expect(result.blocked).toHaveLength(1);
-      expect(result.blocked[0].type).toBe('bundle_exists');
-      expect(result.blocked[0].bundle).toBe('article');
-      // Fields of blocked bundle are not processed
+      expect(result.hasBlockers).toBe(false);
+      expect(result.blocked).toHaveLength(0);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].type).toBe('bundle_exists');
+      expect(result.skipped[0].bundle).toBe('article');
+      // Fields of skipped bundle are not processed
       expect(result.toCreate).toHaveLength(0);
     });
 
@@ -366,7 +368,7 @@ describe('Import Commands', () => {
       expect(result.blocked[0].requestedType).toBe('text_long');
     });
 
-    test('mixed scenario — some bundles ok, some blocked', () => {
+    test('mixed scenario — some bundles ok, some skipped', () => {
       const project = {
         entities: {
           node: {
@@ -405,10 +407,10 @@ describe('Import Commands', () => {
 
       const result = auditImport(project, reportData);
 
-      expect(result.hasBlockers).toBe(true);
-      expect(result.blocked).toHaveLength(1);
-      expect(result.blocked[0].type).toBe('bundle_exists');
-      expect(result.blocked[0].bundle).toBe('page');
+      expect(result.hasBlockers).toBe(false);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].type).toBe('bundle_exists');
+      expect(result.skipped[0].bundle).toBe('page');
 
       // article bundle and its new field are in toCreate
       expect(result.toCreate).toHaveLength(2); // bundle + new field

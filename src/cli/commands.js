@@ -9,3 +9,4 @@ export * from './commands/bundleFieldCmds.js';
 export * from './commands/formDisplayCmds.js';
 export * from './commands/roleCmds.js';
 export * from './commands/miscCmds.js';
+export * from './commands/themeCmds.js';

@@ -230,14 +230,30 @@ export async function handleImportModel(project) {
       return;
     }
 
+    // Show skipped bundles
+    if (audit.skipped.length > 0) {
+      console.log(chalk.yellow('\nThe following bundles already exist and will be skipped:'));
+      for (const s of audit.skipped) {
+        console.log(chalk.yellow(`  • ${s.message}`));
+      }
+    }
+
     // Show summary
     const bundleCount = audit.toCreate.filter(i => i.kind === 'bundle').length;
     const fieldCount = audit.toCreate.filter(i => i.kind === 'field').length;
     console.log(chalk.cyan(`\nImport summary:`));
     console.log(chalk.cyan(`  Bundles to create: ${bundleCount}`));
     console.log(chalk.cyan(`  Fields to create:  ${fieldCount}`));
+    if (audit.skipped.length > 0) {
+      console.log(chalk.cyan(`  Bundles skipped:   ${audit.skipped.length}`));
+    }
     if (audit.reused.length > 0) {
       console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
+    }
+
+    if (bundleCount === 0 && fieldCount === 0 && audit.reused.length === 0) {
+      console.log(chalk.yellow('\nNothing to import — all bundles already exist.'));
+      return;
     }
 
     const confirm = await select({
@@ -260,6 +276,9 @@ export async function handleImportModel(project) {
     console.log(chalk.green(`\nImport complete!`));
     console.log(chalk.cyan(`  Bundles created: ${bundlesCreated}`));
     console.log(chalk.cyan(`  Fields created:  ${fieldsCreated}`));
+    if (audit.skipped.length > 0) {
+      console.log(chalk.cyan(`  Bundles skipped: ${audit.skipped.length}`));
+    }
 
     if (result.errors.length > 0) {
       console.log(chalk.red(`\n  Errors: ${result.errors.length}`));

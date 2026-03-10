@@ -175,11 +175,19 @@ export async function cmdImportModel(options) {
       process.exit(1);
     }
 
+    // Show skipped bundles
+    if (audit.skipped.length > 0) {
+      console.log(chalk.yellow('\nSkipping existing bundles:'));
+      for (const s of audit.skipped) {
+        console.log(chalk.yellow(`  • ${s.message}`));
+      }
+    }
+
     // Import
     const result = await importContentModel(project, reportData, audit);
 
     if (options.json) {
-      output({ success: true, ...result, reused: audit.reused }, true);
+      output({ success: true, ...result, reused: audit.reused, skipped: audit.skipped }, true);
     } else {
       console.log(chalk.green(`\nImport complete!`));
       const bundles = result.created.filter(c => c.kind === 'bundle');
@@ -188,6 +196,9 @@ export async function cmdImportModel(options) {
       console.log(chalk.cyan(`  Bundles created:        ${bundles.length}`));
       console.log(chalk.cyan(`  Fields created:         ${fields.length}`));
       console.log(chalk.cyan(`  Form displays created:  ${formDisplays.length}`));
+      if (audit.skipped.length > 0) {
+        console.log(chalk.cyan(`  Bundles skipped:        ${audit.skipped.length}`));
+      }
       if (audit.reused.length > 0) {
         console.log(chalk.cyan(`  Fields reusing existing storage: ${audit.reused.length}`));
       }

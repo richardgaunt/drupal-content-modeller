@@ -48,7 +48,16 @@ import {
   cmdDrushStatus,
   cmdSkillInstall,
   cmdLog,
-  cmdImportModel
+  cmdImportModel,
+  cmdComponentList,
+  cmdComponentListCustom,
+  cmdComponentListOverridden,
+  cmdComponentInspect,
+  cmdViewModeList,
+  cmdViewModeCreate,
+  cmdViewModeDelete,
+  cmdThemeSuggestionsBundle,
+  cmdThemeSuggestionsField
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -59,7 +68,10 @@ import {
   ROLE_HELP, ROLE_HELP_DATA,
   DRUSH_HELP, DRUSH_HELP_DATA,
   REPORT_HELP, REPORT_HELP_DATA,
-  ADMIN_HELP, ADMIN_HELP_DATA
+  ADMIN_HELP, ADMIN_HELP_DATA,
+  COMPONENT_HELP, COMPONENT_HELP_DATA,
+  VIEW_MODE_HELP, VIEW_MODE_HELP_DATA,
+  THEME_SUGGESTIONS_HELP, THEME_SUGGESTIONS_HELP_DATA
 } from './src/cli/help/index.js';
 
 const program = new Command();
@@ -624,6 +636,117 @@ skillCmd
   .option('-f, --force', 'Overwrite existing skill')
   .option('-j, --json', 'Output as JSON')
   .action(cmdSkillInstall);
+
+// ============================================
+// Component Commands
+// ============================================
+
+const componentCmd = program
+  .command('component')
+  .description('Component management commands');
+
+componentCmd.addHelpText('after', COMPONENT_HELP);
+componentCmd._helpData = COMPONENT_HELP_DATA;
+
+componentCmd
+  .command('list')
+  .description('List all components across all themes')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdComponentList);
+
+componentCmd
+  .command('list-custom')
+  .description('List custom components (active theme, not overrides)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdComponentListCustom);
+
+componentCmd
+  .command('list-overridden')
+  .description('List overridden components (active theme)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdComponentListOverridden);
+
+componentCmd
+  .command('inspect')
+  .description('Inspect a component (show props & slots)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-c, --component <id>', 'Component ID (theme_name:component_name)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdComponentInspect);
+
+// ============================================
+// View Mode Commands
+// ============================================
+
+const viewModeCmd = program
+  .command('view-mode')
+  .description('Entity view mode management commands');
+
+viewModeCmd.addHelpText('after', VIEW_MODE_HELP);
+viewModeCmd._helpData = VIEW_MODE_HELP_DATA;
+
+viewModeCmd
+  .command('list')
+  .description('List entity view modes')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-e, --entity-type <type>', 'Filter by entity type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdViewModeList);
+
+viewModeCmd
+  .command('create')
+  .description('Create a new entity view mode')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-l, --label <label>', 'View mode label')
+  .option('-n, --name <name>', 'Machine name (auto-generated if omitted)')
+  .option('-d, --description <desc>', 'View mode description')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdViewModeCreate);
+
+viewModeCmd
+  .command('delete')
+  .description('Delete an entity view mode')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-n, --name <name>', 'View mode machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdViewModeDelete);
+
+// ============================================
+// Theme Suggestion Commands
+// ============================================
+
+const themeSuggestionsCmd = program
+  .command('theme-suggestions')
+  .description('Theme suggestion commands');
+
+themeSuggestionsCmd.addHelpText('after', THEME_SUGGESTIONS_HELP);
+themeSuggestionsCmd._helpData = THEME_SUGGESTIONS_HELP_DATA;
+
+themeSuggestionsCmd
+  .command('bundle')
+  .description('List theme suggestions for a bundle')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-v, --view-mode <mode>', 'View mode machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdThemeSuggestionsBundle);
+
+themeSuggestionsCmd
+  .command('field')
+  .description('List theme suggestions for a field')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .requiredOption('-n, --field-name <name>', 'Field machine name')
+  .requiredOption('-t, --field-type <type>', 'Field type')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdThemeSuggestionsField);
 
 // ============================================
 // Help Command

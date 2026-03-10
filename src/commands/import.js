@@ -146,6 +146,7 @@ export function auditImport(project, reportData) {
   const toCreate = [];
   const reused = [];
   const blocked = [];
+  const skipped = [];
 
   for (const entityTypeData of reportData.entityTypes) {
     const entityType = entityTypeData.entityType;
@@ -154,14 +155,14 @@ export function auditImport(project, reportData) {
       const bundleId = bundle.bundle;
       const bundleLabel = bundle.label || bundleId;
 
-      // Check bundle collision
+      // Check bundle collision — skip but don't block
       if (bundleExists(project, entityType, bundleId)) {
-        blocked.push({
+        skipped.push({
           type: 'bundle_exists',
           entityType,
           bundle: bundleId,
           label: bundleLabel,
-          message: `Bundle "${bundleId}" already exists for ${entityType}`
+          message: `Bundle "${bundleId}" already exists for ${entityType} — skipping`
         });
         continue;
       }
@@ -226,6 +227,7 @@ export function auditImport(project, reportData) {
     toCreate,
     reused,
     blocked,
+    skipped,
     hasBlockers: blocked.length > 0
   };
 }

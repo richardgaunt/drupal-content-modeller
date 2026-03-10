@@ -6,3 +6,6 @@ export { ROLE_HELP, ROLE_HELP_DATA } from './roleHelp.js';
 export { DRUSH_HELP, DRUSH_HELP_DATA } from './drushHelp.js';
 export { REPORT_HELP, REPORT_HELP_DATA } from './reportHelp.js';
 export { ADMIN_HELP, ADMIN_HELP_DATA } from './adminHelp.js';
+export { COMPONENT_HELP, COMPONENT_HELP_DATA } from './themeHelp.js';
+export { VIEW_MODE_HELP, VIEW_MODE_HELP_DATA } from './themeHelp.js';
+export { THEME_SUGGESTIONS_HELP, THEME_SUGGESTIONS_HELP_DATA } from './themeHelp.js';

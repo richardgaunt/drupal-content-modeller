@@ -16,6 +16,9 @@ Optionally, `dcm` can sync with a live Drupal site via drush integration to impo
 - **Field** — A data field on a bundle (e.g. a "Subtitle" string field on Article). Field names must be specified and use a prefix per entity type: `field_n_` (node), `field_m_` (media), `field_p_` (paragraph), `field_t_` (taxonomy_term), `field_b_` (block_content). Use `dcm field prefixes` to query these.
 - **Form display** — Controls how fields appear on the entity edit form. Supports widgets, field groups (tabs, fieldsets, details), ordering, and hiding fields.
 - **Role** — A user role with permissions for CRUD operations on bundles.
+- **Component** — A Drupal Single Directory Component (SDC) from the project's theme. Components can be custom or overrides of a base theme component. Identified by `theme_name:component_name`.
+- **View mode** — Controls how an entity is displayed in different contexts (e.g. teaser, card, full). Each view mode generates a config file.
+- **Theme suggestions** — Drupal's template suggestion system for overriding templates per entity type, bundle, view mode, or field.
 
 ### Typical Workflow
 
@@ -1397,6 +1400,449 @@ Ready to sync using "drush" in /var/www/mysite
 
 Checking drush availability...
 Drush is available and working.
+```
+
+---
+
+## Component Commands
+
+### `dcm component list`
+
+List all components across all themes in the project.
+
+```bash
+dcm component list \
+  --project <slug>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm component list -p my-site
+dcm component list -p my-site --json
+```
+
+**JSON output:**
+```json
+{
+  "theme": {
+    "activeTheme": "mytheme",
+    "baseThemes": [
+      { "name": "CivicTheme", "machine_name": "civictheme" }
+    ]
+  },
+  "components": [
+    {
+      "id": "civictheme:header",
+      "name": "Header",
+      "machine_name": "header",
+      "description": "Site header component",
+      "replaces": null,
+      "theme_machine_name": "civictheme"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### `dcm component list-custom`
+
+List custom components in the active theme (components that are not overrides).
+
+```bash
+dcm component list-custom \
+  --project <slug>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm component list-custom -p my-site
+dcm component list-custom -p my-site --json
+```
+
+**JSON output:**
+```json
+{
+  "theme": {
+    "activeTheme": "mytheme",
+    "baseThemes": []
+  },
+  "components": [
+    {
+      "id": "mytheme:hero_banner",
+      "name": "Hero Banner",
+      "machine_name": "hero_banner",
+      "description": "Custom hero banner"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### `dcm component list-overridden`
+
+List overridden components in the active theme (components that override a base theme component).
+
+```bash
+dcm component list-overridden \
+  --project <slug>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm component list-overridden -p my-site
+dcm component list-overridden -p my-site --json
+```
+
+**JSON output:**
+```json
+{
+  "theme": {
+    "activeTheme": "mytheme",
+    "baseThemes": [
+      { "name": "CivicTheme", "machine_name": "civictheme" }
+    ]
+  },
+  "components": [
+    {
+      "id": "mytheme:header",
+      "name": "Header",
+      "machine_name": "header",
+      "description": "Customised header",
+      "replaces": "civictheme:header"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### `dcm component inspect`
+
+Inspect a component's props, slots, and assets.
+
+```bash
+dcm component inspect \
+  --project <slug> \
+  --component <theme_name:component_name>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--component` | `-c` | Yes | Component ID (format: `theme_name:component_name`) |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm component inspect -p my-site -c civictheme:header
+dcm component inspect -p my-site -c civictheme:header --json
+```
+
+**JSON output:**
+```json
+{
+  "id": "civictheme:header",
+  "name": "Header",
+  "machine_name": "header",
+  "description": "Site header component",
+  "status": "stable",
+  "replaces": null,
+  "directory": "/path/to/theme/components/header",
+  "assets": ["header.twig", "header.css"],
+  "props": [
+    {
+      "name": "Title",
+      "machine_name": "title",
+      "type": "string",
+      "description": "Header title text",
+      "extra": ""
+    }
+  ],
+  "slots": [
+    {
+      "name": "Content",
+      "machine_name": "content",
+      "description": "Main content slot"
+    }
+  ]
+}
+```
+
+---
+
+## View Mode Commands
+
+### `dcm view-mode list`
+
+List entity view modes. Optionally filter by entity type.
+
+```bash
+dcm view-mode list \
+  --project <slug> \
+  [--entity-type <type>]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | No | Filter by entity type |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm view-mode list -p my-site
+dcm view-mode list -p my-site -e node
+dcm view-mode list -p my-site -e node --json
+```
+
+**JSON output:**
+```json
+{
+  "viewModes": [
+    {
+      "entityType": "node",
+      "label": "Teaser",
+      "viewModeName": "teaser"
+    },
+    {
+      "entityType": "node",
+      "label": "Card",
+      "viewModeName": "card"
+    }
+  ],
+  "total": 2
+}
+```
+
+---
+
+### `dcm view-mode create`
+
+Create a new entity view mode.
+
+```bash
+dcm view-mode create \
+  --project <slug> \
+  --entity-type <type> \
+  --label <label> \
+  [--name <machine_name>] \
+  [--description <desc>]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--label` | `-l` | Yes | View mode label |
+| `--name` | `-n` | No | Machine name (auto-generated from label if omitted) |
+| `--description` | `-d` | No | View mode description |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm view-mode create -p my-site -e node -l "Card"
+dcm view-mode create -p my-site -e paragraph -l "Featured" -n featured
+dcm view-mode create -p my-site -e node -l "Card" --json
+```
+
+**JSON output:**
+```json
+{
+  "entityType": "node",
+  "label": "Card",
+  "viewModeName": "card",
+  "file": "core.entity_view_mode.node.card.yml"
+}
+```
+
+---
+
+### `dcm view-mode delete`
+
+Delete an entity view mode.
+
+```bash
+dcm view-mode delete \
+  --project <slug> \
+  --entity-type <type> \
+  --name <machine_name>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--name` | `-n` | Yes | View mode machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm view-mode delete -p my-site -e node -n card
+```
+
+**JSON output:**
+```json
+{
+  "deleted": true,
+  "entityType": "node",
+  "viewModeName": "card"
+}
+```
+
+---
+
+## Theme Suggestion Commands
+
+### `dcm theme-suggestions bundle`
+
+List Drupal theme suggestions for a bundle. Shows preprocess function names and corresponding Twig template filenames in priority order.
+
+```bash
+dcm theme-suggestions bundle \
+  --project <slug> \
+  --entity-type <type> \
+  --bundle <bundle> \
+  [--view-mode <mode>]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--view-mode` | `-v` | No | View mode machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm theme-suggestions bundle -p my-site -e node -b article
+dcm theme-suggestions bundle -p my-site -e node -b article -v teaser
+dcm theme-suggestions bundle -p my-site -e node -b article --json
+```
+
+**JSON output:**
+```json
+{
+  "entityType": "node",
+  "bundle": "article",
+  "viewMode": "teaser",
+  "themeName": "mytheme",
+  "suggestions": [
+    {
+      "suggestion": "node",
+      "preprocessFunction": "mytheme_preprocess_node()",
+      "twigTemplate": "node.html.twig"
+    },
+    {
+      "suggestion": "node__teaser",
+      "preprocessFunction": "mytheme_preprocess_node__teaser()",
+      "twigTemplate": "node--teaser.html.twig"
+    },
+    {
+      "suggestion": "node__article",
+      "preprocessFunction": "mytheme_preprocess_node__article()",
+      "twigTemplate": "node--article.html.twig"
+    },
+    {
+      "suggestion": "node__article__teaser",
+      "preprocessFunction": "mytheme_preprocess_node__article__teaser()",
+      "twigTemplate": "node--article--teaser.html.twig"
+    }
+  ]
+}
+```
+
+---
+
+### `dcm theme-suggestions field`
+
+List Drupal theme suggestions for a field. Shows preprocess function names and corresponding Twig template filenames in priority order.
+
+```bash
+dcm theme-suggestions field \
+  --project <slug> \
+  --entity-type <type> \
+  --bundle <bundle> \
+  --field-name <name> \
+  --field-type <type>
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--field-name` | `-n` | Yes | Field machine name |
+| `--field-type` | `-t` | Yes | Field type |
+| `--json` | `-j` | No | Output as JSON |
+
+**Example:**
+```bash
+dcm theme-suggestions field -p my-site -e node -b article -n field_n_subtitle -t string
+dcm theme-suggestions field -p my-site -e node -b article -n field_n_subtitle -t string --json
+```
+
+**JSON output:**
+```json
+{
+  "entityType": "node",
+  "bundle": "article",
+  "fieldName": "field_n_subtitle",
+  "fieldType": "string",
+  "themeName": "mytheme",
+  "suggestions": [
+    {
+      "suggestion": "field",
+      "preprocessFunction": "mytheme_preprocess_field()",
+      "twigTemplate": "field.html.twig"
+    },
+    {
+      "suggestion": "field__string",
+      "preprocessFunction": "mytheme_preprocess_field__string()",
+      "twigTemplate": "field--string.html.twig"
+    },
+    {
+      "suggestion": "field__field_n_subtitle",
+      "preprocessFunction": "mytheme_preprocess_field__field_n_subtitle()",
+      "twigTemplate": "field--field-n-subtitle.html.twig"
+    },
+    {
+      "suggestion": "field__node__article",
+      "preprocessFunction": "mytheme_preprocess_field__node__article()",
+      "twigTemplate": "field--node--article.html.twig"
+    },
+    {
+      "suggestion": "field__node__field_n_subtitle",
+      "preprocessFunction": "mytheme_preprocess_field__node__field_n_subtitle()",
+      "twigTemplate": "field--node--field-n-subtitle.html.twig"
+    },
+    {
+      "suggestion": "field__node__field_n_subtitle__article",
+      "preprocessFunction": "mytheme_preprocess_field__node__field_n_subtitle__article()",
+      "twigTemplate": "field--node--field-n-subtitle--article.html.twig"
+    }
+  ]
+}
 ```
 
 ---

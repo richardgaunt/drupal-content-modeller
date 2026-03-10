@@ -41,6 +41,8 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'add-bundle-to-refs', name: 'Add bundle to entity reference fields' },
     { value: 'edit-form-display', name: 'Edit form display' },
     { value: 'import-model', name: 'Import content model from JSON' },
+    { value: 'import-spreadsheet', name: 'Import content model from spreadsheet' },
+    { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
     { value: 'back', name: 'Back' }
   ],
   'browse-inspect': [
@@ -54,6 +56,7 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'report-bundle', name: 'Generate report for bundle' },
     { value: 'report-entity', name: 'Generate report for entity type' },
     { value: 'report-project', name: 'Generate report for project' },
+    { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
     { value: 'back', name: 'Back' }
   ],
   'roles': [

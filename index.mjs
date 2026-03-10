@@ -57,7 +57,9 @@ import {
   cmdViewModeCreate,
   cmdViewModeDelete,
   cmdThemeSuggestionsBundle,
-  cmdThemeSuggestionsField
+  cmdThemeSuggestionsField,
+  cmdExportSpreadsheet,
+  cmdImportSpreadsheet
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -622,6 +624,26 @@ program
   .option('-b, --bundle <entityType:bundle...>', 'Import specific bundles (e.g. node:article)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdImportModel);
+
+// ============================================
+// Spreadsheet Commands
+// ============================================
+
+program
+  .command('export-spreadsheet')
+  .description('Export content model to xlsx spreadsheet')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-o, --output <path>', 'Output file path')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdExportSpreadsheet);
+
+program
+  .command('import-spreadsheet')
+  .description('Import content model from xlsx spreadsheet (full sync)')
+  .requiredOption('-p, --project <slug>', 'Target project slug')
+  .requiredOption('-f, --file <path>', 'Path to .xlsx spreadsheet file')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdImportSpreadsheet);
 
 // ============================================
 // Skill Commands

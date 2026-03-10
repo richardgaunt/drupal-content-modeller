@@ -49,6 +49,10 @@ import {
   handleAdminLinks,
   handleDrushSync
 } from './reportMenus.js';
+import {
+  handleExportSpreadsheet,
+  handleImportSpreadsheet
+} from './spreadsheetMenus.js';
 
 /**
  * Display the main menu and handle user selection
@@ -357,6 +361,12 @@ async function handleAction(project, action) {
     case 'import-model':
       await handleImportModel(project);
       project = await loadProject(project.slug);
+      break;
+    case 'import-spreadsheet':
+      project = await handleImportSpreadsheet(project);
+      break;
+    case 'export-spreadsheet':
+      await handleExportSpreadsheet(project);
       break;
     case 'admin-links':
       await handleAdminLinks(project);

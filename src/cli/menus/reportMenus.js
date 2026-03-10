@@ -3,7 +3,7 @@
  * Handles report generation, import, admin links, and drush sync menu actions.
  */
 
-import { select, input, checkbox, search } from '@inquirer/prompts';
+import { select, input, checkbox, search, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { join } from 'path';
 import { readFileSync } from 'fs';
@@ -13,7 +13,15 @@ import { createEntityReport, createProjectReport, createBundleReport } from '../
 import { getReportsDir } from '../../io/fileSystem.js';
 import { getEntityTypeLabel } from '../../generators/reportGenerator.js';
 import { listRoles } from '../../commands/role.js';
-import { auditImport, importContentModel, validateReportData } from '../../commands/import.js';
+import {
+  auditImport,
+  importContentModel,
+  validateReportData,
+  resolveImportDependencies,
+  filterReportData,
+  listReportBundles
+} from '../../commands/import.js';
+import { getEntityTypeSingularLabel } from '../../constants/entityTypes.js';
 import { syncWithDrupal, getSyncStatus } from '../../commands/drush.js';
 import { promptForReportUrl } from './contentMenus.js';
 
@@ -211,12 +219,71 @@ export async function handleImportModel(project) {
     });
 
     const raw = readFileSync(filePath.trim(), 'utf8');
-    const reportData = JSON.parse(raw);
+    let reportData = JSON.parse(raw);
 
     const validation = validateReportData(reportData);
     if (validation !== true) {
       console.log(chalk.red(`Invalid report data: ${validation}`));
       return;
+    }
+
+    // Bundle selection
+    const allBundles = listReportBundles(reportData);
+
+    if (allBundles.length === 0) {
+      console.log(chalk.yellow('No bundles found in report.'));
+      return;
+    }
+
+    const importScope = await select({
+      message: 'What would you like to import?',
+      choices: [
+        { value: 'all', name: 'All bundles' },
+        { value: 'select', name: 'Select specific bundles' }
+      ]
+    });
+
+    if (importScope === 'select') {
+      const selectedKeys = await checkbox({
+        message: 'Select bundles to import:',
+        choices: allBundles.map(b => ({
+          value: `${b.entityType}:${b.bundle}`,
+          name: `${b.label} (${getEntityTypeSingularLabel(b.entityType)})`,
+          checked: false
+        }))
+      });
+
+      if (selectedKeys.length === 0) {
+        console.log(chalk.yellow('No bundles selected.'));
+        return;
+      }
+
+      const selectedBundles = selectedKeys.map(key => {
+        const [entityType, bundle] = key.split(':');
+        return { entityType, bundle };
+      });
+
+      // Resolve dependencies
+      const deps = resolveImportDependencies(reportData, selectedBundles);
+      const confirmedDeps = [];
+
+      if (deps.dependencies.length > 0) {
+        console.log(chalk.cyan('\nThe selected bundles reference other bundles in the report:'));
+
+        for (const dep of deps.dependencies) {
+          const shouldInclude = await confirm({
+            message: `Import "${dep.label}" (${getEntityTypeSingularLabel(dep.entityType)})?`,
+            default: true
+          });
+
+          if (shouldInclude) {
+            confirmedDeps.push(dep);
+          }
+        }
+      }
+
+      const allIncluded = [...selectedBundles, ...confirmedDeps];
+      reportData = filterReportData(reportData, allIncluded, project.entities);
     }
 
     const audit = auditImport(project, reportData);
@@ -256,7 +323,7 @@ export async function handleImportModel(project) {
       return;
     }
 
-    const confirm = await select({
+    const proceed = await select({
       message: 'Proceed with import?',
       choices: [
         { value: 'yes', name: 'Yes' },
@@ -264,7 +331,7 @@ export async function handleImportModel(project) {
       ]
     });
 
-    if (confirm !== 'yes') {
+    if (proceed !== 'yes') {
       console.log(chalk.yellow('Import cancelled.'));
       return;
     }

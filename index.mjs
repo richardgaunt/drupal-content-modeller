@@ -619,6 +619,7 @@ program
   .description('Import content model from JSON report')
   .requiredOption('-p, --project <slug>', 'Target project slug')
   .requiredOption('-f, --file <path>', 'Path to JSON report file')
+  .option('-b, --bundle <entityType:bundle...>', 'Import specific bundles (e.g. node:article)')
   .option('-j, --json', 'Output as JSON')
   .action(cmdImportModel);
 

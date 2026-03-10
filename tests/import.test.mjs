@@ -6,7 +6,10 @@ import {
   validateReportData,
   translateFieldSettings,
   auditImport,
-  buildFormDisplayFromReport
+  buildFormDisplayFromReport,
+  resolveImportDependencies,
+  filterReportData,
+  listReportBundles
 } from '../src/commands/import.js';
 
 describe('Import Commands', () => {
@@ -724,6 +727,400 @@ describe('Import Commands', () => {
       expect(result.entityType).toBe('node');
       expect(result.bundle).toBe('article');
       expect(result.mode).toBe('default');
+    });
+  });
+
+  describe('listReportBundles', () => {
+    test('returns flat list of all bundles', () => {
+      const reportData = {
+        entityTypes: [
+          {
+            entityType: 'node',
+            bundles: [
+              { bundle: 'article', label: 'Article' },
+              { bundle: 'page', label: 'Page' }
+            ]
+          },
+          {
+            entityType: 'paragraph',
+            bundles: [
+              { bundle: 'card', label: 'Card' }
+            ]
+          }
+        ]
+      };
+
+      const result = listReportBundles(reportData);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ entityType: 'node', bundle: 'article', label: 'Article' });
+      expect(result[2]).toEqual({ entityType: 'paragraph', bundle: 'card', label: 'Card' });
+    });
+
+    test('uses bundle id as label fallback', () => {
+      const reportData = {
+        entityTypes: [
+          { entityType: 'node', bundles: [{ bundle: 'article' }] }
+        ]
+      };
+
+      const result = listReportBundles(reportData);
+      expect(result[0].label).toBe('article');
+    });
+
+    test('returns empty array for empty report', () => {
+      expect(listReportBundles({ entityTypes: [] })).toEqual([]);
+    });
+  });
+
+  describe('resolveImportDependencies', () => {
+    const reportData = {
+      entityTypes: [
+        {
+          entityType: 'node',
+          bundles: [
+            {
+              bundle: 'article',
+              label: 'Article',
+              fields: [
+                {
+                  name: 'field_n_tags',
+                  type: 'entity_reference',
+                  settings: {
+                    handler: 'default:taxonomy_term',
+                    handler_settings: {
+                      target_bundles: { tags: 'tags' }
+                    }
+                  }
+                },
+                {
+                  name: 'field_n_sections',
+                  type: 'entity_reference_revisions',
+                  settings: {
+                    handler: 'default:paragraph',
+                    handler_settings: {
+                      target_bundles: { card: 'card', hero: 'hero' }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              bundle: 'page',
+              label: 'Page',
+              fields: []
+            }
+          ]
+        },
+        {
+          entityType: 'taxonomy_term',
+          bundles: [
+            { bundle: 'tags', label: 'Tags', fields: [] }
+          ]
+        },
+        {
+          entityType: 'paragraph',
+          bundles: [
+            { bundle: 'card', label: 'Card', fields: [] },
+            { bundle: 'hero', label: 'Hero', fields: [] }
+          ]
+        }
+      ]
+    };
+
+    test('finds direct entity_reference dependencies', () => {
+      const selected = [{ entityType: 'node', bundle: 'article' }];
+      const result = resolveImportDependencies(reportData, selected);
+
+      const depKeys = result.dependencies.map(d => `${d.entityType}:${d.bundle}`);
+      expect(depKeys).toContain('taxonomy_term:tags');
+    });
+
+    test('finds entity_reference_revisions dependencies', () => {
+      const selected = [{ entityType: 'node', bundle: 'article' }];
+      const result = resolveImportDependencies(reportData, selected);
+
+      const depKeys = result.dependencies.map(d => `${d.entityType}:${d.bundle}`);
+      expect(depKeys).toContain('paragraph:card');
+      expect(depKeys).toContain('paragraph:hero');
+    });
+
+    test('does not include already-selected bundles as dependencies', () => {
+      const selected = [
+        { entityType: 'node', bundle: 'article' },
+        { entityType: 'taxonomy_term', bundle: 'tags' }
+      ];
+      const result = resolveImportDependencies(reportData, selected);
+
+      const depKeys = result.dependencies.map(d => `${d.entityType}:${d.bundle}`);
+      expect(depKeys).not.toContain('taxonomy_term:tags');
+    });
+
+    test('ignores references to bundles not in the report', () => {
+      const reportWithExternal = {
+        entityTypes: [
+          {
+            entityType: 'node',
+            bundles: [
+              {
+                bundle: 'article',
+                label: 'Article',
+                fields: [
+                  {
+                    name: 'field_n_author',
+                    type: 'entity_reference',
+                    settings: {
+                      handler: 'default:node',
+                      handler_settings: {
+                        target_bundles: { profile: 'profile' }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const selected = [{ entityType: 'node', bundle: 'article' }];
+      const result = resolveImportDependencies(reportWithExternal, selected);
+      expect(result.dependencies).toHaveLength(0);
+    });
+
+    test('resolves transitive dependencies', () => {
+      const reportWithChain = {
+        entityTypes: [
+          {
+            entityType: 'node',
+            bundles: [
+              {
+                bundle: 'article',
+                label: 'Article',
+                fields: [
+                  {
+                    name: 'field_n_sections',
+                    type: 'entity_reference_revisions',
+                    settings: {
+                      handler: 'default:paragraph',
+                      handler_settings: {
+                        target_bundles: { card: 'card' }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            entityType: 'paragraph',
+            bundles: [
+              {
+                bundle: 'card',
+                label: 'Card',
+                fields: [
+                  {
+                    name: 'field_p_media',
+                    type: 'entity_reference',
+                    settings: {
+                      handler: 'default:media',
+                      handler_settings: {
+                        target_bundles: { image: 'image' }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            entityType: 'media',
+            bundles: [
+              { bundle: 'image', label: 'Image', fields: [] }
+            ]
+          }
+        ]
+      };
+
+      const selected = [{ entityType: 'node', bundle: 'article' }];
+      const result = resolveImportDependencies(reportWithChain, selected);
+
+      const depKeys = result.dependencies.map(d => `${d.entityType}:${d.bundle}`);
+      expect(depKeys).toContain('paragraph:card');
+      expect(depKeys).toContain('media:image');
+    });
+
+    test('returns no dependencies for bundle with no references', () => {
+      const selected = [{ entityType: 'node', bundle: 'page' }];
+      const result = resolveImportDependencies(reportData, selected);
+      expect(result.dependencies).toHaveLength(0);
+    });
+
+    test('returns selected bundles unchanged', () => {
+      const selected = [{ entityType: 'node', bundle: 'article' }];
+      const result = resolveImportDependencies(reportData, selected);
+      expect(result.selected).toBe(selected);
+    });
+  });
+
+  describe('filterReportData', () => {
+    const fullReport = {
+      entityTypes: [
+        {
+          entityType: 'node',
+          bundles: [
+            {
+              bundle: 'article',
+              label: 'Article',
+              fields: [
+                {
+                  name: 'field_n_tags',
+                  type: 'entity_reference',
+                  label: 'Tags',
+                  settings: {
+                    handler: 'default:taxonomy_term',
+                    handler_settings: {
+                      target_bundles: { tags: 'tags', categories: 'categories' }
+                    }
+                  }
+                },
+                {
+                  name: 'field_n_body',
+                  type: 'text_long',
+                  label: 'Body'
+                }
+              ]
+            },
+            {
+              bundle: 'page',
+              label: 'Page',
+              fields: []
+            }
+          ]
+        },
+        {
+          entityType: 'taxonomy_term',
+          bundles: [
+            { bundle: 'tags', label: 'Tags', fields: [] },
+            { bundle: 'categories', label: 'Categories', fields: [] }
+          ]
+        }
+      ]
+    };
+
+    test('includes only specified bundles', () => {
+      const included = [{ entityType: 'node', bundle: 'article' }];
+      const result = filterReportData(fullReport, included, {});
+
+      expect(result.entityTypes).toHaveLength(1);
+      expect(result.entityTypes[0].bundles).toHaveLength(1);
+      expect(result.entityTypes[0].bundles[0].bundle).toBe('article');
+    });
+
+    test('removes entity types with no included bundles', () => {
+      const included = [{ entityType: 'node', bundle: 'article' }];
+      const result = filterReportData(fullReport, included, {});
+
+      const entityTypes = result.entityTypes.map(et => et.entityType);
+      expect(entityTypes).not.toContain('taxonomy_term');
+    });
+
+    test('prunes target_bundles to only available bundles', () => {
+      const included = [
+        { entityType: 'node', bundle: 'article' },
+        { entityType: 'taxonomy_term', bundle: 'tags' }
+      ];
+      const result = filterReportData(fullReport, included, {});
+
+      const tagsField = result.entityTypes[0].bundles[0].fields.find(
+        f => f.name === 'field_n_tags'
+      );
+      expect(Object.keys(tagsField.settings.handler_settings.target_bundles)).toEqual(['tags']);
+    });
+
+    test('keeps target_bundles that exist in the project', () => {
+      const included = [{ entityType: 'node', bundle: 'article' }];
+      const projectEntities = {
+        taxonomy_term: { tags: { label: 'Tags' }, categories: { label: 'Categories' } }
+      };
+      const result = filterReportData(fullReport, included, projectEntities);
+
+      const tagsField = result.entityTypes[0].bundles[0].fields.find(
+        f => f.name === 'field_n_tags'
+      );
+      expect(Object.keys(tagsField.settings.handler_settings.target_bundles)).toEqual(['tags', 'categories']);
+    });
+
+    test('does not mutate original report data', () => {
+      const included = [{ entityType: 'node', bundle: 'article' }];
+      filterReportData(fullReport, included, {});
+
+      // Original should still have both target_bundles
+      const originalField = fullReport.entityTypes[0].bundles[0].fields[0];
+      expect(Object.keys(originalField.settings.handler_settings.target_bundles)).toEqual(['tags', 'categories']);
+    });
+
+    test('preserves non-reference fields unchanged', () => {
+      const included = [{ entityType: 'node', bundle: 'article' }];
+      const result = filterReportData(fullReport, included, {});
+
+      const bodyField = result.entityTypes[0].bundles[0].fields.find(
+        f => f.name === 'field_n_body'
+      );
+      expect(bodyField.type).toBe('text_long');
+    });
+
+    test('prunes target_bundles_drag_drop when present', () => {
+      const reportWithDragDrop = {
+        entityTypes: [
+          {
+            entityType: 'node',
+            bundles: [
+              {
+                bundle: 'article',
+                label: 'Article',
+                fields: [
+                  {
+                    name: 'field_n_sections',
+                    type: 'entity_reference_revisions',
+                    settings: {
+                      handler: 'default:paragraph',
+                      handler_settings: {
+                        target_bundles: { card: 'card', hero: 'hero' },
+                        target_bundles_drag_drop: {
+                          card: { weight: 0, enabled: true },
+                          hero: { weight: 1, enabled: true }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            entityType: 'paragraph',
+            bundles: [
+              { bundle: 'card', label: 'Card', fields: [] },
+              { bundle: 'hero', label: 'Hero', fields: [] }
+            ]
+          }
+        ]
+      };
+
+      const included = [
+        { entityType: 'node', bundle: 'article' },
+        { entityType: 'paragraph', bundle: 'card' }
+      ];
+      const result = filterReportData(reportWithDragDrop, included, {});
+
+      const field = result.entityTypes[0].bundles[0].fields[0];
+      expect(Object.keys(field.settings.handler_settings.target_bundles)).toEqual(['card']);
+      expect(Object.keys(field.settings.handler_settings.target_bundles_drag_drop)).toEqual(['card']);
+    });
+
+    test('handles empty included list', () => {
+      const result = filterReportData(fullReport, [], {});
+      expect(result.entityTypes).toHaveLength(0);
     });
   });
 });

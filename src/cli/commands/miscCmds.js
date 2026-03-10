@@ -10,7 +10,14 @@ import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { loadProject } from '../../commands/project.js';
 import { loadFormDisplay } from '../../commands/formDisplay.js';
-import { auditImport, importContentModel, validateReportData } from '../../commands/import.js';
+import {
+  auditImport,
+  importContentModel,
+  validateReportData,
+  resolveImportDependencies,
+  filterReportData,
+  listReportBundles
+} from '../../commands/import.js';
 import { createEntityReport, createProjectReport } from '../../commands/report.js';
 import {
   getBundleAdminUrls,
@@ -157,6 +164,40 @@ export async function cmdImportModel(options) {
     const validation = validateReportData(reportData);
     if (validation !== true) {
       throw new Error(`Invalid report data: ${validation}`);
+    }
+
+    // Filter by --bundle if provided
+    if (options.bundle) {
+      const bundleSpecs = Array.isArray(options.bundle) ? options.bundle : [options.bundle];
+      const selectedBundles = bundleSpecs.map(spec => {
+        const [entityType, bundle] = spec.split(':');
+        if (!entityType || !bundle) {
+          throw new Error(`Invalid --bundle format "${spec}". Use entityType:bundle (e.g. node:article)`);
+        }
+        return { entityType, bundle };
+      });
+
+      // Validate selected bundles exist in report
+      const allBundles = listReportBundles(reportData);
+      const allKeys = new Set(allBundles.map(b => `${b.entityType}:${b.bundle}`));
+      for (const sel of selectedBundles) {
+        if (!allKeys.has(`${sel.entityType}:${sel.bundle}`)) {
+          throw new Error(`Bundle "${sel.entityType}:${sel.bundle}" not found in report`);
+        }
+      }
+
+      // Resolve dependencies and include them all in CLI mode
+      const deps = resolveImportDependencies(reportData, selectedBundles);
+      const allIncluded = [...selectedBundles, ...deps.dependencies];
+
+      if (deps.dependencies.length > 0 && !options.json) {
+        console.log(chalk.cyan('\nIncluding dependencies:'));
+        for (const dep of deps.dependencies) {
+          console.log(chalk.cyan(`  • ${dep.label} (${dep.entityType})`));
+        }
+      }
+
+      reportData = filterReportData(reportData, allIncluded, project.entities);
     }
 
     // Audit

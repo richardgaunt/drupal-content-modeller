@@ -563,6 +563,56 @@ dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysi
 
 ---
 
+## Import Commands
+
+### `dcm import`
+
+Import a content model from a JSON project report into a target project. Supports importing all bundles or selecting specific bundles with automatic dependency resolution.
+
+```bash
+dcm import \
+  --project "project-slug" \
+  --file "/path/to/report.json" \
+  [--bundle "entityType:bundle" ...] \
+  [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Target project slug |
+| `--file` | `-f` | Yes | Path to JSON report file |
+| `--bundle` | `-b` | No | Import specific bundles (repeatable, format: `entityType:bundle`) |
+| `--json` | `-j` | No | Output as JSON |
+
+**Behaviour:**
+
+- **Without `--bundle`**: Imports all bundles from the report.
+- **With `--bundle`**: Imports only the specified bundles. Dependencies (bundles referenced via `entity_reference` or `entity_reference_revisions` fields) are automatically detected and included. Transitive dependencies are resolved recursively.
+- **Existing bundles**: Bundles that already exist in the target project are skipped with a warning (the import continues with remaining bundles).
+- **Field type conflicts**: If a field storage already exists with a different type than the report specifies, the import is blocked with an error.
+- **Target bundle pruning**: When importing a subset of bundles, `target_bundles` in entity reference fields are pruned to only include bundles that are being imported or already exist in the target project.
+
+**Examples:**
+```bash
+# Import everything from a report
+dcm import -p my-site -f ~/reports/project-report.json
+
+# Import a single content type (auto-includes dependencies)
+dcm import -p my-site -f ~/reports/project-report.json -b node:article
+
+# Import multiple specific bundles
+dcm import -p my-site -f ~/reports/project-report.json -b node:article -b paragraph:hero -b taxonomy_term:tags
+
+# JSON output
+dcm import -p my-site -f ~/reports/project-report.json --json
+```
+
+**Interactive mode:**
+
+When using the interactive menu (Content Modelling > Import content model from JSON), you are prompted to choose between importing all bundles or selecting specific ones via a checkbox list. If your selection references other bundles in the report, you are asked to confirm each dependency individually. Declined dependencies are stripped from `target_bundles` in the referencing fields.
+
+---
+
 ## Form Display Commands
 
 ### `dcm form-display create`

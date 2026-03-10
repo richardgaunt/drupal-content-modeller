@@ -233,6 +233,191 @@ export function auditImport(project, reportData) {
 }
 
 /**
+ * Build a lookup of all bundles in report data, keyed by "entityType:bundle"
+ * @param {object} reportData - Validated report data
+ * @returns {Map<string, object>} - Map of "entityType:bundle" to bundle data
+ */
+function buildBundleLookup(reportData) {
+  const lookup = new Map();
+  for (const et of reportData.entityTypes) {
+    for (const bundle of et.bundles) {
+      lookup.set(`${et.entityType}:${bundle.bundle}`, {
+        entityType: et.entityType,
+        bundle: bundle.bundle,
+        label: bundle.label || bundle.bundle,
+        data: bundle
+      });
+    }
+  }
+  return lookup;
+}
+
+/**
+ * Extract the target entity type from a handler string like "default:node"
+ * @param {string} handler - Handler string
+ * @returns {string} - Entity type
+ */
+function extractTargetType(handler) {
+  if (!handler || typeof handler !== 'string') return 'node';
+  const parts = handler.split(':');
+  return parts.length > 1 ? parts[1] : 'node';
+}
+
+/**
+ * Resolve dependencies for selected bundles by walking entity_reference
+ * and entity_reference_revisions target_bundles.
+ * @param {object} reportData - Validated report data
+ * @param {Array<{entityType: string, bundle: string}>} selectedBundles - User-selected bundles
+ * @returns {{ selected: Array, dependencies: Array }} - Selected and dependency bundles
+ */
+export function resolveImportDependencies(reportData, selectedBundles) {
+  const bundleLookup = buildBundleLookup(reportData);
+  const selectedKeys = new Set(selectedBundles.map(b => `${b.entityType}:${b.bundle}`));
+  const dependencyKeys = new Set();
+  const visited = new Set();
+  const queue = [...selectedKeys];
+
+  while (queue.length > 0) {
+    const key = queue.shift();
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const entry = bundleLookup.get(key);
+    if (!entry) continue;
+
+    const fields = entry.data.fields || [];
+    for (const field of fields) {
+      if (field.type !== 'entity_reference' && field.type !== 'entity_reference_revisions') {
+        continue;
+      }
+
+      const settings = field.settings || {};
+      const targetType = field.type === 'entity_reference_revisions'
+        ? 'paragraph'
+        : extractTargetType(settings.handler);
+      const targetBundles = settings.handler_settings?.target_bundles;
+
+      if (!targetBundles || typeof targetBundles !== 'object') continue;
+
+      for (const bundleName of Object.keys(targetBundles)) {
+        const depKey = `${targetType}:${bundleName}`;
+        if (!selectedKeys.has(depKey) && bundleLookup.has(depKey) && !dependencyKeys.has(depKey)) {
+          dependencyKeys.add(depKey);
+          queue.push(depKey);
+        }
+      }
+    }
+  }
+
+  const dependencies = [...dependencyKeys].map(key => {
+    const entry = bundleLookup.get(key);
+    return { entityType: entry.entityType, bundle: entry.bundle, label: entry.label };
+  });
+
+  return { selected: selectedBundles, dependencies };
+}
+
+/**
+ * Filter report data to only include specified bundles, and prune
+ * target_bundles in entity_reference fields to only reference bundles
+ * that are included or already exist in the project.
+ * @param {object} reportData - Full validated report data
+ * @param {Array<{entityType: string, bundle: string}>} includedBundles - Bundles to include
+ * @param {object} projectEntities - project.entities object for checking existing bundles
+ * @returns {object} - Filtered report data
+ */
+export function filterReportData(reportData, includedBundles, projectEntities) {
+  const includedKeys = new Set(includedBundles.map(b => `${b.entityType}:${b.bundle}`));
+
+  // Build set of bundles that are "available" (included in import OR exist in project)
+  const availableKeys = new Set(includedKeys);
+  if (projectEntities) {
+    for (const [entityType, bundles] of Object.entries(projectEntities)) {
+      for (const bundleName of Object.keys(bundles)) {
+        availableKeys.add(`${entityType}:${bundleName}`);
+      }
+    }
+  }
+
+  const filteredEntityTypes = [];
+
+  for (const et of reportData.entityTypes) {
+    const filteredBundles = [];
+
+    for (const bundle of et.bundles) {
+      const key = `${et.entityType}:${bundle.bundle}`;
+      if (!includedKeys.has(key)) continue;
+
+      // Deep clone bundle to avoid mutating original
+      const clonedBundle = JSON.parse(JSON.stringify(bundle));
+
+      // Prune target_bundles in reference fields
+      for (const field of (clonedBundle.fields || [])) {
+        if (field.type !== 'entity_reference' && field.type !== 'entity_reference_revisions') {
+          continue;
+        }
+
+        const settings = field.settings;
+        if (!settings?.handler_settings?.target_bundles) continue;
+
+        const targetType = field.type === 'entity_reference_revisions'
+          ? 'paragraph'
+          : extractTargetType(settings.handler);
+
+        const prunedBundles = {};
+        for (const [bName, bVal] of Object.entries(settings.handler_settings.target_bundles)) {
+          if (availableKeys.has(`${targetType}:${bName}`)) {
+            prunedBundles[bName] = bVal;
+          }
+        }
+        settings.handler_settings.target_bundles = prunedBundles;
+
+        // Also prune target_bundles_drag_drop if present
+        if (settings.handler_settings.target_bundles_drag_drop) {
+          const prunedDragDrop = {};
+          for (const [bName, bVal] of Object.entries(settings.handler_settings.target_bundles_drag_drop)) {
+            if (availableKeys.has(`${targetType}:${bName}`)) {
+              prunedDragDrop[bName] = bVal;
+            }
+          }
+          settings.handler_settings.target_bundles_drag_drop = prunedDragDrop;
+        }
+      }
+
+      filteredBundles.push(clonedBundle);
+    }
+
+    if (filteredBundles.length > 0) {
+      filteredEntityTypes.push({
+        entityType: et.entityType,
+        bundles: filteredBundles
+      });
+    }
+  }
+
+  return { entityTypes: filteredEntityTypes };
+}
+
+/**
+ * Get a flat list of all bundles in report data
+ * @param {object} reportData - Validated report data
+ * @returns {Array<{entityType: string, bundle: string, label: string}>}
+ */
+export function listReportBundles(reportData) {
+  const bundles = [];
+  for (const et of reportData.entityTypes) {
+    for (const bundle of et.bundles) {
+      bundles.push({
+        entityType: et.entityType,
+        bundle: bundle.bundle,
+        label: bundle.label || bundle.bundle
+      });
+    }
+  }
+  return bundles;
+}
+
+/**
  * Build a form display object from report data, using a base form display for defaults.
  * @param {object} baseFormDisplay - Base form display from createFormDisplay
  * @param {object} reportFormDisplay - Form display data from JSON report

@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { readFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, copyFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -32,6 +32,7 @@ import {
   getSyncStatus
 } from '../../commands/drush.js';
 import { readLog } from '../../io/commandLog.js';
+import { parseFilterFormats } from '../../io/configReader.js';
 import {
   output,
   handleError,
@@ -413,37 +414,123 @@ export async function cmdDrushStatus(options) {
 }
 
 /**
- * Install the dcm Claude Code skill to ~/.claude/skills/
+ * List text formats/filters in a project
+ */
+export async function cmdFilterList(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    const formats = await parseFilterFormats(project.configDirectory);
+
+    if (options.json) {
+      output(formats, true);
+      return;
+    }
+
+    if (formats.length === 0) {
+      console.log(chalk.yellow('No text formats found.'));
+      return;
+    }
+
+    console.log();
+    console.log(chalk.cyan(`Text Formats (${formats.length}):`));
+    console.log();
+
+    for (const fmt of formats) {
+      const status = fmt.status ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log(`  ${chalk.bold(fmt.name)} (${fmt.id}) [${status}]`);
+      console.log(`    HTML mode: ${fmt.htmlMode}`);
+
+      if (fmt.allowedHtml) {
+        // Extract just the tag names for a concise summary
+        const tags = fmt.allowedHtml.match(/<([a-z][a-z0-9-]*)/gi) || [];
+        const tagNames = tags.map(t => t.slice(1));
+        console.log(`    Allowed tags: ${tagNames.join(', ')}`);
+      }
+
+      if (fmt.mediaEmbed) {
+        const types = fmt.mediaEmbed.allowedMediaTypes.length > 0
+          ? fmt.mediaEmbed.allowedMediaTypes.join(', ')
+          : 'all';
+        console.log(`    Media embed: ${chalk.cyan('yes')} (view mode: ${fmt.mediaEmbed.defaultViewMode}, types: ${types})`);
+      }
+
+      if (fmt.linkit) {
+        console.log(`    Linkit: ${chalk.cyan('yes')}`);
+      }
+
+      const filterNames = fmt.filters.map(f => f.id).join(', ');
+      console.log(`    Active filters: ${filterNames}`);
+      console.log();
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Install all dcm Claude Code skills to ~/.claude/skills/
  */
 export async function cmdSkillInstall(options) {
   try {
     const __dirname = dirname(fileURLToPath(import.meta.url));
-    const source = join(__dirname, '..', '..', '..', '.claude', 'skills', 'dcm', 'SKILL.md');
-    const targetDir = join(homedir(), '.claude', 'skills', 'dcm');
-    const target = join(targetDir, 'SKILL.md');
+    const skillsRoot = join(__dirname, '..', '..', '..', '.claude', 'skills');
 
-    if (!existsSync(source)) {
-      throw new Error('Source SKILL.md not found in package. The package may be corrupted.');
+    if (!existsSync(skillsRoot)) {
+      throw new Error('Skills directory not found in package. The package may be corrupted.');
     }
 
-    if (existsSync(target) && !options.force) {
-      if (options.json) {
-        output({ success: false, error: 'Skill already installed. Use --force to overwrite.' }, true);
-      } else {
-        console.error(chalk.red('Error: Skill already installed at ' + target));
-        console.error(chalk.yellow('Use --force to overwrite.'));
+    const skillDirs = readdirSync(skillsRoot, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name);
+
+    if (skillDirs.length === 0) {
+      throw new Error('No skills found in package.');
+    }
+
+    const installed = [];
+    const skipped = [];
+
+    for (const skillName of skillDirs) {
+      const source = join(skillsRoot, skillName, 'SKILL.md');
+      const targetDir = join(homedir(), '.claude', 'skills', skillName);
+      const target = join(targetDir, 'SKILL.md');
+
+      if (!existsSync(source)) {
+        continue;
       }
-      process.exit(1);
-    }
 
-    mkdirSync(targetDir, { recursive: true });
-    copyFileSync(source, target);
+      if (existsSync(target) && !options.force) {
+        skipped.push({ name: skillName, path: target });
+        continue;
+      }
+
+      mkdirSync(targetDir, { recursive: true });
+      copyFileSync(source, target);
+      installed.push({ name: skillName, path: target });
+    }
 
     if (options.json) {
-      output({ success: true, path: target }, true);
+      output({ success: true, installed, skipped }, true);
     } else {
-      console.log(chalk.green('dcm skill installed successfully!'));
-      console.log(chalk.cyan(`Installed to: ${target}`));
+      if (installed.length > 0) {
+        for (const skill of installed) {
+          console.log(chalk.green(`Installed skill: ${skill.name}`));
+          console.log(chalk.cyan(`  → ${skill.path}`));
+        }
+      }
+      if (skipped.length > 0) {
+        for (const skill of skipped) {
+          console.log(chalk.yellow(`Skipped (already installed): ${skill.name}`));
+        }
+        console.log(chalk.yellow('Use --force to overwrite existing skills.'));
+      }
+      if (installed.length === 0 && skipped.length === 0) {
+        console.log(chalk.yellow('No skills to install.'));
+      }
     }
   } catch (error) {
     handleError(error);

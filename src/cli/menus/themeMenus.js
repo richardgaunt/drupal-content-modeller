@@ -16,6 +16,7 @@ import { writeViewMode, viewModeExists, deleteViewMode } from '../../io/configRe
 import { generateViewMode } from '../../generators/viewModeGenerator.js';
 import { ENTITY_ORDER, getEntityTypeLabel, getEntityTypeSingularLabel } from '../../constants/entityTypes.js';
 import { getBundleThemeSuggestions, getFieldThemeSuggestions } from '../../utils/themeSuggestions.js';
+import { checkDrushAvailable, drushGetThemePreprocesses } from '../../commands/drush.js';
 import {
   PROP_TYPES,
   isValidPropName,
@@ -1462,6 +1463,179 @@ async function handleFieldThemeSuggestions(project) {
 }
 
 /**
+ * Handle live theme preprocesses from Drupal via drush
+ * @param {object} project - Project object
+ */
+async function handleThemePreprocesses(project) {
+  const drushCheck = await checkDrushAvailable(project);
+  if (!drushCheck.available) {
+    console.log(chalk.yellow(drushCheck.message));
+    return;
+  }
+
+  const mode = await select({
+    message: 'View preprocesses for:',
+    choices: [
+      { value: 'entity', name: 'Entity type / bundle / view mode' },
+      { value: 'field', name: 'Field' },
+      { value: 'all', name: 'All entity types' }
+    ]
+  });
+
+  let entityType = null;
+  let bundle = null;
+  let viewMode = null;
+  let fieldName = null;
+
+  if (mode === 'entity' || mode === 'field') {
+    const entityTypes = Object.keys(project.entities || {}).filter(
+      type => Object.keys(project.entities[type]).length > 0
+    );
+
+    if (entityTypes.length === 0) {
+      console.log(chalk.yellow('No entities found. Sync the project first.'));
+      return;
+    }
+
+    entityType = await select({
+      message: 'Select entity type:',
+      choices: entityTypes.map(type => ({
+        value: type,
+        name: `${getEntityTypeLabel(type)} (${Object.keys(project.entities[type]).length} bundles)`
+      }))
+    });
+
+    if (mode === 'entity') {
+      const bundles = Object.values(project.entities[entityType] || {});
+      const bundleChoices = [
+        { value: '__all__', name: 'All bundles' },
+        ...bundles
+          .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+          .map(b => ({ value: b.id, name: b.label || b.id }))
+      ];
+
+      const selectedBundle = await select({
+        message: 'Select bundle:',
+        choices: bundleChoices
+      });
+      if (selectedBundle !== '__all__') bundle = selectedBundle;
+
+      // View mode selection
+      const viewModes = (project.viewModes || []).filter(v => v.entityType === entityType);
+      if (viewModes.length > 0) {
+        const vmChoices = [
+          { value: '__all__', name: 'All view modes' },
+          ...viewModes.map(v => ({ value: v.viewModeName, name: v.label || v.viewModeName }))
+        ];
+        const selectedVm = await select({
+          message: 'Select view mode:',
+          choices: vmChoices
+        });
+        if (selectedVm !== '__all__') viewMode = selectedVm;
+      }
+    } else {
+      // Field mode — pick bundle then field
+      const bundles = Object.values(project.entities[entityType] || {});
+      const selectedBundle = await select({
+        message: 'Select bundle:',
+        choices: bundles
+          .sort((a, b) => (a.label || '').localeCompare(b.label || ''))
+          .map(b => ({ value: b.id, name: b.label || b.id }))
+      });
+
+      const bundleObj = project.entities[entityType][selectedBundle];
+      const fields = Object.values(bundleObj.fields || {});
+      if (fields.length === 0) {
+        console.log(chalk.yellow('No fields found for this bundle.'));
+        return;
+      }
+
+      fieldName = await search({
+        message: 'Select field:',
+        source: async (input) => {
+          const term = (input || '').toLowerCase();
+          return fields
+            .filter(f =>
+              f.name.toLowerCase().includes(term) ||
+              (f.label || '').toLowerCase().includes(term)
+            )
+            .map(f => ({
+              value: f.name,
+              name: `${f.label || f.name} (${f.name}) [${f.type}]`
+            }));
+        }
+      });
+    }
+  }
+
+  console.log(chalk.cyan('Querying Drupal theme registry...'));
+  const result = await drushGetThemePreprocesses(project);
+
+  if (!result.success) {
+    console.log(chalk.red(result.message));
+    return;
+  }
+
+  // Filter the data
+  let filtered = result.data;
+
+  if (fieldName) {
+    const fieldData = filtered.field;
+    if (fieldData) {
+      const narrowed = { field: { base: fieldData.base, variants: {} } };
+      for (const [hook, funcs] of Object.entries(fieldData.variants)) {
+        if (hook.includes(`__${fieldName}`)) {
+          narrowed.field.variants[hook] = funcs;
+        }
+      }
+      filtered = narrowed;
+    } else {
+      filtered = {};
+    }
+  } else if (entityType) {
+    const entry = filtered[entityType];
+    if (entry) {
+      const narrowed = { [entityType]: { base: entry.base, variants: {} } };
+      for (const [hook, funcs] of Object.entries(entry.variants)) {
+        if (bundle && !hook.includes(`__${bundle}`)) continue;
+        if (viewMode && !hook.includes(`__${viewMode}`)) continue;
+        narrowed[entityType].variants[hook] = funcs;
+      }
+      filtered = narrowed;
+    } else {
+      filtered = {};
+    }
+  }
+
+  // Print results
+  console.log();
+  for (const [type, entry] of Object.entries(filtered)) {
+    console.log(chalk.cyan(`=== ${type} ===`));
+    console.log();
+
+    if (entry.base.length > 0) {
+      console.log(chalk.white(`  ${type}:`));
+      for (const func of entry.base) {
+        console.log(chalk.gray(`    - ${func}`));
+      }
+      console.log();
+    }
+
+    for (const [hook, funcs] of Object.entries(entry.variants)) {
+      console.log(chalk.white(`  ${hook}:`));
+      for (const func of funcs) {
+        console.log(chalk.gray(`    - ${func}`));
+      }
+      console.log();
+    }
+  }
+
+  if (Object.keys(filtered).length === 0) {
+    console.log(chalk.yellow('No preprocess functions found for the selected filters.'));
+  }
+}
+
+/**
  * Theme & Components submenu
  * @param {object} project - Project object
  * @returns {Promise<object>} - Updated project
@@ -1484,6 +1658,7 @@ export async function handleThemeMenu(project) {
     { value: 'remove-view-mode', name: 'Remove entity view mode' },
     { value: 'bundle-suggestions', name: 'List theme suggestions for bundle' },
     { value: 'field-suggestions', name: 'List theme suggestions for field' },
+    { value: 'theme-preprocesses', name: 'List live preprocess functions (drush)' },
     { value: 'back', name: 'Back' }
   ];
 
@@ -1556,6 +1731,9 @@ export async function handleThemeMenu(project) {
             break;
           case 'field-suggestions':
             await handleFieldThemeSuggestions(project);
+            break;
+          case 'theme-preprocesses':
+            await handleThemePreprocesses(project);
             break;
         }
       } catch (innerError) {

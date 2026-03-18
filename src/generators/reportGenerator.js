@@ -383,6 +383,79 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     md += generateBundlePermissionsTable(options.roles, entityType, bundle.id);
   }
 
+  // Preprocess functions section (from live Drupal data)
+  if (options.preprocessData) {
+    md += generateBundlePreprocessSection(entityType, bundle, options.preprocessData);
+  }
+
+  return md;
+}
+
+/**
+ * Generate markdown section for preprocess functions of a bundle
+ * @param {string} entityType - Entity type
+ * @param {object} bundle - Bundle object
+ * @param {object} preprocessData - Full preprocess data from drush
+ * @returns {string} - Markdown content
+ */
+export function generateBundlePreprocessSection(entityType, bundle, preprocessData) {
+  const entry = preprocessData[entityType];
+  if (!entry) return '';
+
+  let md = `#### Preprocess Functions\n\n`;
+
+  // Entity-level preprocesses
+  const entityRows = [];
+
+  const baseFuncs = Array.isArray(entry.base) ? entry.base : [];
+  if (baseFuncs.length > 0) {
+    entityRows.push({ hook: entityType, funcs: baseFuncs });
+  }
+
+  // Find bundle-specific and bundle+view_mode hooks
+  for (const [hook, funcs] of Object.entries(entry.variants)) {
+    if (hook.includes(`__${bundle.id}`)) {
+      entityRows.push({ hook, funcs: Array.isArray(funcs) ? funcs : [] });
+    }
+  }
+
+  if (entityRows.length > 0) {
+    md += `| Hook | Preprocess Functions |\n`;
+    md += `|------|---------------------|\n`;
+    for (const row of entityRows) {
+      const funcList = row.funcs.map(f => `\`${f}\``).join(', ');
+      md += `| \`${row.hook}\` | ${funcList} |\n`;
+    }
+    md += '\n';
+  }
+
+  // Field-level preprocesses
+  const fieldData = preprocessData.field;
+  if (fieldData && bundle.fields) {
+    const fieldRows = [];
+    const fieldNames = Object.keys(bundle.fields);
+
+    for (const [hook, funcs] of Object.entries(fieldData.variants)) {
+      for (const fieldName of fieldNames) {
+        if (hook.includes(`__${fieldName}`)) {
+          fieldRows.push({ hook, funcs: Array.isArray(funcs) ? funcs : [] });
+          break;
+        }
+      }
+    }
+
+    if (fieldRows.length > 0) {
+      md += `**Field Preprocesses**\n\n`;
+      md += `| Hook | Preprocess Functions |\n`;
+      md += `|------|---------------------|\n`;
+      for (const row of fieldRows) {
+        const funcList = row.funcs.map(f => `\`${f}\``).join(', ');
+        md += `| \`${row.hook}\` | ${funcList} |\n`;
+      }
+      md += '\n';
+    }
+  }
+
   return md;
 }
 

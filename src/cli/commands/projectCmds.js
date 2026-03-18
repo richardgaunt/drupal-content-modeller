@@ -60,6 +60,60 @@ export async function cmdProjectList(options) {
 }
 
 /**
+ * View project configuration details
+ */
+export async function cmdProjectView(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+
+    // Build a config-only view (exclude entities to keep output manageable)
+    const config = {
+      name: project.name,
+      slug: project.slug,
+      configDirectory: project.configDirectory || null,
+      baseUrl: project.baseUrl || null,
+      drupalRoot: project.drupalRoot || null,
+      drushCommand: project.drushCommand || null,
+      lastSync: project.lastSync || null,
+      editableBaseTheme: project.editableBaseTheme || false,
+      theme: project.theme ? {
+        themes: (project.theme.themes || []).map(t => ({
+          name: t.name,
+          machine_name: t.machine_name,
+          directory: t.directory
+        }))
+      } : null
+    };
+
+    if (options.json) {
+      output(config, true);
+    } else {
+      console.log();
+      console.log(chalk.cyan(`Project: ${config.name}`));
+      console.log(`  Slug:             ${config.slug}`);
+      console.log(`  Config directory:  ${config.configDirectory || chalk.gray('not set')}`);
+      console.log(`  Base URL:          ${config.baseUrl || chalk.gray('not set')}`);
+      console.log(`  Drupal root:       ${config.drupalRoot || chalk.gray('not set')}`);
+      console.log(`  Drush command:     ${config.drushCommand || chalk.gray('not set')}`);
+      console.log(`  Last sync:         ${config.lastSync || chalk.gray('never')}`);
+      if (config.theme) {
+        console.log(`  Theme chain:`);
+        for (const t of config.theme.themes) {
+          console.log(`    - ${t.name} (${t.machine_name}) → ${t.directory}`);
+        }
+      }
+      console.log();
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
  * Edit a project
  */
 export async function cmdProjectEdit(options) {

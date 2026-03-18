@@ -10,7 +10,12 @@ export const REPORT_HELP_DATA = {
     'dcm report entity -p my-site -e node',
     'dcm report entity -p my-site -e node -o ~/docs/content-types.md',
     'dcm report project -p my-site',
-    'dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysite.com'
+    'dcm report project -p my-site -o ~/docs/content-model.md -u https://staging.mysite.com',
+    'dcm report migration -p my-site',
+    'dcm report migration -p my-site --json',
+    'dcm report migration -p my-site -m atsb_publication',
+    'dcm report migration -p my-site -m atsb_publication --json',
+    'dcm migration list -p my-site'
   ]
 };
 

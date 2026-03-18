@@ -5,6 +5,8 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 const execAsync = promisify(exec);
 
@@ -155,6 +157,74 @@ export async function syncWithDrupal(project, options = {}) {
     message: 'Configuration synced successfully',
     details: { import: importResult, export: exportResult }
   };
+}
+
+/**
+ * Fetch theme registry preprocess functions from a live Drupal instance.
+ * @param {object} project - Project object with drupalRoot and drushCommand
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function drushGetThemePreprocesses(project) {
+  if (!project.drupalRoot) {
+    return {
+      success: false,
+      message: 'Drupal root directory not configured',
+      data: null
+    };
+  }
+
+  const drushCmd = project.drushCommand || 'drush';
+
+  // Write PHP script inside the Drupal root so it's accessible inside Docker
+  // containers. Using php:script avoids shell escaping issues with $variables
+  // across ahoy/ddev/docker wrappers that nest multiple bash -c layers.
+  /* eslint-disable no-useless-escape */
+  const phpScript = `<?php
+\$registry = \\Drupal::service('theme.registry')->get();
+\$types = ['paragraph','node','taxonomy_term','block','block_content','field','media'];
+\$result = [];
+foreach (\$types as \$type) {
+  \$entry = ['base' => [], 'variants' => []];
+  if (isset(\$registry[\$type])) {
+    \$entry['base'] = \$registry[\$type]['preprocess functions'] ?? [];
+  }
+  \$prefix = \$type . '__';
+  foreach (\$registry as \$hook => \$info) {
+    if (strpos(\$hook, \$prefix) === 0) {
+      \$entry['variants'][\$hook] = \$info['preprocess functions'] ?? [];
+    }
+  }
+  \$result[\$type] = \$entry;
+}
+echo json_encode(\$result);
+`;
+  /* eslint-enable no-useless-escape */
+
+  const scriptName = `.dcm-preprocess-${Date.now()}.php`;
+  const scriptPath = join(project.drupalRoot, scriptName);
+
+  try {
+    writeFileSync(scriptPath, phpScript);
+    const { stdout } = await execAsync(`${drushCmd} php:script ${scriptName}`, {
+      cwd: project.drupalRoot,
+      timeout: 60000
+    });
+
+    const data = JSON.parse(stdout.trim());
+    return {
+      success: true,
+      message: 'Theme preprocess data retrieved',
+      data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to fetch theme preprocesses: ${error.message}`,
+      data: null
+    };
+  } finally {
+    try { unlinkSync(scriptPath); } catch { /* ignore cleanup errors */ }
+  }
 }
 
 /**

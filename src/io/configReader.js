@@ -25,6 +25,16 @@ import {
   getFormDisplayFilename
 } from '../parsers/formDisplayParser.js';
 import {
+  filterMigrationFiles,
+  filterMigrationGroupFiles,
+  parseMigration,
+  parseMigrationGroup
+} from '../parsers/migrationParser.js';
+import {
+  filterFormatFiles,
+  parseFilterFormat
+} from '../parsers/filterParser.js';
+import {
   parseRole,
   getRoleFilename,
   isRoleFile,
@@ -638,6 +648,124 @@ export function viewModeExists(configPath, entityType, viewModeName) {
 export async function writeViewMode(configPath, entityType, viewModeName, yamlContent) {
   const filePath = getViewModePath(configPath, entityType, viewModeName);
   await writeYamlFile(filePath, yamlContent);
+}
+
+// ============================================
+// Filter Format Functions
+// ============================================
+
+/**
+ * Read all filter format configs from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed filter formats
+ */
+export async function parseFilterFormats(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const formatFiles = filterFormatFiles(files);
+  const formats = [];
+
+  for (const filename of formatFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const format = parseFilterFormat(config);
+        if (format && format.id) {
+          formats.push(format);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return formats.sort((a, b) => a.weight - b.weight);
+}
+
+// ============================================
+// Migration Functions
+// ============================================
+
+/**
+ * Read all migration configs from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object>} - { groups: [], migrations: [] }
+ */
+export async function parseMigrationConfigs(configPath) {
+  if (!directoryExists(configPath)) {
+    throw new Error(`Configuration directory does not exist: ${configPath}`);
+  }
+
+  const files = await listFiles(configPath);
+  const groups = [];
+  const migrations = [];
+
+  // Parse migration groups
+  const groupFiles = filterMigrationGroupFiles(files);
+  for (const filename of groupFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const group = parseMigrationGroup(config);
+        if (group && group.id) {
+          groups.push(group);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  // Parse migrations
+  const migrationFiles = filterMigrationFiles(files);
+  for (const filename of migrationFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const migration = parseMigration(config);
+        if (migration && migration.id) {
+          migrations.push(migration);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return { groups, migrations };
+}
+
+/**
+ * Read a single migration config by ID
+ * @param {string} configPath - Path to config directory
+ * @param {string} migrationId - Migration ID
+ * @returns {Promise<object|null>} - Parsed migration or null
+ */
+export async function parseSingleMigrationConfig(configPath, migrationId) {
+  const filename = `migrate_plus.migration.${migrationId}.yml`;
+  const filePath = join(configPath, filename);
+
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    if (config) {
+      return parseMigration(config);
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+  }
+
+  return null;
 }
 
 /**

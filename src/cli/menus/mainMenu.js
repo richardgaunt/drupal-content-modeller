@@ -41,13 +41,17 @@ import { handleEditFormDisplay } from './formDisplayMenus.js';
 import { handleManageRoles } from './roleMenus.js';
 import { handleManageStories } from './storyMenus.js';
 import { handleThemeMenu } from './themeMenus.js';
+import { parseFilterFormats } from '../../io/configReader.js';
 import {
   handleBundleReport,
   handleEntityReport,
   handleProjectReport,
+  handleExportJson,
   handleImportModel,
   handleAdminLinks,
-  handleDrushSync
+  handleDrushSync,
+  handleMigrationReport,
+  handleSingleMigrationReport
 } from './reportMenus.js';
 import {
   handleExportSpreadsheet,
@@ -358,6 +362,9 @@ async function handleAction(project, action) {
     case 'report-project':
       await handleProjectReport(project);
       break;
+    case 'export-json':
+      await handleExportJson(project);
+      break;
     case 'import-model':
       await handleImportModel(project);
       project = await loadProject(project.slug);
@@ -367,6 +374,9 @@ async function handleAction(project, action) {
       break;
     case 'export-spreadsheet':
       await handleExportSpreadsheet(project);
+      break;
+    case 'list-filters':
+      await handleListFilters(project);
       break;
     case 'admin-links':
       await handleAdminLinks(project);
@@ -379,6 +389,12 @@ async function handleAction(project, action) {
       break;
     case 'drush-sync':
       await handleDrushSync(project);
+      break;
+    case 'report-migrations':
+      await handleMigrationReport(project);
+      break;
+    case 'report-migration-single':
+      await handleSingleMigrationReport(project);
       break;
   }
   return project;
@@ -409,4 +425,52 @@ function handleListEntities(project) {
 
   console.log(`Total: ${summary.bundleCount} bundles across ${summary.entityTypeCount} entity types`);
   console.log();
+}
+
+/**
+ * Handle list text formats action
+ * @param {object} project - The current project
+ */
+async function handleListFilters(project) {
+  try {
+    const formats = await parseFilterFormats(project.configDirectory);
+
+    if (formats.length === 0) {
+      console.log(chalk.yellow('No text formats found.'));
+      return;
+    }
+
+    console.log();
+    console.log(chalk.cyan(`Text Formats (${formats.length}):`));
+    console.log();
+
+    for (const fmt of formats) {
+      const status = fmt.status ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log(`  ${chalk.bold(fmt.name)} (${fmt.id}) [${status}]`);
+      console.log(`    HTML mode: ${fmt.htmlMode}`);
+
+      if (fmt.allowedHtml) {
+        const tags = fmt.allowedHtml.match(/<([a-z][a-z0-9-]*)/gi) || [];
+        const tagNames = tags.map(t => t.slice(1));
+        console.log(`    Allowed tags: ${tagNames.join(', ')}`);
+      }
+
+      if (fmt.mediaEmbed) {
+        const types = fmt.mediaEmbed.allowedMediaTypes.length > 0
+          ? fmt.mediaEmbed.allowedMediaTypes.join(', ')
+          : 'all';
+        console.log(`    Media embed: ${chalk.cyan('yes')} (view mode: ${fmt.mediaEmbed.defaultViewMode}, types: ${types})`);
+      }
+
+      if (fmt.linkit) {
+        console.log(`    Linkit: ${chalk.cyan('yes')}`);
+      }
+
+      const filterNames = fmt.filters.map(f => f.id).join(', ');
+      console.log(`    Active filters: ${filterNames}`);
+      console.log();
+    }
+  } catch (error) {
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
 }

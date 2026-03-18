@@ -5,7 +5,7 @@
 
 import { select, input, checkbox, search, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { readFileSync } from 'fs';
 
 import { getBundleSummary } from '../../commands/list.js';
@@ -21,9 +21,41 @@ import {
   filterReportData,
   listReportBundles
 } from '../../commands/import.js';
-import { getEntityTypeSingularLabel } from '../../constants/entityTypes.js';
-import { syncWithDrupal, getSyncStatus } from '../../commands/drush.js';
+import { getEntityTypeSingularLabel, ENTITY_ORDER } from '../../constants/entityTypes.js';
+import { writeFile, mkdir } from 'fs/promises';
+import { syncWithDrupal, getSyncStatus, checkDrushAvailable, drushGetThemePreprocesses } from '../../commands/drush.js';
 import { promptForReportUrl } from './contentMenus.js';
+import {
+  createMigrationReport,
+  createSingleMigrationReport,
+  getMigrationReportData,
+  listMigrations
+} from '../../commands/migration.js';
+
+/**
+ * Prompt user to include live preprocess data if drush is available
+ * @param {object} project - The current project
+ * @returns {Promise<object|null>} - Preprocess data or null
+ */
+async function promptForPreprocessData(project) {
+  const drushCheck = await checkDrushAvailable(project);
+  if (!drushCheck.available) return null;
+
+  const include = await confirm({
+    message: 'Include live preprocess data from Drupal?',
+    default: false
+  });
+
+  if (!include) return null;
+
+  console.log(chalk.cyan('Querying Drupal theme registry...'));
+  const result = await drushGetThemePreprocesses(project);
+  if (!result.success) {
+    console.log(chalk.yellow(`Could not fetch preprocesses: ${result.message}`));
+    return null;
+  }
+  return result.data;
+}
 
 /**
  * Handle single bundle report generation
@@ -89,12 +121,18 @@ export async function handleBundleReport(project) {
     // Read roles for permissions
     const roles = await listRoles(project);
 
+    // Optionally fetch live preprocess data
+    const preprocessData = await promptForPreprocessData(project);
+
     // Generate reports for all selected bundles
     for (const bundleId of bundleIds) {
       const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
       const outputPath = join(getReportsDir(project.slug), filename);
 
-      const result = await createBundleReport(project, entityType, bundleId, outputPath, baseUrl, { roles });
+      const opts = { roles, preprocessData };
+      const result = await createBundleReport(
+        project, entityType, bundleId, outputPath, baseUrl, opts
+      );
       if (result) {
         console.log(chalk.green(`Report saved to: ${outputPath}`));
       } else {
@@ -149,11 +187,14 @@ export async function handleEntityReport(project) {
     // Read roles for permissions
     const roles = await listRoles(project);
 
+    // Optionally fetch live preprocess data
+    const preprocessData = await promptForPreprocessData(project);
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-${entityType}-report.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createEntityReport(project, entityType, outputPath, baseUrl, { roles });
+    await createEntityReport(project, entityType, outputPath, baseUrl, { roles, preprocessData });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
@@ -183,16 +224,71 @@ export async function handleProjectReport(project) {
     // Read roles for permissions
     const roles = await listRoles(project);
 
+    // Optionally fetch live preprocess data
+    const preprocessData = await promptForPreprocessData(project);
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-content-model.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createProjectReport(project, outputPath, baseUrl, { roles });
+    await createProjectReport(project, outputPath, baseUrl, { roles, preprocessData });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;
     }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle export content model to JSON
+ * Exports the project's content model in the same format used by JSON import.
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleExportJson(project) {
+  try {
+    if (!project.entities) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    const defaultPath = join(getReportsDir(project.slug), `${project.slug}-content-model.json`);
+
+    const outputPath = await input({
+      message: 'Output file path:',
+      default: defaultPath
+    });
+
+    const entities = project.entities || {};
+    const entityTypes = ENTITY_ORDER
+      .filter(et => Object.keys(entities[et] || {}).length > 0)
+      .map(et => ({
+        entityType: et,
+        bundles: Object.entries(entities[et]).map(([bundleId, bundleData]) => ({
+          bundle: bundleId,
+          label: bundleData.label || bundleId,
+          description: bundleData.description || '',
+          fields: Object.entries(bundleData.fields || {}).map(([fieldName, fieldData]) => ({
+            name: fieldName,
+            type: fieldData.type,
+            label: fieldData.label || fieldName,
+            description: fieldData.description || '',
+            required: !!fieldData.required,
+            cardinality: fieldData.cardinality || 1,
+            settings: fieldData.settings || {}
+          }))
+        }))
+      }));
+
+    const data = { entityTypes };
+    const trimmedPath = outputPath.trim();
+    await mkdir(dirname(trimmedPath), { recursive: true });
+    await writeFile(trimmedPath, JSON.stringify(data, null, 2), 'utf8');
+    console.log(chalk.green(`\nJSON exported to: ${outputPath.trim()}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') return;
     console.log(chalk.red(`Error: ${error.message}`));
   }
 }
@@ -566,6 +662,97 @@ export async function handleDrushSync(project) {
     if (error.name === 'ExitPromptError') {
       return;
     }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle migration report generation (all migrations)
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleMigrationReport(project) {
+  try {
+    const migrations = await listMigrations(project);
+
+    if (migrations.length === 0) {
+      console.log(chalk.yellow('No migration configs found in this project.'));
+      return;
+    }
+
+    const format = await select({
+      message: `Found ${migrations.length} migrations. Output format:`,
+      choices: [
+        { value: 'markdown', name: 'Markdown report' },
+        { value: 'json', name: 'JSON (for LLM consumption)' }
+      ]
+    });
+
+    if (format === 'json') {
+      const data = await getMigrationReportData(project);
+      const defaultPath = join(getReportsDir(project.slug), `${project.slug}-migrations.json`);
+      const outputPath = await input({
+        message: 'Output file path:',
+        default: defaultPath
+      });
+
+      await mkdir(dirname(outputPath.trim()), { recursive: true });
+      await writeFile(outputPath.trim(), JSON.stringify(data, null, 2), 'utf8');
+      console.log(chalk.green(`JSON exported to: ${outputPath.trim()}`));
+    } else {
+      const filename = `${project.slug}-migrations-report.md`;
+      const outputPath = join(getReportsDir(project.slug), filename);
+      await createMigrationReport(project, outputPath);
+      console.log(chalk.green(`Report saved to: ${outputPath}`));
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') return;
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle single migration report generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleSingleMigrationReport(project) {
+  try {
+    const migrations = await listMigrations(project);
+
+    if (migrations.length === 0) {
+      console.log(chalk.yellow('No migration configs found in this project.'));
+      return;
+    }
+
+    const migrationChoices = migrations.map(m => ({
+      value: m.id,
+      name: `${m.label} (${m.id})${m.group ? ` [${m.group}]` : ''}`,
+      label: m.label
+    }));
+
+    const migrationId = await search({
+      message: 'Select migration (type to search):',
+      source: async (searchInput) => {
+        const term = (searchInput || '').toLowerCase();
+        return migrationChoices.filter(c =>
+          c.name.toLowerCase().includes(term) ||
+          c.value.toLowerCase().includes(term)
+        );
+      }
+    });
+
+    const filename = `${project.slug}-migration-${migrationId}.md`;
+    const outputPath = join(getReportsDir(project.slug), filename);
+
+    const result = await createSingleMigrationReport(project, migrationId, outputPath);
+    if (result) {
+      console.log(chalk.green(`Report saved to: ${outputPath}`));
+    } else {
+      console.log(chalk.red(`Migration "${migrationId}" not found.`));
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') return;
     console.log(chalk.red(`Error: ${error.message}`));
   }
 }

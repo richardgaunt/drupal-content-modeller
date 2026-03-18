@@ -12,6 +12,7 @@ import { generateMachineName, validateMachineName } from '../../utils/slug.js';
 import { ENTITY_ORDER, getEntityTypeLabel, getEntityTypeSingularLabel } from '../../constants/entityTypes.js';
 import { getBundleThemeSuggestions, getFieldThemeSuggestions } from '../../utils/themeSuggestions.js';
 import { createTable } from '../../commands/list.js';
+import { checkDrushAvailable, drushGetThemePreprocesses } from '../../commands/drush.js';
 import {
   output,
   handleError,
@@ -727,6 +728,118 @@ export async function cmdThemeSuggestionsField(options) {
         console.log(chalk.gray(`  ${twig}`));
         console.log();
       }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Theme Preprocess Commands (live from Drupal)
+// ============================================
+
+/**
+ * Filter preprocess data by entity type, bundle, view mode, or field.
+ * @param {object} data - Full preprocess data from drush
+ * @param {object} filters - Optional filters
+ * @returns {object} - Filtered data
+ */
+function filterPreprocessData(data, filters = {}) {
+  const { entityType, bundle, viewMode, field } = filters;
+
+  // If filtering by field, only return field data
+  if (field) {
+    const fieldData = data.field;
+    if (!fieldData) return {};
+
+    const filtered = { field: { base: fieldData.base, variants: {} } };
+    for (const [hook, funcs] of Object.entries(fieldData.variants)) {
+      if (hook.includes(`__${field}`)) {
+        filtered.field.variants[hook] = funcs;
+      }
+    }
+    return filtered;
+  }
+
+  // If no entity type filter, return everything
+  if (!entityType) return data;
+
+  const entry = data[entityType];
+  if (!entry) return {};
+
+  const filtered = { [entityType]: { base: entry.base, variants: {} } };
+
+  for (const [hook, funcs] of Object.entries(entry.variants)) {
+    if (bundle && !hook.includes(`__${bundle}`)) continue;
+    if (viewMode && !hook.includes(`__${viewMode}`)) continue;
+    filtered[entityType].variants[hook] = funcs;
+  }
+
+  return filtered;
+}
+
+/**
+ * Format preprocess data for console output
+ * @param {object} data - Preprocess data (full or filtered)
+ */
+function printPreprocessData(data) {
+  for (const [entityType, entry] of Object.entries(data)) {
+    console.log(chalk.cyan(`=== ${entityType} ===`));
+    console.log();
+
+    if (entry.base.length > 0) {
+      console.log(chalk.white(`  ${entityType}:`));
+      for (const func of entry.base) {
+        console.log(chalk.gray(`    - ${func}`));
+      }
+      console.log();
+    }
+
+    for (const [hook, funcs] of Object.entries(entry.variants)) {
+      console.log(chalk.white(`  ${hook}:`));
+      for (const func of funcs) {
+        console.log(chalk.gray(`    - ${func}`));
+      }
+      console.log();
+    }
+  }
+}
+
+/**
+ * List live theme preprocess functions from a Drupal instance
+ */
+export async function cmdThemePreprocesses(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+
+    const drushCheck = await checkDrushAvailable(project);
+    if (!drushCheck.available) {
+      throw new Error(drushCheck.message);
+    }
+
+    console.log(chalk.cyan('Querying Drupal theme registry...'));
+    const result = await drushGetThemePreprocesses(project);
+
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    const filtered = filterPreprocessData(result.data, {
+      entityType: options.entityType,
+      bundle: options.bundle,
+      viewMode: options.viewMode,
+      field: options.field
+    });
+
+    if (options.json) {
+      output(filtered, true);
+    } else {
+      console.log();
+      printPreprocessData(filtered);
     }
   } catch (error) {
     handleError(error);

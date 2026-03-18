@@ -40,15 +40,13 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'edit-field', name: 'Edit field instance' },
     { value: 'add-bundle-to-refs', name: 'Add bundle to entity reference fields' },
     { value: 'edit-form-display', name: 'Edit form display' },
-    { value: 'import-model', name: 'Import content model from JSON' },
-    { value: 'import-spreadsheet', name: 'Import content model from spreadsheet' },
-    { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
     { value: 'back', name: 'Back' }
   ],
   'browse-inspect': [
     { value: 'list-entities', name: 'List entity types' },
     { value: 'list-entity-fields', name: 'List fields of entity' },
     { value: 'list-bundle-fields', name: 'List fields of bundle' },
+    { value: 'list-filters', name: 'List text formats & filters' },
     { value: 'admin-links', name: 'Admin links for bundle' },
     { value: 'back', name: 'Back' }
   ],
@@ -56,7 +54,12 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'report-bundle', name: 'Generate report for bundle' },
     { value: 'report-entity', name: 'Generate report for entity type' },
     { value: 'report-project', name: 'Generate report for project' },
+    { value: 'export-json', name: 'Export content model to JSON' },
     { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
+    { value: 'import-model', name: 'Import content model from JSON' },
+    { value: 'import-spreadsheet', name: 'Import content model from spreadsheet' },
+    { value: 'report-migrations', name: 'Generate migration report' },
+    { value: 'report-migration-single', name: 'Generate single migration report' },
     { value: 'back', name: 'Back' }
   ],
   'roles': [

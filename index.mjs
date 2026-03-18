@@ -6,6 +6,7 @@ import {
   cmdHelp,
   cmdProjectCreate,
   cmdProjectList,
+  cmdProjectView,
   cmdProjectEdit,
   cmdProjectSync,
   cmdProjectDelete,
@@ -58,8 +59,13 @@ import {
   cmdViewModeDelete,
   cmdThemeSuggestionsBundle,
   cmdThemeSuggestionsField,
+  cmdThemePreprocesses,
   cmdExportSpreadsheet,
-  cmdImportSpreadsheet
+  cmdImportSpreadsheet,
+  cmdMigrationReport,
+  cmdMigrationReportSingle,
+  cmdMigrationList,
+  cmdFilterList
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -108,6 +114,13 @@ projectCmd
   .description('List all projects')
   .option('-j, --json', 'Output as JSON')
   .action(cmdProjectList);
+
+projectCmd
+  .command('view')
+  .description('View project configuration details')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdProjectView);
 
 projectCmd
   .command('edit')
@@ -283,6 +296,51 @@ reportCmd
   .option('-j, --json', 'Output as JSON')
   .action(cmdReportProject);
 
+reportCmd
+  .command('migration')
+  .description('Generate a migration report (all or single)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-m, --migration <id>', 'Single migration ID (omit for all)')
+  .option('-o, --output <path>', 'Output file path')
+  .option('-j, --json', 'Output as JSON')
+  .action(async (options) => {
+    if (options.migration) {
+      await cmdMigrationReportSingle(options);
+    } else {
+      await cmdMigrationReport(options);
+    }
+  });
+
+// ============================================
+// Migration Commands
+// ============================================
+
+const migrationCmd = program
+  .command('migration')
+  .description('Migration management commands');
+
+migrationCmd
+  .command('list')
+  .description('List all migrations in a project')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdMigrationList);
+
+migrationCmd
+  .command('report')
+  .description('Generate a migration report')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-m, --migration <id>', 'Single migration ID (omit for all)')
+  .option('-o, --output <path>', 'Output file path')
+  .option('-j, --json', 'Output as JSON')
+  .action(async (options) => {
+    if (options.migration) {
+      await cmdMigrationReportSingle(options);
+    } else {
+      await cmdMigrationReport(options);
+    }
+  });
+
 // ============================================
 // Admin Commands
 // ============================================
@@ -302,6 +360,17 @@ adminCmd
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .option('-j, --json', 'Output as JSON')
   .action(cmdAdminLinks);
+
+// ============================================
+// Filter Commands
+// ============================================
+
+program
+  .command('filter-list')
+  .description('List text formats and filters in a project')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdFilterList);
 
 // ============================================
 // Form Display Commands
@@ -770,6 +839,21 @@ themeSuggestionsCmd
   .requiredOption('-t, --field-type <type>', 'Field type')
   .option('-j, --json', 'Output as JSON')
   .action(cmdThemeSuggestionsField);
+
+// ============================================
+// Theme Preprocess Commands (live from Drupal)
+// ============================================
+
+program
+  .command('theme-preprocesses')
+  .description('List live theme preprocess functions from Drupal')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-e, --entity-type <type>', 'Filter by entity type')
+  .option('-b, --bundle <bundle>', 'Filter by bundle')
+  .option('-v, --view-mode <mode>', 'Filter by view mode')
+  .option('-f, --field <name>', 'Filter by field name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdThemePreprocesses);
 
 // ============================================
 // Help Command

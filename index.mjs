@@ -65,7 +65,10 @@ import {
   cmdMigrationReport,
   cmdMigrationReportSingle,
   cmdMigrationList,
-  cmdFilterList
+  cmdFilterList,
+  cmdWorkflowList,
+  cmdWorkflowAdd,
+  cmdWorkflowRemove
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -371,6 +374,41 @@ program
   .requiredOption('-p, --project <slug>', 'Project slug')
   .option('-j, --json', 'Output as JSON')
   .action(cmdFilterList);
+
+// ============================================
+// Workflow Commands
+// ============================================
+
+const workflowCmd = program
+  .command('workflow')
+  .description('Workflow management commands');
+
+workflowCmd
+  .command('list')
+  .description('List workflows and their entity type assignments')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdWorkflowList);
+
+workflowCmd
+  .command('add')
+  .description('Add a bundle to a workflow')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-w, --workflow <id>', 'Workflow ID')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdWorkflowAdd);
+
+workflowCmd
+  .command('remove')
+  .description('Remove a bundle from a workflow')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-w, --workflow <id>', 'Workflow ID')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdWorkflowRemove);
 
 // ============================================
 // Form Display Commands

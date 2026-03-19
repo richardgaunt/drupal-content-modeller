@@ -96,6 +96,18 @@ field_n_body/format:
   default_value: civictheme_rich_text   # ← from filter-list output
 ```
 
+## Step 3c: Check workflow assignments
+
+Check if any destination bundles are in a content moderation workflow:
+
+```bash
+dcm workflow list -p <project> --json
+```
+
+This returns all workflows with their states, transitions, and which entity type/bundles are assigned. If a destination bundle appears in a workflow's `entityTypes`, you must:
+1. Add a `moderation_state` process mapping (see "Moderation State" pattern below) instead of setting `status` directly
+2. Map source publish status to the correct workflow state IDs
+
 ## Step 4: Plan the migration chain
 
 Determine what migrations are needed and their dependency order:
@@ -232,6 +244,20 @@ uid:
   plugin: default_value
   default_value: 1
 ```
+
+### Moderation State (content moderation / workflows)
+When the destination bundle is in a content moderation workflow, add a `moderation_state` process mapping. Use `static_map` to translate the source node's `status` field (0 = unpublished, 1 = published) to workflow state machine names:
+```yaml
+moderation_state:
+  plugin: static_map
+  source: status
+  map:
+    0: draft
+    1: published
+```
+The `map` values (`draft`, `published`) are the workflow state IDs — check via `dcm workflow list -p <project> --json` to get the actual state IDs for the destination workflow. The standard CivicTheme editorial workflow uses `draft`, `needs_review`, `published`, and `archived`. For most migrations, mapping `0 → draft` and `1 → published` is correct.
+
+**Important:** When `moderation_state` is set, do **not** also set `status` directly — content moderation controls the published state via the workflow. If you set both, the `status` value may conflict with the moderation state.
 
 ### Text with Format (text_long, string_long)
 Always set both value and format:

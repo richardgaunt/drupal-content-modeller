@@ -32,7 +32,18 @@ import {
   getSyncStatus
 } from '../../commands/drush.js';
 import { readLog } from '../../io/commandLog.js';
-import { parseFilterFormats } from '../../io/configReader.js';
+import {
+  parseFilterFormats,
+  parseWorkflowConfigs,
+  readRawWorkflowConfig,
+  writeWorkflowConfig
+} from '../../io/configReader.js';
+import {
+  addBundleToWorkflow,
+  removeBundleFromWorkflow
+} from '../../parsers/workflowParser.js';
+import { getBundleConfigName } from '../../constants/entityTypes.js';
+import yaml from 'js-yaml';
 import {
   output,
   handleError,
@@ -574,6 +585,154 @@ export async function cmdLog(options) {
       }
       console.log();
     }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * List workflows in a project
+ */
+export async function cmdWorkflowList(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    const workflows = await parseWorkflowConfigs(project.configDirectory);
+
+    if (options.json) {
+      output(workflows, true);
+      return;
+    }
+
+    if (workflows.length === 0) {
+      console.log(chalk.yellow('No workflows found.'));
+      return;
+    }
+
+    console.log();
+    console.log(chalk.cyan(`Workflows (${workflows.length}):`));
+
+    for (const wf of workflows) {
+      const status = wf.status ? chalk.green('enabled') : chalk.gray('disabled');
+      console.log();
+      console.log(`  ${chalk.bold(wf.label)} (${wf.id}) [${status}]`);
+      console.log(`    Type: ${wf.type}`);
+      console.log(`    Default state: ${wf.defaultModerationState}`);
+
+      // States
+      const stateLabels = wf.states.map(s => {
+        const pub = s.published ? chalk.green('published') : chalk.gray('unpublished');
+        return `${s.label} [${pub}]`;
+      });
+      console.log(`    States: ${stateLabels.join(', ')}`);
+
+      // Transitions
+      const transitionLabels = wf.transitions.map(t =>
+        `${t.label} (${t.from.join(', ')} → ${t.to})`
+      );
+      console.log(`    Transitions: ${transitionLabels.join('; ')}`);
+
+      // Entity types
+      const entityEntries = Object.entries(wf.entityTypes);
+      if (entityEntries.length === 0) {
+        console.log(`    Entity types: ${chalk.gray('none')}`);
+      } else {
+        console.log('    Entity types:');
+        for (const [entityType, bundles] of entityEntries) {
+          console.log(`      ${chalk.cyan(entityType)}: ${bundles.join(', ')}`);
+        }
+      }
+    }
+    console.log();
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Add a bundle to a workflow
+ */
+export async function cmdWorkflowAdd(options) {
+  try {
+    if (!options.project) throw new Error('--project is required');
+    if (!options.workflow) throw new Error('--workflow is required');
+    if (!options.entityType) throw new Error('--entity-type is required');
+    if (!options.bundle) throw new Error('--bundle is required');
+
+    if (!isValidEntityType(options.entityType)) {
+      throw new Error(`Invalid entity type: ${options.entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`);
+    }
+
+    const project = await loadProject(options.project);
+    const config = await readRawWorkflowConfig(project.configDirectory, options.workflow);
+    if (!config) {
+      throw new Error(`Workflow not found: ${options.workflow}`);
+    }
+
+    // Check if bundle already in workflow
+    const existing = config.type_settings?.entity_types?.[options.entityType] || [];
+    if (existing.includes(options.bundle)) {
+      throw new Error(`Bundle "${options.bundle}" (${options.entityType}) is already in workflow "${options.workflow}"`);
+    }
+
+    const bundleConfigName = getBundleConfigName(options.entityType, options.bundle);
+    const updated = addBundleToWorkflow(config, options.entityType, options.bundle, bundleConfigName);
+    const yamlContent = yaml.dump(updated, { lineWidth: -1, noRefs: true, quotingType: "'", forceQuotes: false });
+    await writeWorkflowConfig(project.configDirectory, options.workflow, yamlContent);
+
+    if (options.json) {
+      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle }, true);
+    } else {
+      console.log(chalk.green(`Added ${options.entityType}:${options.bundle} to workflow "${options.workflow}".`));
+    }
+
+    logSuccess(`workflow add -w ${options.workflow} -e ${options.entityType} -b ${options.bundle}`);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Remove a bundle from a workflow
+ */
+export async function cmdWorkflowRemove(options) {
+  try {
+    if (!options.project) throw new Error('--project is required');
+    if (!options.workflow) throw new Error('--workflow is required');
+    if (!options.entityType) throw new Error('--entity-type is required');
+    if (!options.bundle) throw new Error('--bundle is required');
+
+    if (!isValidEntityType(options.entityType)) {
+      throw new Error(`Invalid entity type: ${options.entityType}. Valid types: ${VALID_ENTITY_TYPES.join(', ')}`);
+    }
+
+    const project = await loadProject(options.project);
+    const config = await readRawWorkflowConfig(project.configDirectory, options.workflow);
+    if (!config) {
+      throw new Error(`Workflow not found: ${options.workflow}`);
+    }
+
+    // Check if bundle is in workflow
+    const existing = config.type_settings?.entity_types?.[options.entityType] || [];
+    if (!existing.includes(options.bundle)) {
+      throw new Error(`Bundle "${options.bundle}" (${options.entityType}) is not in workflow "${options.workflow}"`);
+    }
+
+    const bundleConfigName = getBundleConfigName(options.entityType, options.bundle);
+    const updated = removeBundleFromWorkflow(config, options.entityType, options.bundle, bundleConfigName);
+    const yamlContent = yaml.dump(updated, { lineWidth: -1, noRefs: true, quotingType: "'", forceQuotes: false });
+    await writeWorkflowConfig(project.configDirectory, options.workflow, yamlContent);
+
+    if (options.json) {
+      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle }, true);
+    } else {
+      console.log(chalk.green(`Removed ${options.entityType}:${options.bundle} from workflow "${options.workflow}".`));
+    }
+
+    logSuccess(`workflow remove -w ${options.workflow} -e ${options.entityType} -b ${options.bundle}`);
   } catch (error) {
     handleError(error);
   }

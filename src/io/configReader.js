@@ -35,6 +35,11 @@ import {
   parseFilterFormat
 } from '../parsers/filterParser.js';
 import {
+  filterWorkflowFiles,
+  parseWorkflow,
+  getWorkflowFilename
+} from '../parsers/workflowParser.js';
+import {
   parseRole,
   getRoleFilename,
   isRoleFile,
@@ -684,6 +689,69 @@ export async function parseFilterFormats(configPath) {
   }
 
   return formats.sort((a, b) => a.weight - b.weight);
+}
+
+// ============================================
+// Workflow Functions
+// ============================================
+
+/**
+ * Read all workflow configs from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed workflows
+ */
+export async function parseWorkflowConfigs(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const workflowFiles = filterWorkflowFiles(files);
+  const workflows = [];
+
+  for (const filename of workflowFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const workflow = parseWorkflow(config);
+        if (workflow && workflow.id) {
+          workflows.push(workflow);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return workflows;
+}
+
+/**
+ * Read a single raw workflow config (unparsed YAML object)
+ * @param {string} configPath - Path to config directory
+ * @param {string} workflowId - Workflow ID
+ * @returns {Promise<object|null>} - Raw config object or null
+ */
+export async function readRawWorkflowConfig(configPath, workflowId) {
+  const filename = getWorkflowFilename(workflowId);
+  const filePath = join(configPath, filename);
+  if (!existsSync(filePath)) return null;
+
+  const content = await readTextFile(filePath);
+  return parseYaml(content);
+}
+
+/**
+ * Write a workflow config to a YAML file
+ * @param {string} configPath - Path to config directory
+ * @param {string} workflowId - Workflow ID
+ * @param {string} yamlContent - YAML string to write
+ */
+export async function writeWorkflowConfig(configPath, workflowId, yamlContent) {
+  const filename = getWorkflowFilename(workflowId);
+  const filePath = join(configPath, filename);
+  await writeYamlFile(filePath, yamlContent);
 }
 
 // ============================================

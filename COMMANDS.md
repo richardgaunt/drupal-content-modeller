@@ -1897,6 +1897,130 @@ dcm theme-suggestions field -p my-site -e node -b article -n field_n_subtitle -t
 
 ---
 
+## Workflow Commands
+
+### `dcm workflow list`
+
+List workflows and their entity type/bundle assignments.
+
+```bash
+dcm workflow list --project "project-slug" [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+dcm workflow list -p my-site
+dcm workflow list -p my-site --json
+```
+
+**Text output:**
+```
+Workflows (1):
+
+  Editorial (civictheme_editorial) [enabled]
+    Type: content_moderation
+    Default state: published
+    States: Draft [unpublished], Needs Review [unpublished], Published [published], Archived [unpublished]
+    Transitions: Create New Draft (draft, published → draft); Needs Review (draft → needs_review); Publish (draft, needs_review, published → published); Archive (published → archived)
+    Entity types:
+      block_content: civictheme_banner, civictheme_component_block
+      media: civictheme_audio, civictheme_document, civictheme_image
+      node: civictheme_alert, civictheme_event, civictheme_page
+```
+
+**JSON output:**
+```json
+[
+  {
+    "id": "civictheme_editorial",
+    "label": "Editorial",
+    "type": "content_moderation",
+    "status": true,
+    "defaultModerationState": "published",
+    "states": [
+      { "id": "draft", "label": "Draft", "published": false, "defaultRevision": false, "weight": -2 },
+      { "id": "published", "label": "Published", "published": true, "defaultRevision": true, "weight": 0 }
+    ],
+    "transitions": [
+      { "id": "publish", "label": "Publish", "from": ["draft", "needs_review", "published"], "to": "published", "weight": 1 }
+    ],
+    "entityTypes": {
+      "node": ["civictheme_alert", "civictheme_event", "civictheme_page"],
+      "media": ["civictheme_audio", "civictheme_document"]
+    }
+  }
+]
+```
+
+---
+
+### `dcm workflow add`
+
+Add a bundle to a workflow. Updates both `entity_types` and `dependencies.config` in the workflow YAML file.
+
+```bash
+dcm workflow add \
+  --project "project-slug" \
+  --workflow "workflow_id" \
+  --entity-type "node" \
+  --bundle "bundle_name"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--workflow` | `-w` | Yes | Workflow ID (e.g. `editorial`, `civictheme_editorial`) |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Add a content type to the editorial workflow
+dcm workflow add -p my-site -w editorial -e node -b article
+
+# Add a media type
+dcm workflow add -p my-site -w editorial -e media -b document
+```
+
+---
+
+### `dcm workflow remove`
+
+Remove a bundle from a workflow. Updates both `entity_types` and `dependencies.config` in the workflow YAML file.
+
+```bash
+dcm workflow remove \
+  --project "project-slug" \
+  --workflow "workflow_id" \
+  --entity-type "node" \
+  --bundle "bundle_name"
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--workflow` | `-w` | Yes | Workflow ID |
+| `--entity-type` | `-e` | Yes | Entity type |
+| `--bundle` | `-b` | Yes | Bundle machine name |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+# Remove a content type from the editorial workflow
+dcm workflow remove -p my-site -w editorial -e node -b article
+
+# Remove a media type
+dcm workflow remove -p my-site -w editorial -e media -b document
+```
+
+---
+
 ## Automatic Sync (--sync flag)
 
 Many commands support the `--sync` flag to automatically sync with Drupal after making changes. This runs `drush cim && drush cex` after the operation completes.

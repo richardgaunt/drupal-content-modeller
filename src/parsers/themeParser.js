@@ -19,6 +19,7 @@ export function parseThemeInfo(yamlContent) {
 
   return {
     name: config.name || null,
-    baseTheme: config['base theme'] || null
+    baseTheme: config['base theme'] || null,
+    regions: config.regions || null
   };
 }

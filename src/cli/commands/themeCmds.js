@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import { loadProject } from '../../commands/project.js';
 import { syncProject } from '../../commands/sync.js';
 import { readComponentDetail } from '../../io/componentReader.js';
+import { readThemeDirectory } from '../../io/themeReader.js';
 import { writeViewMode, viewModeExists, deleteViewMode } from '../../io/configReader.js';
 import { generateViewMode } from '../../generators/viewModeGenerator.js';
 import { generateMachineName, validateMachineName } from '../../utils/slug.js';
@@ -840,6 +841,72 @@ export async function cmdThemePreprocesses(options) {
     } else {
       console.log();
       printPreprocessData(filtered);
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+// ============================================
+// Theme Region Commands
+// ============================================
+
+/**
+ * List regions for the active theme
+ */
+export async function cmdThemeRegions(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    requireTheme(project);
+
+    const activeTheme = project.theme.themes[0];
+    let regions = activeTheme.regions;
+
+    // Live-read regions from the info.yml if not in saved project data
+    if (!regions || Object.keys(regions).length === 0) {
+      const themeInfo = await readThemeDirectory(activeTheme.directory);
+      regions = themeInfo.regions;
+    }
+
+    regions = regions || {};
+    const regionList = Object.entries(regions).map(([machine_name, label]) => ({
+      machine_name,
+      label
+    }));
+
+    if (options.json) {
+      output({
+        theme: {
+          name: activeTheme.name,
+          machine_name: activeTheme.machine_name
+        },
+        regions: regionList,
+        total: regionList.length
+      }, true);
+    } else {
+      console.log();
+      console.log(chalk.cyan(`Active Theme: ${activeTheme.name} (${activeTheme.machine_name})`));
+      console.log();
+
+      if (regionList.length === 0) {
+        console.log('No regions defined.');
+      } else {
+        const table = createTable(
+          [
+            { header: 'Machine Name', minWidth: 25, getValue: r => r.machine_name },
+            { header: 'Label', minWidth: 25, getValue: r => r.label }
+          ],
+          regionList
+        );
+
+        console.log(table);
+        console.log();
+        console.log(chalk.cyan(`Total: ${regionList.length} regions`));
+      }
     }
   } catch (error) {
     handleError(error);

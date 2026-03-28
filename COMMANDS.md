@@ -1897,6 +1897,62 @@ dcm theme-suggestions field -p my-site -e node -b article -n field_n_subtitle -t
 
 ---
 
+## Theme Region Commands
+
+### `dcm theme-regions`
+
+List regions defined in the active theme's `*.info.yml` file.
+
+```bash
+dcm theme-regions --project "project-slug" [--json]
+```
+
+| Option | Short | Required | Description |
+|--------|-------|----------|-------------|
+| `--project` | `-p` | Yes | Project slug |
+| `--json` | `-j` | No | Output as JSON |
+
+**Examples:**
+```bash
+dcm theme-regions -p my-site
+dcm theme-regions -p my-site --json
+```
+
+**Text output:**
+```
+Active Theme: My Theme (mytheme)
+
+Machine Name               Label
+─────────────────────────  ─────────────────────────
+header_top_1               Header top 1
+banner                     Banner
+content                    Content
+sidebar_top_left           Sidebar Top Left
+footer_bottom_1            Footer bottom 1
+
+Total: 5 regions
+```
+
+**JSON output:**
+```json
+{
+  "theme": {
+    "name": "My Theme",
+    "machine_name": "mytheme"
+  },
+  "regions": [
+    { "machine_name": "header_top_1", "label": "Header top 1" },
+    { "machine_name": "banner", "label": "Banner" },
+    { "machine_name": "content", "label": "Content" },
+    { "machine_name": "sidebar_top_left", "label": "Sidebar Top Left" },
+    { "machine_name": "footer_bottom_1", "label": "Footer bottom 1" }
+  ],
+  "total": 5
+}
+```
+
+---
+
 ## Workflow Commands
 
 ### `dcm workflow list`

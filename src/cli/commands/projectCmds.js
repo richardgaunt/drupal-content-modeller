@@ -80,6 +80,11 @@ export async function cmdProjectView(options) {
       drushCommand: project.drushCommand || null,
       lastSync: project.lastSync || null,
       editableBaseTheme: project.editableBaseTheme || false,
+      activeTheme: project.theme?.themes?.[0] ? {
+        label: project.theme.themes[0].name,
+        machine_name: project.theme.themes[0].machine_name,
+        directory: project.theme.themes[0].directory
+      } : null,
       theme: project.theme ? {
         themes: (project.theme.themes || []).map(t => ({
           name: t.name,
@@ -100,6 +105,9 @@ export async function cmdProjectView(options) {
       console.log(`  Drupal root:       ${config.drupalRoot || chalk.gray('not set')}`);
       console.log(`  Drush command:     ${config.drushCommand || chalk.gray('not set')}`);
       console.log(`  Last sync:         ${config.lastSync || chalk.gray('never')}`);
+      if (config.activeTheme) {
+        console.log(`  Active theme:      ${config.activeTheme.label} (${config.activeTheme.machine_name}) → ${config.activeTheme.directory}`);
+      }
       if (config.theme) {
         console.log(`  Theme chain:`);
         for (const t of config.theme.themes) {

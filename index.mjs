@@ -60,6 +60,7 @@ import {
   cmdThemeSuggestionsBundle,
   cmdThemeSuggestionsField,
   cmdThemePreprocesses,
+  cmdThemeRegions,
   cmdExportSpreadsheet,
   cmdImportSpreadsheet,
   cmdMigrationReport,
@@ -892,6 +893,17 @@ program
   .option('-f, --field <name>', 'Filter by field name')
   .option('-j, --json', 'Output as JSON')
   .action(cmdThemePreprocesses);
+
+// ============================================
+// Theme Region Commands
+// ============================================
+
+program
+  .command('theme-regions')
+  .description('List regions defined in the active theme')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdThemeRegions);
 
 // ============================================
 // Help Command

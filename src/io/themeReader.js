@@ -34,12 +34,13 @@ export async function readThemeDirectory(themeDir) {
 
   const machineName = infoFile.replace('.info.yml', '');
   const content = await readFile(join(themeDir, infoFile), 'utf-8');
-  const { name, baseTheme } = parseThemeInfo(content);
+  const { name, baseTheme, regions } = parseThemeInfo(content);
 
   return {
     machineName,
     name: name || machineName,
     baseTheme,
+    regions: regions || {},
     directory: themeDir
   };
 }
@@ -143,6 +144,7 @@ export async function resolveThemeChain(themeDir) {
       name: themeInfo.name,
       machine_name: themeInfo.machineName,
       directory: themeInfo.directory,
+      regions: themeInfo.regions,
       components
     });
 

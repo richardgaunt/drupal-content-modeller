@@ -10,7 +10,8 @@ import { readFileSync } from 'fs';
 
 import { getBundleSummary } from '../../commands/list.js';
 import { createEntityReport, createProjectReport, createBundleReport } from '../../commands/report.js';
-import { getReportsDir } from '../../io/fileSystem.js';
+import { getReportsDir, getTicketsDir } from '../../io/fileSystem.js';
+import { createTickets } from '../../commands/ticket.js';
 import { getEntityTypeLabel } from '../../generators/reportGenerator.js';
 import { listRoles } from '../../commands/role.js';
 import {
@@ -24,6 +25,7 @@ import {
 import { getEntityTypeSingularLabel, ENTITY_ORDER } from '../../constants/entityTypes.js';
 import { writeFile, mkdir } from 'fs/promises';
 import { syncWithDrupal, getSyncStatus, checkDrushAvailable, drushGetThemePreprocesses } from '../../commands/drush.js';
+import { loadFormDisplay } from '../../commands/formDisplay.js';
 import { promptForReportUrl } from './contentMenus.js';
 import {
   createMigrationReport,
@@ -129,7 +131,8 @@ export async function handleBundleReport(project) {
       const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
       const outputPath = join(getReportsDir(project.slug), filename);
 
-      const opts = { roles, preprocessData };
+      const formDisplay = await loadFormDisplay(project, entityType, bundleId);
+      const opts = { roles, preprocessData, formDisplay };
       const result = await createBundleReport(
         project, entityType, bundleId, outputPath, baseUrl, opts
       );
@@ -190,11 +193,21 @@ export async function handleEntityReport(project) {
     // Optionally fetch live preprocess data
     const preprocessData = await promptForPreprocessData(project);
 
+    // Load form displays for the entity type
+    const formDisplays = {};
+    const bundles = project.entities[entityType] || {};
+    for (const bundleId of Object.keys(bundles)) {
+      const fd = await loadFormDisplay(project, entityType, bundleId);
+      if (fd) {
+        formDisplays[bundleId] = fd;
+      }
+    }
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-${entityType}-report.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createEntityReport(project, entityType, outputPath, baseUrl, { roles, preprocessData });
+    await createEntityReport(project, entityType, outputPath, baseUrl, { roles, preprocessData, formDisplays });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
@@ -227,12 +240,59 @@ export async function handleProjectReport(project) {
     // Optionally fetch live preprocess data
     const preprocessData = await promptForPreprocessData(project);
 
+    // Load form displays for all entity types
+    const formDisplays = {};
+    for (const entityType of Object.keys(project.entities || {})) {
+      const bundles = project.entities[entityType] || {};
+      formDisplays[entityType] = {};
+      for (const bundleId of Object.keys(bundles)) {
+        const fd = await loadFormDisplay(project, entityType, bundleId);
+        if (fd) {
+          formDisplays[entityType][bundleId] = fd;
+        }
+      }
+    }
+
     // Generate filename in project reports directory
     const filename = `${project.slug}-content-model.md`;
     const outputPath = join(getReportsDir(project.slug), filename);
 
-    await createProjectReport(project, outputPath, baseUrl, { roles, preprocessData });
+    await createProjectReport(project, outputPath, baseUrl, { roles, preprocessData, formDisplays });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle QA ticket generation
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handleGenerateTickets(project) {
+  try {
+    const summary = getBundleSummary(project);
+
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    // Ask about base URL
+    const baseUrl = await promptForReportUrl(project);
+
+    const outputDir = getTicketsDir(project.slug);
+
+    console.log(chalk.cyan('Generating QA tickets...'));
+    const results = await createTickets(project, outputDir, baseUrl);
+
+    console.log(chalk.green(`Generated ${results.length} tickets in: ${outputDir}`));
+    for (const ticket of results) {
+      console.log(chalk.cyan(`  ${ticket.filename}`));
+    }
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

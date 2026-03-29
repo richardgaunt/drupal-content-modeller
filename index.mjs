@@ -69,7 +69,8 @@ import {
   cmdFilterList,
   cmdWorkflowList,
   cmdWorkflowAdd,
-  cmdWorkflowRemove
+  cmdWorkflowRemove,
+  cmdGenerateTickets
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -314,6 +315,15 @@ reportCmd
       await cmdMigrationReport(options);
     }
   });
+
+reportCmd
+  .command('tickets')
+  .description('Generate QA tickets from content model')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-o, --output <path>', 'Output directory')
+  .option('-u, --base-url <url>', 'Base URL for admin links')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdGenerateTickets);
 
 // ============================================
 // Migration Commands

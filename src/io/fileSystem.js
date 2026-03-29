@@ -96,6 +96,15 @@ export function getReportsDir(slug) {
 }
 
 /**
+ * Get the path to a project's tickets directory
+ * @param {string} slug - Project slug
+ * @returns {string} - Absolute path to tickets directory
+ */
+export function getTicketsDir(slug) {
+  return join(getProjectPath(slug), 'tickets');
+}
+
+/**
  * Get the path to a project's command log file
  * @param {string} slug - Project slug
  * @returns {string} - Absolute path to log.jsonl

@@ -12,6 +12,23 @@ import {
 } from '../constants/entityTypes.js';
 import { formatCardinality } from '../utils/slug.js';
 import { findFieldParentGroup } from '../parsers/formDisplayParser.js';
+import { getWidgetByType } from '../constants/fieldWidgets.js';
+
+/**
+ * Format a widget type as "Label (machine_name)" for display.
+ * Falls back to just the machine name if the label can't be resolved.
+ * @param {string} fieldType - Drupal field type
+ * @param {string|null} widgetType - Widget machine name
+ * @returns {string} - Formatted widget label
+ */
+export function formatWidgetLabel(fieldType, widgetType) {
+  if (!widgetType) return '-';
+  const widget = getWidgetByType(fieldType, widgetType);
+  if (widget?.label) {
+    return `${widget.label} (${widgetType})`;
+  }
+  return widgetType;
+}
 
 // Re-export for backward compatibility
 export { getEntityTypeLabel, getEntityAdminPath, getBundleAdminUrls, formatCardinality };
@@ -332,7 +349,7 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
       md += `| ${label} `;
       md += `| \`${fieldName}\` `;
       md += `| ${config.type} `;
-      md += `| ${config.widget} |\n`;
+      md += `| ${formatWidgetLabel(config.type, config.widget)} |\n`;
     }
 
     md += '\n';
@@ -363,13 +380,13 @@ export function generateBundleReport(bundle, entityType, baseUrl = '', options =
     const fieldPath = getFieldAdminPath(entityType, bundle.id, field.name);
     const fieldUrl = baseUrl ? `${baseUrl}${fieldPath}` : fieldPath;
     const formField = formDisplayFields.find(f => f.name === field.name);
-    const widget = formField?.type || '-';
+    const widgetType = formField?.type || null;
 
     md += `| <input type="checkbox"> `;
     md += `| ${field.label || field.name} `;
     md += `| \`${field.name}\` `;
     md += `| ${field.type} `;
-    md += `| ${widget} `;
+    md += `| ${formatWidgetLabel(field.type, widgetType)} `;
     md += `| ${field.description || '-'} `;
     md += `| ${formatCardinality(field.cardinality || 1)} `;
     md += `| ${field.required ? 'Yes' : 'No'} `;

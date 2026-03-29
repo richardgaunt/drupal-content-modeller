@@ -58,6 +58,7 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
     { value: 'import-model', name: 'Import content model from JSON' },
     { value: 'import-spreadsheet', name: 'Import content model from spreadsheet' },
+    { value: 'generate-tickets', name: 'Generate QA tickets' },
     { value: 'report-migrations', name: 'Generate migration report' },
     { value: 'report-migration-single', name: 'Generate single migration report' },
     { value: 'back', name: 'Back' }

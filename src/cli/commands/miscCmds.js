@@ -24,7 +24,8 @@ import {
   generateEntityTypeReportData,
   generateProjectReportData
 } from '../../generators/reportGenerator.js';
-import { getReportsDir } from '../../io/fileSystem.js';
+import { getReportsDir, getTicketsDir } from '../../io/fileSystem.js';
+import { createTickets } from '../../commands/ticket.js';
 import { listRoles } from '../../commands/role.js';
 import {
   checkDrushAvailable,
@@ -733,6 +734,40 @@ export async function cmdWorkflowRemove(options) {
     }
 
     logSuccess(`workflow remove -w ${options.workflow} -e ${options.entityType} -b ${options.bundle}`);
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Generate QA tickets from project content model
+ */
+export async function cmdGenerateTickets(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    await autoSyncProject(project);
+
+    if (!project.entities) {
+      throw new Error('Project has not been synced. Run "dcm project sync" first.');
+    }
+
+    const baseUrl = options.baseUrl || project.baseUrl || '';
+    const outputDir = options.output || getTicketsDir(project.slug);
+
+    const results = await createTickets(project, outputDir, baseUrl);
+
+    if (options.json) {
+      output({ success: true, tickets: results, outputDir }, true);
+    } else {
+      console.log(chalk.green(`Generated ${results.length} tickets in: ${outputDir}`));
+      for (const ticket of results) {
+        console.log(chalk.cyan(`  ${ticket.filename}`));
+      }
+    }
   } catch (error) {
     handleError(error);
   }

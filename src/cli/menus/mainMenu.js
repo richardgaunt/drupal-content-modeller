@@ -46,6 +46,7 @@ import {
   handleBundleReport,
   handleEntityReport,
   handleProjectReport,
+  handleGenerateTickets,
   handleExportJson,
   handleImportModel,
   handleAdminLinks,
@@ -389,6 +390,9 @@ async function handleAction(project, action) {
       break;
     case 'drush-sync':
       await handleDrushSync(project);
+      break;
+    case 'generate-tickets':
+      await handleGenerateTickets(project);
       break;
     case 'report-migrations':
       await handleMigrationReport(project);

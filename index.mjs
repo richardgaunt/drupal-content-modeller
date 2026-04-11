@@ -70,7 +70,8 @@ import {
   cmdWorkflowList,
   cmdWorkflowAdd,
   cmdWorkflowRemove,
-  cmdGenerateTickets
+  cmdGenerateTickets,
+  cmdGenerateTemplates
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -324,6 +325,18 @@ reportCmd
   .option('-u, --base-url <url>', 'Base URL for admin links')
   .option('-j, --json', 'Output as JSON')
   .action(cmdGenerateTickets);
+
+reportCmd
+  .command('templates')
+  .description('Generate blank ticket templates for manual authoring')
+  .option('-e, --entity-type <type>', 'Entity type (omit for all types)')
+  .option('-l, --label <label>', 'Bundle label (e.g. "Article")')
+  .option('-m, --machine-name <name>', 'Bundle machine name (e.g. "article")')
+  .option('-n, --number <num>', 'Ticket number')
+  .option('-u, --base-url <url>', 'Base URL for admin links')
+  .option('-o, --output <path>', 'Output directory')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdGenerateTemplates);
 
 // ============================================
 // Migration Commands

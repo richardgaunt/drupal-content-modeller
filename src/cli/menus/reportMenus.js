@@ -10,7 +10,6 @@ import { readFileSync } from 'fs';
 
 import { getBundleSummary } from '../../commands/list.js';
 import { createEntityReport, createProjectReport, createBundleReport } from '../../commands/report.js';
-import { getReportsDir, getTicketsDir } from '../../io/fileSystem.js';
 import { createTickets } from '../../commands/ticket.js';
 import { getEntityTypeLabel } from '../../generators/reportGenerator.js';
 import { listRoles } from '../../commands/role.js';
@@ -33,6 +32,23 @@ import {
   getMigrationReportData,
   listMigrations
 } from '../../commands/migration.js';
+
+/**
+ * Prompt user to choose an output directory for reports/tickets.
+ * Defaults to the current working directory.
+ * @returns {Promise<string>} - Absolute path to output directory
+ */
+async function promptForOutputDirectory() {
+  const outputDir = await input({
+    message: 'Output directory:',
+    default: process.cwd(),
+    validate: (val) => {
+      if (!val || !val.trim()) return 'Directory path is required';
+      return true;
+    }
+  });
+  return outputDir.trim();
+}
 
 /**
  * Prompt user to include live preprocess data if drush is available
@@ -126,10 +142,13 @@ export async function handleBundleReport(project) {
     // Optionally fetch live preprocess data
     const preprocessData = await promptForPreprocessData(project);
 
+    // Choose output directory
+    const outputDir = await promptForOutputDirectory();
+
     // Generate reports for all selected bundles
     for (const bundleId of bundleIds) {
       const filename = `${project.slug}-${entityType}-${bundleId}-report.md`;
-      const outputPath = join(getReportsDir(project.slug), filename);
+      const outputPath = join(outputDir, filename);
 
       const formDisplay = await loadFormDisplay(project, entityType, bundleId);
       const opts = { roles, preprocessData, formDisplay };
@@ -203,9 +222,12 @@ export async function handleEntityReport(project) {
       }
     }
 
-    // Generate filename in project reports directory
+    // Choose output directory
+    const outputDir = await promptForOutputDirectory();
+
+    // Generate filename
     const filename = `${project.slug}-${entityType}-report.md`;
-    const outputPath = join(getReportsDir(project.slug), filename);
+    const outputPath = join(outputDir, filename);
 
     await createEntityReport(project, entityType, outputPath, baseUrl, { roles, preprocessData, formDisplays });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
@@ -253,9 +275,12 @@ export async function handleProjectReport(project) {
       }
     }
 
-    // Generate filename in project reports directory
+    // Choose output directory
+    const outputDir = await promptForOutputDirectory();
+
+    // Generate filename
     const filename = `${project.slug}-content-model.md`;
-    const outputPath = join(getReportsDir(project.slug), filename);
+    const outputPath = join(outputDir, filename);
 
     await createProjectReport(project, outputPath, baseUrl, { roles, preprocessData, formDisplays });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
@@ -284,7 +309,7 @@ export async function handleGenerateTickets(project) {
     // Ask about base URL
     const baseUrl = await promptForReportUrl(project);
 
-    const outputDir = getTicketsDir(project.slug);
+    const outputDir = await promptForOutputDirectory();
 
     console.log(chalk.cyan('Generating QA tickets...'));
     const results = await createTickets(project, outputDir, baseUrl);
@@ -314,7 +339,7 @@ export async function handleExportJson(project) {
       return;
     }
 
-    const defaultPath = join(getReportsDir(project.slug), `${project.slug}-content-model.json`);
+    const defaultPath = join(process.cwd(), `${project.slug}-content-model.json`);
 
     const outputPath = await input({
       message: 'Output file path:',
@@ -750,7 +775,7 @@ export async function handleMigrationReport(project) {
 
     if (format === 'json') {
       const data = await getMigrationReportData(project);
-      const defaultPath = join(getReportsDir(project.slug), `${project.slug}-migrations.json`);
+      const defaultPath = join(process.cwd(), `${project.slug}-migrations.json`);
       const outputPath = await input({
         message: 'Output file path:',
         default: defaultPath
@@ -760,8 +785,9 @@ export async function handleMigrationReport(project) {
       await writeFile(outputPath.trim(), JSON.stringify(data, null, 2), 'utf8');
       console.log(chalk.green(`JSON exported to: ${outputPath.trim()}`));
     } else {
+      const outputDir = await promptForOutputDirectory();
       const filename = `${project.slug}-migrations-report.md`;
-      const outputPath = join(getReportsDir(project.slug), filename);
+      const outputPath = join(outputDir, filename);
       await createMigrationReport(project, outputPath);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
     }
@@ -802,8 +828,9 @@ export async function handleSingleMigrationReport(project) {
       }
     });
 
+    const outputDir = await promptForOutputDirectory();
     const filename = `${project.slug}-migration-${migrationId}.md`;
-    const outputPath = join(getReportsDir(project.slug), filename);
+    const outputPath = join(outputDir, filename);
 
     const result = await createSingleMigrationReport(project, migrationId, outputPath);
     if (result) {

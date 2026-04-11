@@ -364,3 +364,134 @@ export function generateAllTickets(project, baseUrl = '', options = {}) {
 
   return tickets;
 }
+
+/**
+ * Entity type choices for the template.
+ */
+const ENTITY_TYPE_LABELS = {
+  node: 'content type',
+  media: 'media type',
+  paragraph: 'paragraph type',
+  taxonomy_term: 'vocabulary',
+  block_content: 'block type'
+};
+
+/**
+ * Generate a blank ticket template for humans to fill out.
+ * @param {string} entityType - Entity type (defaults to 'node')
+ * @param {object} [options] - Optional bundle info
+ * @param {string} [options.label] - Bundle label (e.g. "Article")
+ * @param {string} [options.machineName] - Bundle machine name (e.g. "article")
+ * @param {number} [options.ticketNumber] - Ticket number
+ * @param {string} [options.baseUrl] - Base URL for admin links
+ * @returns {string} - Markdown template
+ */
+export function generateTicketTemplate(entityType = 'node', options = {}) {
+  const singularLabel = ENTITY_TYPE_LABELS[entityType] || 'content type';
+  const baseFieldNames = TICKET_BASE_FIELDS[entityType] || [];
+  const allBaseFields = getBaseFields(entityType);
+  const label = options.label || '<Label>';
+  const machineName = options.machineName || '<machine_name>';
+  const ticketNum = options.ticketNumber ? String(options.ticketNumber).padStart(3, '0') : '<number>';
+  const baseUrl = options.baseUrl || '';
+  const addPath = getEntityAddPath(entityType, machineName);
+
+  // Resolve admin URL
+  let adminUrl = '<admin_url>';
+  if (machineName !== '<machine_name>') {
+    const adminUrls = getBundleAdminUrls(entityType, machineName);
+    const editForm = adminUrls.find(u => u.name === 'Edit Form');
+    if (editForm) {
+      adminUrl = baseUrl ? `${baseUrl}${editForm.path}` : editForm.path;
+    }
+  }
+
+  let md = `# ${ticketNum} - Create ${label} ${singularLabel}\n\n`;
+
+  // Instructions (only when no bundle specified)
+  if (!options.label) {
+    md += `<!-- INSTRUCTIONS:\n`;
+    md += `  Fill in the sections below. Fields marked with * are used by the\n`;
+    md += `  /drupal-content-modeller--create-ticket skill to auto-fill defaults.\n`;
+    md += `\n`;
+    md += `  Required:\n`;
+    md += `    - Title (replace <Label> above with the bundle label)\n`;
+    md += `    - Entity type: ${entityType}\n`;
+    md += `    - At least one field row with a Field Name and Field Type\n`;
+    md += `\n`;
+    md += `  Optional (will be auto-filled if missing):\n`;
+    md += `    - Machine Name (derived from Field Name)\n`;
+    md += `    - Widget (default for the field type)\n`;
+    md += `    - Cardinality (defaults to Single)\n`;
+    md += `    - Required (defaults to No)\n`;
+    md += `-->\n\n`;
+  }
+
+  // Metadata comment
+  md += `<!-- entity_type: ${entityType} -->\n`;
+  if (machineName !== '<machine_name>') {
+    md += `<!-- bundle: ${machineName} -->\n`;
+  }
+  md += `\n`;
+
+  // AC - Create entity type
+  md += `## AC - Create entity type\n\n`;
+  md += `Given I am an administrator\n`;
+  md += `When I go to [${label} configuration](${adminUrl})\n`;
+  md += `Then the ${singularLabel} "${label}" exists and is configured\n\n`;
+
+  // AC - Fields
+  md += `## AC - Fields are configured as follows\n\n`;
+  md += `Given I am a <role>\n`;
+  if (addPath) {
+    const fullAddUrl = baseUrl ? `${baseUrl}${addPath}` : addPath;
+    md += `When I add a ${singularLabel} ([Add new ${label}](${fullAddUrl}))\n\n`;
+  } else {
+    md += `When I edit a ${singularLabel}\n\n`;
+  }
+  md += `Then I can see the following fields:\n\n`;
+
+  md += `| Check | Field Name | Machine Name | Field Type | Widget | Description | Cardinality | Required | Other |\n`;
+  md += `|-------|------------|--------------|------------|--------|-------------|-------------|----------|-------|\n`;
+
+  // Pre-fill base fields
+  for (const fieldName of baseFieldNames) {
+    const config = allBaseFields[fieldName];
+    if (!config) continue;
+    md += `| <input type="checkbox"> | ${config.label} | \`${fieldName}\` | ${config.type} | | - | Single | Yes | - |\n`;
+  }
+
+  // Empty rows for human to fill
+  for (let i = 0; i < 5; i++) {
+    md += `| <input type="checkbox"> | | | | | | | | |\n`;
+  }
+
+  md += `\n`;
+
+  // AC - Permissions
+  md += `## AC - Permissions are configured to the following\n\n`;
+  md += `The following ${singularLabel} permissions are configured as follows:\n\n`;
+  md += `| Role | Create | Edit own | Edit any | Delete own | Delete any |\n`;
+  md += `|------|--------|----------|----------|------------|------------|\n`;
+  md += `| | | | | | |\n`;
+  md += `| | | | | | |\n`;
+
+  md += `\n`;
+
+  // Dependencies
+  md += `## Dependencies\n\n`;
+  md += `<!-- List any bundles that must exist before this one -->\n\n`;
+
+  return md;
+}
+
+/**
+ * Generate templates for all entity types.
+ * @returns {Array<{filename: string, content: string}>}
+ */
+export function generateAllTemplates() {
+  return Object.entries(ENTITY_TYPE_LABELS).map(([entityType, label]) => ({
+    filename: `template-${label.replace(/\s+/g, '-')}.md`,
+    content: generateTicketTemplate(entityType)
+  }));
+}

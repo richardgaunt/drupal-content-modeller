@@ -6,7 +6,8 @@
 import { writeTextFile, getTicketsDir } from '../io/fileSystem.js';
 import { loadFormDisplay } from './formDisplay.js';
 import { listRoles } from './role.js';
-import { generateAllTickets } from '../generators/ticketGenerator.js';
+import { generateAllTickets, generateAllTemplates, generateTicketTemplate } from '../generators/ticketGenerator.js';
+import { getEntityTypeSingularLabel } from '../constants/entityTypes.js';
 import { join } from 'path';
 
 /**
@@ -51,6 +52,51 @@ export async function createTickets(project, outputDir, baseUrl = '') {
       entityType: ticket.entityType,
       bundleId: ticket.bundleId
     });
+  }
+
+  return results;
+}
+
+/**
+ * Generate and save blank ticket templates.
+ * Without options: generates one template per entity type.
+ * With options.entityType: generates a single template for that entity type/bundle.
+ * @param {string} outputDir - Directory to save templates
+ * @param {object} [options] - Optional filters
+ * @param {string} [options.entityType] - Entity type
+ * @param {string} [options.label] - Bundle label
+ * @param {string} [options.machineName] - Bundle machine name
+ * @param {number} [options.ticketNumber] - Ticket number
+ * @param {string} [options.baseUrl] - Base URL
+ * @returns {Promise<Array<{filename: string}>>}
+ */
+export async function createTicketTemplates(outputDir, options = {}) {
+  if (options.entityType) {
+    const content = generateTicketTemplate(options.entityType, {
+      label: options.label,
+      machineName: options.machineName,
+      ticketNumber: options.ticketNumber,
+      baseUrl: options.baseUrl
+    });
+
+    const singularLabel = getEntityTypeSingularLabel(options.entityType);
+    const label = options.label || 'template';
+    const filename = options.label
+      ? `template-${label.toLowerCase().replace(/\s+/g, '-')}-${singularLabel.replace(/\s+/g, '-')}.md`
+      : `template-${singularLabel.replace(/\s+/g, '-')}.md`;
+
+    const filePath = join(outputDir, filename);
+    await writeTextFile(filePath, content);
+    return [{ filename }];
+  }
+
+  const templates = generateAllTemplates();
+
+  const results = [];
+  for (const template of templates) {
+    const filePath = join(outputDir, template.filename);
+    await writeTextFile(filePath, template.content);
+    results.push({ filename: template.filename });
   }
 
   return results;

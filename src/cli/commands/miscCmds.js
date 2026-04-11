@@ -25,7 +25,7 @@ import {
   generateProjectReportData
 } from '../../generators/reportGenerator.js';
 import { getReportsDir, getTicketsDir } from '../../io/fileSystem.js';
-import { createTickets } from '../../commands/ticket.js';
+import { createTickets, createTicketTemplates } from '../../commands/ticket.js';
 import { listRoles } from '../../commands/role.js';
 import {
   checkDrushAvailable,
@@ -766,6 +766,53 @@ export async function cmdGenerateTickets(options) {
       console.log(chalk.green(`Generated ${results.length} tickets in: ${outputDir}`));
       for (const ticket of results) {
         console.log(chalk.cyan(`  ${ticket.filename}`));
+      }
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Generate blank ticket templates.
+ * Without --entity-type: generates one template per entity type.
+ * With --entity-type (and optionally --label, --machine-name): generates a single template.
+ */
+export async function cmdGenerateTemplates(options) {
+  try {
+    const outputDir = options.output || process.cwd();
+
+    if (options.entityType) {
+      if (!isValidEntityType(options.entityType)) {
+        throw new Error(`Invalid entity type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
+      }
+
+      const result = await createTicketTemplates(outputDir, {
+        entityType: options.entityType,
+        label: options.label,
+        machineName: options.machineName,
+        ticketNumber: options.number ? parseInt(options.number, 10) : undefined,
+        baseUrl: options.baseUrl
+      });
+
+      if (options.json) {
+        output({ success: true, templates: result, outputDir }, true);
+      } else {
+        console.log(chalk.green(`Generated template in: ${outputDir}`));
+        for (const template of result) {
+          console.log(chalk.cyan(`  ${template.filename}`));
+        }
+      }
+    } else {
+      const results = await createTicketTemplates(outputDir);
+
+      if (options.json) {
+        output({ success: true, templates: results, outputDir }, true);
+      } else {
+        console.log(chalk.green(`Generated ${results.length} templates in: ${outputDir}`));
+        for (const template of results) {
+          console.log(chalk.cyan(`  ${template.filename}`));
+        }
       }
     }
   } catch (error) {

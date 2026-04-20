@@ -9,6 +9,46 @@ Drupal Content Modeller - A CLI application that:
 - Creates new entity bundles and fields via interactive CLI prompts
 - Generates Drupal-compatible YAML configuration files
 
+## Roles and Hand-offs
+
+DCM is used by three roles. Each owns different artifacts; the hand-offs
+between them are where work gets lost if the boundaries aren't clear.
+
+**Business Analyst.** Owns the content model as a business artifact. Runs
+stakeholder interviews, audits legacy content, reviews designs for content
+implications, writes acceptance criteria. Uses
+`/drupal-content-modeller--discover` for greenfield projects,
+`/drupal-content-modeller--create-ticket` to apply Drupal defaults to
+partially-filled tickets, `dcm project sync` and `dcm report templates` when
+working against an existing project. Produces discovery markdown under
+`projects/<slug>/discovery/` and filled tickets under `projects/<slug>/tickets/`.
+Does **not** write YAML, run migrations, or hand-pick widget machine names.
+
+**Tech Lead.** Sequences the ticket queue, reviews the model for feasibility
+(cardinality choices, reference cycles, reuse opportunities), and owns the
+hand-off from BA to developers. Reads discovery artifacts and filled tickets;
+flags issues back to the BA before build starts. Typically does not run
+`dcm bundle create` / `dcm field create` directly, but reviews the YAML those
+commands produce.
+
+**Developer.** Reads a filled ticket and runs `/dcm` to generate the Drupal
+config (`dcm bundle create`, `dcm field create`, permissions, form/display
+modes). Runs `/drupal-migrate` when legacy content needs to land in the new
+bundles. Does **not** re-litigate the content model — escalates back to the
+BA if a ticket is ambiguous or wrong.
+
+**Hand-off points.**
+- BA → Tech Lead: after discovery Phases 1–4 are signed off with stakeholders
+  and tickets are filled.
+- Tech Lead → Developer: once tickets are sequenced and any feasibility issues
+  are resolved.
+- Developer → QA: once `/dcm` has produced config and the Given/When/Then
+  acceptance criteria can be verified against a running site.
+
+Menus and webforms are currently outside DCM's generation scope; they get
+planning-only tickets and are implemented manually by a developer or site
+builder.
+
 ## Build/Test Commands
 
 - **Start CLI**: `npm run start` - launches the interactive CLI

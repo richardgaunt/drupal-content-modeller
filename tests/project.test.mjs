@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 
 // Import pure utility functions
 import { generateSlug, isValidProjectName } from '../src/utils/slug';
-import { createProjectObject, getProjectSummary } from '../src/utils/project';
+import { createProjectObject, getProjectSummary, projectMatchesCwd } from '../src/utils/project';
 
 // Import I/O functions - use setProjectsDir for testing
 import { setProjectsDir } from '../src/io/fileSystem';
@@ -94,6 +94,7 @@ describe('Project Utilities (Pure)', () => {
         name: 'My Project',
         slug: 'my-project',
         configDirectory: '/path/to/config',
+        baseDirectory: '',
         baseUrl: '',
         drupalRoot: '',
         drushCommand: 'drush',
@@ -113,6 +114,41 @@ describe('Project Utilities (Pure)', () => {
       const project = createProjectObject('My Project', 'my-project', '/path/to/config', 'https://example.com');
 
       expect(project.baseUrl).toBe('https://example.com');
+    });
+
+    test('creates project with baseDirectory via options', () => {
+      const project = createProjectObject('My Project', 'my-project', '/path/to/config', '', {
+        baseDirectory: '/repos/my-project'
+      });
+
+      expect(project.baseDirectory).toBe('/repos/my-project');
+    });
+  });
+
+  describe('projectMatchesCwd', () => {
+    test('matches when cwd equals baseDirectory', () => {
+      const project = { baseDirectory: '/repos/my-project', configDirectory: '/repos/my-project/config/sync' };
+      expect(projectMatchesCwd(project, '/repos/my-project')).toBe(true);
+    });
+
+    test('matches when cwd is inside baseDirectory', () => {
+      const project = { baseDirectory: '/repos/my-project', configDirectory: '/repos/my-project/config/sync' };
+      expect(projectMatchesCwd(project, '/repos/my-project/web/modules/custom')).toBe(true);
+    });
+
+    test('does not match a sibling directory with a prefix collision', () => {
+      const project = { baseDirectory: '/repos/my-project', configDirectory: '' };
+      expect(projectMatchesCwd(project, '/repos/my-project-other')).toBe(false);
+    });
+
+    test('falls back to configDirectory when baseDirectory is unset', () => {
+      const project = { baseDirectory: '', configDirectory: '/repos/legacy/config/sync' };
+      expect(projectMatchesCwd(project, '/repos/legacy/config/sync/sub')).toBe(true);
+    });
+
+    test('returns false when both roots are unset', () => {
+      const project = { baseDirectory: '', configDirectory: '' };
+      expect(projectMatchesCwd(project, '/anywhere')).toBe(false);
     });
   });
 

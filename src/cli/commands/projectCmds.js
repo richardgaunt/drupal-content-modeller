@@ -19,7 +19,9 @@ export async function cmdProjectCreate(options) {
       throw new Error('--config-path is required');
     }
 
-    const project = await createProject(options.name, options.configPath, options.baseUrl || '');
+    const project = await createProject(options.name, options.configPath, options.baseUrl || '', {
+      baseDirectory: options.baseDir || ''
+    });
     logSuccess(project.slug);
 
     if (options.json) {
@@ -75,6 +77,7 @@ export async function cmdProjectView(options) {
       name: project.name,
       slug: project.slug,
       configDirectory: project.configDirectory || null,
+      baseDirectory: project.baseDirectory || null,
       baseUrl: project.baseUrl || null,
       drupalRoot: project.drupalRoot || null,
       drushCommand: project.drushCommand || null,
@@ -101,6 +104,7 @@ export async function cmdProjectView(options) {
       console.log(chalk.cyan(`Project: ${config.name}`));
       console.log(`  Slug:             ${config.slug}`);
       console.log(`  Config directory:  ${config.configDirectory || chalk.gray('not set')}`);
+      console.log(`  Base directory:    ${config.baseDirectory || chalk.gray('not set')}`);
       console.log(`  Base URL:          ${config.baseUrl || chalk.gray('not set')}`);
       console.log(`  Drupal root:       ${config.drupalRoot || chalk.gray('not set')}`);
       console.log(`  Drush command:     ${config.drushCommand || chalk.gray('not set')}`);
@@ -137,6 +141,10 @@ export async function cmdProjectEdit(options) {
       configDirectory: options.configPath || project.configDirectory,
       baseUrl: options.baseUrl !== undefined ? options.baseUrl : project.baseUrl
     };
+
+    if (options.baseDir !== undefined) {
+      updates.baseDirectory = options.baseDir;
+    }
 
     const updated = await updateProject(project, updates);
     logSuccess(updated.slug);

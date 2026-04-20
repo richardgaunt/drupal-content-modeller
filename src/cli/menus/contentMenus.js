@@ -748,6 +748,11 @@ export async function handleEditProject(project) {
       validate: validateConfigDirectory
     });
 
+    const baseDirectory = await input({
+      message: 'Project base directory (repo root; used to auto-load dcm when run inside it):',
+      default: project.baseDirectory || ''
+    });
+
     const baseUrl = await input({
       message: 'Base URL (e.g., https://example.com):',
       default: project.baseUrl || '',
@@ -809,6 +814,7 @@ export async function handleEditProject(project) {
     const updates = {
       name: name.trim(),
       configDirectory: configDirectory.trim(),
+      baseDirectory: baseDirectory.trim(),
       baseUrl: baseUrl.trim(),
       drupalRoot: drupalRoot.trim(),
       drushCommand: drushCommand.trim() || 'drush',

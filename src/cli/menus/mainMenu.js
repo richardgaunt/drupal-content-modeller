@@ -18,7 +18,7 @@ import {
   validateThemeDirectory
 } from '../prompts.js';
 import { resolveThemeChain } from '../../io/themeReader.js';
-import { createProject, loadProject, listProjects } from '../../commands/project.js';
+import { createProject, loadProject, listProjects, findProjectsByCwd } from '../../commands/project.js';
 import {
   formatLastSync,
   groupBundlesByEntityType,
@@ -83,6 +83,35 @@ export async function showMainMenu() {
   console.log(chalk.cyan('Drupal Content Modeller'));
   console.log();
 
+  // Auto-load a project when dcm is run inside its base/config directory.
+  try {
+    const matches = await findProjectsByCwd(process.cwd());
+    if (matches.length === 1) {
+      const [project] = matches;
+      console.log(chalk.green(`Auto-loaded project: ${project.name} (${project.slug})`));
+      console.log();
+      await showProjectMenu(project);
+      return;
+    }
+    if (matches.length > 1) {
+      console.log(chalk.yellow(`Multiple projects match this directory (${matches.length}). Pick one:`));
+      const selectedSlug = await select({
+        message: 'Select a project:',
+        choices: matches.map(p => ({ value: p.slug, name: `${p.name} (${p.slug})` }))
+      });
+      const project = await loadProject(selectedSlug);
+      await showProjectMenu(project);
+      return;
+    }
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      console.log();
+      console.log(chalk.green('Goodbye!'));
+      return;
+    }
+    console.log(chalk.red(`Auto-detect failed: ${error.message}`));
+  }
+
   while (true) {
     try {
       const action = await select({
@@ -130,6 +159,11 @@ async function handleCreateProject() {
     const configDir = await input({
       message: 'Configuration directory path?',
       validate: validateConfigDirectory
+    });
+
+    const baseDirectory = await input({
+      message: 'Project base directory (optional, repo root — used to auto-load dcm when run inside it)?',
+      default: ''
     });
 
     const baseUrl = await input({
@@ -184,7 +218,8 @@ async function handleCreateProject() {
       drupalRoot: drupalRoot.trim(),
       drushCommand: drushCommand.trim() || 'drush',
       theme,
-      editableBaseTheme
+      editableBaseTheme,
+      baseDirectory: baseDirectory.trim()
     });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));

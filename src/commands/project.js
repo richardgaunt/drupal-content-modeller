@@ -4,7 +4,7 @@
  */
 
 import { generateSlug, isValidProjectName } from '../utils/slug.js';
-import { createProjectObject, getProjectSummary } from '../utils/project.js';
+import { createProjectObject, getProjectSummary, projectMatchesCwd } from '../utils/project.js';
 import {
   projectExists,
   directoryExists,
@@ -130,6 +130,31 @@ export async function deleteProject(slug) {
 }
 
 /**
+ * Find projects whose baseDirectory (or configDirectory as fallback) contains
+ * the given working directory. Used to auto-load a project when `dcm` is run
+ * from inside a project tree.
+ * @param {string} cwd - Absolute working directory
+ * @returns {Promise<object[]>} - Full project objects that match
+ */
+export async function findProjectsByCwd(cwd) {
+  const slugs = await listProjectDirectories();
+  const matches = [];
+
+  for (const slug of slugs) {
+    try {
+      const project = await loadProject(slug);
+      if (projectMatchesCwd(project, cwd)) {
+        matches.push(project);
+      }
+    } catch {
+      // Skip invalid projects
+    }
+  }
+
+  return matches;
+}
+
+/**
  * Update a project's settings
  * @param {object} project - Current project object
  * @param {object} updates - Object with updated values (name, configDirectory, baseUrl, drupalRoot, drushCommand)
@@ -173,6 +198,11 @@ export async function updateProject(project, updates) {
     drupalRoot: (updates.drupalRoot || '').trim(),
     drushCommand: (updates.drushCommand || 'drush').trim()
   };
+
+  // Update baseDirectory if provided (undefined = no change, empty string = clear)
+  if (updates.baseDirectory !== undefined) {
+    updatedProject.baseDirectory = updates.baseDirectory.trim();
+  }
 
   // Update theme if provided (null means clear, undefined means no change)
   if (updates.theme !== undefined) {

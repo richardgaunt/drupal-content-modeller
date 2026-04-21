@@ -5,6 +5,7 @@ import { showMainMenu } from './src/cli/menus.js';
 import {
   cmdHelp,
   cmdProjectCreate,
+  cmdProjectRegister,
   cmdProjectList,
   cmdProjectView,
   cmdProjectEdit,
@@ -115,6 +116,13 @@ projectCmd
   .option('-u, --base-url <url>', 'Base URL of the Drupal site')
   .option('-j, --json', 'Output as JSON')
   .action(cmdProjectCreate);
+
+projectCmd
+  .command('register')
+  .description('Register an existing DCM project from a Drupal repo (reads <base-dir>/.dcm/project.json)')
+  .requiredOption('-b, --base-dir <path>', 'Path to the Drupal repo containing .dcm/project.json')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdProjectRegister);
 
 projectCmd
   .command('list')

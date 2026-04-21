@@ -223,6 +223,10 @@ async function handleCreateProject() {
     });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
+    if (baseDirectory.trim()) {
+      console.log(chalk.cyan(`Config stored at: ${baseDirectory.trim()}/.dcm/project.json`));
+      console.log(chalk.gray('Commit .dcm/project.json to share the model with your team.'));
+    }
     console.log();
 
     // Check for missing recommended modules on project creation

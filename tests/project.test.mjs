@@ -17,11 +17,17 @@ import {
   saveProject,
   listProjects,
   deleteProject,
-  updateProject
+  updateProject,
+  registerProject
 } from '../src/commands/project';
 
 // Import filesystem functions for testing
-import { getProjectPath, getReportsDir } from '../src/io/fileSystem';
+import {
+  getProjectPath,
+  getReportsDir,
+  getRegistryStubPath,
+  getExternalProjectJsonPath
+} from '../src/io/fileSystem';
 
 describe('Slug Utilities (Pure)', () => {
   describe('generateSlug', () => {
@@ -324,13 +330,14 @@ describe('Project Commands', () => {
 
       const result = await deleteProject('my-project');
 
-      expect(result).toBe(true);
+      expect(result.deleted).toBe(true);
+      expect(result.externalConfigPath).toBeNull();
       expect(existsSync(join(tempDir, 'my-project'))).toBe(false);
     });
 
     test('returns false for missing project', async () => {
       const result = await deleteProject('nonexistent');
-      expect(result).toBe(false);
+      expect(result.deleted).toBe(false);
     });
   });
 
@@ -433,6 +440,148 @@ describe('Project Commands', () => {
         configDirectory: tempConfigDir,
         baseUrl: ''
       })).rejects.toThrow('already exists');
+    });
+  });
+
+  describe('externalized projects (.dcm/project.json)', () => {
+    let tempBaseDir;
+
+    beforeEach(async () => {
+      tempBaseDir = await mkdtemp(join(tmpdir(), 'dcm-repo-'));
+    });
+
+    afterEach(async () => {
+      await rm(tempBaseDir, { recursive: true, force: true });
+    });
+
+    test('create writes stub + external config when baseDirectory is set', async () => {
+      const project = await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+
+      expect(project.slug).toBe('repo-project');
+      expect(existsSync(getRegistryStubPath('repo-project'))).toBe(true);
+      expect(existsSync(getExternalProjectJsonPath(tempBaseDir))).toBe(true);
+      // Legacy in-dcm project.json should NOT exist for externalized projects
+      expect(existsSync(join(getProjectPath('repo-project'), 'project.json'))).toBe(false);
+    });
+
+    test('load resolves externalized project via stub', async () => {
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+
+      const loaded = await loadProject('repo-project');
+      expect(loaded.name).toBe('Repo Project');
+      expect(loaded.baseDirectory).toBe(tempBaseDir);
+    });
+
+    test('save writes back to external config', async () => {
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+      const project = await loadProject('repo-project');
+      project.lastSync = '2026-04-21T00:00:00.000Z';
+      await saveProject(project);
+
+      const reloaded = await loadProject('repo-project');
+      expect(reloaded.lastSync).toBe('2026-04-21T00:00:00.000Z');
+    });
+
+    test('rejects when external config already exists', async () => {
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+
+      await expect(
+        createProject('Other Name', tempConfigDir, '', { baseDirectory: tempBaseDir })
+      ).rejects.toThrow('already exists');
+    });
+
+    test('rejects when baseDirectory does not exist', async () => {
+      await expect(
+        createProject('Ghost', tempConfigDir, '', { baseDirectory: '/nonexistent/repo' })
+      ).rejects.toThrow('Base directory does not exist');
+    });
+
+    test('delete removes stub, leaves external config in place', async () => {
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+      const externalPath = getExternalProjectJsonPath(tempBaseDir);
+      expect(existsSync(externalPath)).toBe(true);
+
+      const result = await deleteProject('repo-project');
+
+      expect(result.deleted).toBe(true);
+      expect(result.externalConfigPath).toBe(externalPath);
+      expect(existsSync(getRegistryStubPath('repo-project'))).toBe(false);
+      expect(existsSync(externalPath)).toBe(true);
+    });
+
+    test('registerProject picks up an existing .dcm/project.json', async () => {
+      // Simulate a teammate who cloned the repo: create, then wipe DCM-side stub.
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+      await rm(getProjectPath('repo-project'), { recursive: true, force: true });
+
+      const project = await registerProject(tempBaseDir);
+
+      expect(project.slug).toBe('repo-project');
+      expect(existsSync(getRegistryStubPath('repo-project'))).toBe(true);
+
+      // And loadProject works after registration
+      const loaded = await loadProject('repo-project');
+      expect(loaded.name).toBe('Repo Project');
+    });
+
+    test('registerProject is idempotent for the same baseDirectory', async () => {
+      await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+      const again = await registerProject(tempBaseDir);
+      expect(again.slug).toBe('repo-project');
+    });
+
+    test('registerProject rejects when no external config exists', async () => {
+      await expect(registerProject(tempBaseDir)).rejects.toThrow('No DCM project config');
+    });
+
+    test('rename still works for externalized projects', async () => {
+      const project = await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+
+      const updated = await updateProject(project, {
+        name: 'Renamed Repo',
+        configDirectory: tempConfigDir,
+        baseUrl: ''
+      });
+
+      expect(updated.slug).toBe('renamed-repo');
+      expect(existsSync(getRegistryStubPath('renamed-repo'))).toBe(true);
+      expect(existsSync(getRegistryStubPath('repo-project'))).toBe(false);
+
+      const loaded = await loadProject('renamed-repo');
+      expect(loaded.name).toBe('Renamed Repo');
+    });
+
+    test('update rejects changing baseDirectory on externalized project', async () => {
+      const project = await createProject('Repo Project', tempConfigDir, '', {
+        baseDirectory: tempBaseDir
+      });
+      const otherDir = await mkdtemp(join(tmpdir(), 'dcm-other-repo-'));
+      try {
+        await expect(updateProject(project, {
+          name: 'Repo Project',
+          configDirectory: tempConfigDir,
+          baseUrl: '',
+          baseDirectory: otherDir
+        })).rejects.toThrow('not supported');
+      } finally {
+        await rm(otherDir, { recursive: true, force: true });
+      }
     });
   });
 });

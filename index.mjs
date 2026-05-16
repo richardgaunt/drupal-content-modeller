@@ -72,7 +72,12 @@ import {
   cmdWorkflowAdd,
   cmdWorkflowRemove,
   cmdGenerateTickets,
-  cmdGenerateTemplates
+  cmdGenerateTemplates,
+  cmdBaInit,
+  cmdBaStatus,
+  cmdBaGate,
+  cmdBaHandoff,
+  cmdBaSyncDown
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -800,6 +805,54 @@ skillCmd
   .option('-f, --force', 'Overwrite existing skill')
   .option('-j, --json', 'Output as JSON')
   .action(cmdSkillInstall);
+
+// ============================================
+// BA Personal Loop Commands
+// ============================================
+
+const baCmd = program
+  .command('ba')
+  .description('Personal Loop — BA content-modelling orchestrator');
+
+baCmd
+  .command('init')
+  .description('Initialise (or resume) the Personal Loop for a project')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaInit);
+
+baCmd
+  .command('status')
+  .description('Show phase, round and the requirement ledger')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaStatus);
+
+baCmd
+  .command('gate')
+  .description('Settled-work gate: classify an incoming signal against the ledger')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-k, --kind <kind>', 'Signal kind: new | match | conflict')
+  .option('-r, --ref <reqId>', 'REQ id the signal matches/conflicts with')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaGate);
+
+baCmd
+  .command('handoff')
+  .description('Outbound stage: mark REQs refined + write an immutable manifest (sync-up stubbed)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --reqs <ids>', 'Comma-separated REQ ids to hand off')
+  .option('-t, --ts <stamp>', 'Manifest timestamp (default: now)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaHandoff);
+
+baCmd
+  .command('sync-down')
+  .description('Inbound stage: reconcile returned team-refined tickets (Jira-fetch stubbed)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-i, --input <json>', 'JSON array: [{reqId,ticketId,content,hash}]')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaSyncDown);
 
 // ============================================
 // Component Commands

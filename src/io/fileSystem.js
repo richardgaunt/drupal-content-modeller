@@ -151,7 +151,8 @@ export async function resolveBaDir(slug) {
   if (!stub) {
     throw new Error(
       `Project "${slug}" is not registered (no .dcm registry stub); ` +
-      `cannot resolve its BA directory.`
+      `cannot resolve its BA directory. It may predate externalization — ` +
+      `recreate it with \`dcm project create\` from your repo root.`
     );
   }
   return join(stub.baseDirectory, '.dcm', 'ba');
@@ -199,8 +200,6 @@ export function directoryExists(dirPath) {
  * @returns {boolean} - True if the project has a registry stub
  */
 export function projectExists(slug) {
-  const projectPath = getProjectPath(slug);
-  if (!existsSync(projectPath)) return false;
   return existsSync(getRegistryStubPath(slug));
 }
 

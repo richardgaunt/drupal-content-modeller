@@ -256,6 +256,12 @@ describe('Project Commands', () => {
         await rm(emptyConfigDir, { recursive: true, force: true });
       }
     });
+
+    test('rejects when no base directory is given', async () => {
+      await expect(createProject('No Base', tempConfigDir)).rejects.toThrow(
+        'A save directory is required'
+      );
+    });
   });
 
   describe('loadProject', () => {

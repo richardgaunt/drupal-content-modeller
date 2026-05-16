@@ -10,7 +10,6 @@ import {
   projectExists,
   directoryExists,
   directoryContainsYmlFiles,
-  getProjectJsonPath,
   getExternalProjectJsonPath,
   getRegistryStubPath,
   readRegistryStub,
@@ -32,11 +31,11 @@ import {
  * @param {object} options - Additional options
  * @param {string} options.drupalRoot - Root directory of Drupal installation
  * @param {string} options.drushCommand - Command to run drush
- * @param {string} options.baseDirectory - Repo root; when set, project.json is
+ * @param {string} options.baseDirectory - REQUIRED. Repo root; project.json is
  *   written to <baseDirectory>/.dcm/project.json and a registry stub is left
- *   in <dcm>/projects/<slug>/.
+ *   in <dcm>/projects/<slug>/. Must be an existing directory.
  * @returns {Promise<object>} - Created project object
- * @throws {Error} - If validation fails
+ * @throws {Error} - If validation fails or baseDirectory is absent
  */
 export async function createProject(name, configDir, baseUrl = '', options = {}) {
   if (!isValidProjectName(name)) {
@@ -67,26 +66,25 @@ export async function createProject(name, configDir, baseUrl = '', options = {})
   const project = createProjectObject(name, slug, configDir, baseUrl, options);
 
   const baseDirectory = (options.baseDirectory || '').trim();
-  if (baseDirectory) {
-    if (!directoryExists(baseDirectory)) {
-      throw new Error(`Base directory does not exist: ${baseDirectory}`);
-    }
-    const externalPath = getExternalProjectJsonPath(baseDirectory);
-    if (existsSync(externalPath)) {
-      throw new Error(
-        `A DCM project config already exists at ${externalPath}. ` +
-        `Use \`dcm project register -b ${baseDirectory}\` to register it instead.`
-      );
-    }
-    await writeJsonFile(externalPath, project);
-    await writeRegistryStub(slug, {
-      slug,
-      baseDirectory,
-      createdAt: new Date().toISOString()
-    });
-  } else {
-    await writeJsonFile(getProjectJsonPath(slug), project);
+  if (!baseDirectory) {
+    throw new Error('A save directory is required (baseDirectory)');
   }
+  if (!directoryExists(baseDirectory)) {
+    throw new Error(`Base directory does not exist: ${baseDirectory}`);
+  }
+  const externalPath = getExternalProjectJsonPath(baseDirectory);
+  if (existsSync(externalPath)) {
+    throw new Error(
+      `A DCM project config already exists at ${externalPath}. ` +
+      `Use \`dcm project register -b ${baseDirectory}\` to register it instead.`
+    );
+  }
+  await writeJsonFile(externalPath, project);
+  await writeRegistryStub(slug, {
+    slug,
+    baseDirectory,
+    createdAt: new Date().toISOString()
+  });
 
   return project;
 }

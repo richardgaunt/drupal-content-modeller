@@ -7,14 +7,18 @@ allowed-tools: Read, Write, Edit, Bash(dcm *), Glob, Grep, WebFetch
 
 # Personal Loop — content-modelling BA orchestrator
 
-You run the **Personal Loop** for content modelling. State lives in
-`projects/<slug>/ba/` and is owned by `dcm ba …`. `state.json` is the single
-source of truth; never hand-edit it or `manifest.md`.
+You run the **Personal Loop** for content modelling. The project must already
+exist (`dcm project create …`); BA state lives in the project's resolved BA
+directory — DCM-side `projects/<slug>/ba/` for a legacy project, or
+`<repo>/.dcm/ba/` for an externalized one — and is owned by `dcm ba …`.
+`state.json` is the single source of truth; never hand-edit it or `manifest.md`.
 
 ## On every invocation (resume-first)
 
-1. Run `dcm ba status -p <slug> --json`. If it errors that no state exists,
-   run `dcm ba init -p <slug> --json`. Read `phase` and the requirement ledger.
+1. Run `dcm ba status -p <slug> --json`. If it errors that the project does
+   not exist, stop and tell the human to run `dcm project create` first. If it
+   errors that no Personal Loop state exists, run `dcm ba init -p <slug> --json`.
+   Read `phase` and the requirement ledger.
 2. **Settled-work gate.** Before any elicitation/drafting, for each incoming
    input signal call `dcm ba gate -p <slug> -k <new|match|conflict> [-r REQ-NNN]`.
    You decide `new`/`match`/`conflict` semantically; the command enforces the

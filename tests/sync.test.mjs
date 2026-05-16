@@ -9,11 +9,13 @@ import { syncProject, getSyncSummary } from '../src/commands/sync';
 describe('Sync Configuration', () => {
   let tempDir;
   let tempConfigDir;
+  let tempBaseDir;
 
   beforeEach(async () => {
     // Create temp directories for testing
     tempDir = await mkdtemp(join(tmpdir(), 'dcm-test-'));
     tempConfigDir = await mkdtemp(join(tmpdir(), 'dcm-config-'));
+    tempBaseDir = await mkdtemp(join(tmpdir(), 'dcm-repo-'));
 
     // Set projects directory to temp directory
     setProjectsDir(tempDir);
@@ -26,6 +28,7 @@ describe('Sync Configuration', () => {
     // Cleanup temp directories
     await rm(tempDir, { recursive: true, force: true });
     await rm(tempConfigDir, { recursive: true, force: true });
+    await rm(tempBaseDir, { recursive: true, force: true });
   });
 
   async function createTestConfig() {
@@ -135,7 +138,7 @@ field_type: text_long
   describe('syncProject', () => {
     test('updates project.entities', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await syncProject(project);
 
@@ -146,7 +149,7 @@ field_type: text_long
 
     test('finds all entity types', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await syncProject(project);
 
@@ -159,7 +162,7 @@ field_type: text_long
 
     test('merges storage and instance data', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await syncProject(project);
 
@@ -174,7 +177,7 @@ field_type: text_long
 
     test('sets lastSync timestamp', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const before = new Date();
       await syncProject(project);
@@ -189,7 +192,7 @@ field_type: text_long
 
     test('returns correct summary', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const summary = await syncProject(project);
 
@@ -201,7 +204,7 @@ field_type: text_long
       // Create empty config dir with just a placeholder yml
       await writeFile(join(tempConfigDir, 'placeholder.yml'), 'empty: true');
 
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const summary = await syncProject(project);
 
@@ -219,7 +222,7 @@ type: good
 `);
       await writeFile(join(tempConfigDir, 'node.type.bad.yml'), 'invalid: yaml: content:');
 
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       // Should not throw, should skip bad file
       const summary = await syncProject(project);
@@ -229,7 +232,7 @@ type: good
 
     test('preserves existing project data', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await syncProject(project);
 
@@ -256,7 +259,7 @@ type: good
 
     test('counts bundles and fields correctly', async () => {
       await createTestConfig();
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
       await syncProject(project);
 
       const loaded = await loadProject('test-project');

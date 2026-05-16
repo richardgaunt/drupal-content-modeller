@@ -3,6 +3,9 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+// Import CLI command handlers
+import { cmdProjectCreate } from '../src/cli/commands/projectCmds';
+
 // Import pure utility functions
 import { generateSlug, isValidProjectName } from '../src/utils/slug';
 import { createProjectObject, getProjectSummary, projectMatchesCwd } from '../src/utils/project';
@@ -596,6 +599,26 @@ describe('Project Commands', () => {
 
     test('loadProject rejects an unregistered slug with a clear message', async () => {
       await expect(loadProject('never-registered')).rejects.toThrow('not found');
+    });
+  });
+
+  describe('cmdProjectCreate (command path)', () => {
+    test('defaults base dir to cwd when --base-dir omitted', async () => {
+      const repo = await mkdtemp(join(tmpdir(), 'dcm-cwd-'));
+      const realCwd = process.cwd();
+      process.chdir(repo);
+      try {
+        await cmdProjectCreate({
+          name: 'Cwd Project',
+          configPath: tempConfigDir,
+          json: true
+        });
+        expect(existsSync(getExternalProjectJsonPath(repo))).toBe(true);
+        expect(existsSync(getRegistryStubPath('cwd-project'))).toBe(true);
+      } finally {
+        process.chdir(realCwd);
+        await rm(repo, { recursive: true, force: true });
+      }
     });
   });
 });

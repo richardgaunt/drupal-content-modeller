@@ -19,8 +19,9 @@ export async function cmdProjectCreate(options) {
       throw new Error('--config-path is required');
     }
 
+    const baseDir = (options.baseDir || process.cwd()).trim();
     const project = await createProject(options.name, options.configPath, options.baseUrl || '', {
-      baseDirectory: options.baseDir || ''
+      baseDirectory: baseDir
     });
     logSuccess(project.slug);
 
@@ -29,9 +30,7 @@ export async function cmdProjectCreate(options) {
     } else {
       console.log(chalk.green(`Project "${project.name}" created successfully!`));
       console.log(chalk.cyan(`Slug: ${project.slug}`));
-      if (options.baseDir) {
-        console.log(chalk.cyan(`Config stored at: ${options.baseDir}/.dcm/project.json`));
-      }
+      console.log(chalk.cyan(`Config stored at: ${baseDir}/.dcm/project.json`));
     }
   } catch (error) {
     handleError(error);

@@ -117,7 +117,7 @@ projectCmd
   .description('Create a new project')
   .requiredOption('-n, --name <name>', 'Project name')
   .requiredOption('-c, --config-path <path>', 'Path to Drupal configuration directory')
-  .option('-b, --base-dir <path>', 'Project base directory (repo root; enables auto-load when dcm runs inside it)')
+  .option('-b, --base-dir <path>', 'Directory to save the project in (.dcm/ created here; defaults to the current directory)')
   .option('-u, --base-url <url>', 'Base URL of the Drupal site')
   .option('-j, --json', 'Output as JSON')
   .action(cmdProjectCreate);

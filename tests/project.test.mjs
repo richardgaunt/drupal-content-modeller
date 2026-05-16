@@ -275,8 +275,8 @@ describe('Project Commands', () => {
       expect(loaded).toEqual(created);
     });
 
-    test('throws for missing project', async () => {
-      await expect(loadProject('nonexistent')).rejects.toThrow('not found');
+    test('throws actionable error for unregistered project', async () => {
+      await expect(loadProject('nonexistent')).rejects.toThrow('not registered');
     });
   });
 
@@ -598,7 +598,7 @@ describe('Project Commands', () => {
     });
 
     test('loadProject rejects an unregistered slug with a clear message', async () => {
-      await expect(loadProject('never-registered')).rejects.toThrow('not found');
+      await expect(loadProject('never-registered')).rejects.toThrow('not registered');
     });
   });
 

@@ -141,23 +141,16 @@ export async function registerProject(baseDirectory) {
  * Load an existing project
  * @param {string} slug - Project slug
  * @returns {Promise<object>} - Project object
- * @throws {Error} - If project not found
+ * @throws {Error} - If the project is not registered (no stub) or its external config is missing
  */
 export async function loadProject(slug) {
-  if (!projectExists(slug)) {
-    throw new Error(`Project "${slug}" not found`);
-  }
-
   const jsonPath = await resolveProjectJsonPath(slug);
   if (!existsSync(jsonPath)) {
     const stub = await readRegistryStub(slug);
-    if (stub) {
-      throw new Error(
-        `Externalized project "${slug}" is missing its config at ${jsonPath}. ` +
-        `The repo at ${stub.baseDirectory} may have been moved or deleted.`
-      );
-    }
-    throw new Error(`Project "${slug}" config missing at ${jsonPath}`);
+    throw new Error(
+      `Externalized project "${slug}" is missing its config at ${jsonPath}. ` +
+      `The repo at ${stub.baseDirectory} may have been moved or deleted.`
+    );
   }
   return readJsonFile(jsonPath);
 }

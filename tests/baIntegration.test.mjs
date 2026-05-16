@@ -4,12 +4,19 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  setProjectsDir, getProjectJsonPath, writeJsonFile, writeRegistryStub, resolveBaDir
+  setProjectsDir, writeJsonFile, getExternalProjectJsonPath, writeRegistryStub, resolveBaDir
 } from '../src/io/fileSystem.js';
 import { baInit, baStatus, baGate, baHandoff, baSyncDown } from '../src/commands/ba.js';
 
-async function seedLegacy(slug) {
-  await writeJsonFile(getProjectJsonPath(slug), { slug, name: slug, configDirectory: '/tmp/cfg' });
+async function seedProject(slug, repoDir, extra = {}) {
+  await writeJsonFile(getExternalProjectJsonPath(repoDir), {
+    name: slug, slug, configDirectory: repoDir, baseDirectory: repoDir,
+    baseUrl: '', drupalRoot: '', drushCommand: 'drush',
+    theme: null, editableBaseTheme: false, lastSync: null,
+    entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {} },
+    ...extra,
+  });
+  await writeRegistryStub(slug, { slug, baseDirectory: repoDir, createdAt: new Date().toISOString() });
 }
 
 describe('Personal Loop end-to-end (project-gated)', () => {
@@ -26,7 +33,7 @@ describe('Personal Loop end-to-end (project-gated)', () => {
   });
 
   test('settled-work survives a fresh resume; refined REQ is skipped, conflict cross-links', async () => {
-    await seedLegacy('p');
+    await seedProject('p', repoDir);
     await baInit('p');
     await baGate('p', { kind: 'new' }); // REQ-001
 
@@ -71,7 +78,7 @@ describe('Personal Loop end-to-end (project-gated)', () => {
   });
 
   test('sync-down is idempotent then repeatable on changed input', async () => {
-    await seedLegacy('p');
+    await seedProject('p', repoDir);
     await baInit('p');
     let s = await baStatus('p', { raw: true });
     s.nextReqSeq = 2;

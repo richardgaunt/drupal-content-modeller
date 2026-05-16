@@ -3,24 +3,49 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setProjectsDir, writeRegistryStub, resolveBaDir } from '../src/io/fileSystem.js';
+import {
+  setProjectsDir, writeRegistryStub, writeJsonFile, getExternalProjectJsonPath, resolveBaDir
+} from '../src/io/fileSystem.js';
 import { createInitialState } from '../src/ba/state.js';
 import { loadState, saveState, appendHandoffManifest, rewriteRequirementBlock } from '../src/io/baStore.js';
 
 describe('ba store IO (project-model resolved)', () => {
-  let projectsDir, repoDir;
+  let projectsDir;
+  // Track extra repo dirs so afterEach can clean all of them
+  let repoDirs;
+
+  async function makeRepoDir() {
+    const d = await mkdtemp(join(tmpdir(), 'repo-'));
+    repoDirs.push(d);
+    return d;
+  }
+
+  async function registerSlug(slug) {
+    const repoDir = await makeRepoDir();
+    await writeJsonFile(getExternalProjectJsonPath(repoDir), {
+      name: slug, slug, configDirectory: repoDir, baseDirectory: repoDir,
+      baseUrl: '', drupalRoot: '', drushCommand: 'drush',
+      theme: null, editableBaseTheme: false, lastSync: null,
+      entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {} },
+    });
+    await writeRegistryStub(slug, { slug, baseDirectory: repoDir, createdAt: new Date().toISOString() });
+    return repoDir;
+  }
+
   beforeEach(async () => {
     projectsDir = await mkdtemp(join(tmpdir(), 'pdir-'));
-    repoDir = await mkdtemp(join(tmpdir(), 'repo-'));
+    repoDirs = [];
     setProjectsDir(projectsDir);
   });
   afterEach(async () => {
     setProjectsDir(null);
     await rm(projectsDir, { recursive: true, force: true });
-    await rm(repoDir, { recursive: true, force: true });
+    await Promise.all(repoDirs.map((d) => rm(d, { recursive: true, force: true })));
+    repoDirs = [];
   });
 
   test('saveState writes state.json AND regenerated manifest.md in the resolved dir', async () => {
+    await registerSlug('my-site');
     const s = createInitialState('my-site');
     await saveState(s);
     const dir = await resolveBaDir('my-site');
@@ -30,19 +55,25 @@ describe('ba store IO (project-model resolved)', () => {
   });
 
   test('externalized project writes under <baseDirectory>/.dcm/ba', async () => {
-    await writeRegistryStub('ext-site', { slug: 'ext-site', baseDirectory: repoDir });
+    const extRepoDir = await makeRepoDir();
+    await writeRegistryStub('ext-site', { slug: 'ext-site', baseDirectory: extRepoDir, createdAt: new Date().toISOString() });
     await saveState(createInitialState('ext-site'));
-    expect(await readFile(join(repoDir, '.dcm', 'ba', 'state.json'), 'utf8')).toContain('"project": "ext-site"');
+    expect(await readFile(join(extRepoDir, '.dcm', 'ba', 'state.json'), 'utf8')).toContain('"project": "ext-site"');
   });
 
   test('loadState returns null when absent, the state when present', async () => {
+    // 'ghost': registered but no state written — loadState should return null
+    await registerSlug('ghost');
     expect(await loadState('ghost')).toBeNull();
+    // 'my-site': registered and state written — loadState should return the state
+    await registerSlug('my-site');
     const s = createInitialState('my-site');
     await saveState(s);
     expect(await loadState('my-site')).toEqual(s);
   });
 
   test('loadState throws on invalid stored state', async () => {
+    await registerSlug('broken');
     const dir = await resolveBaDir('broken');
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'state.json'), '{"version":1,"phase":"bogus"}', 'utf8');
@@ -50,6 +81,7 @@ describe('ba store IO (project-model resolved)', () => {
   });
 
   test('appendHandoffManifest writes immutable file and refuses overwrite', async () => {
+    await registerSlug('my-site');
     await saveState(createInitialState('my-site'));
     await appendHandoffManifest('my-site', 'handoff/2026.md', '# Handoff');
     const dir = await resolveBaDir('my-site');
@@ -60,6 +92,7 @@ describe('ba store IO (project-model resolved)', () => {
   });
 
   test('rewriteRequirementBlock creates a marked block when absent, rewrites it in place when present', async () => {
+    await registerSlug('my-site');
     await saveState(createInitialState('my-site'));
     const file = join(await resolveBaDir('my-site'), 'requirements.md');
 

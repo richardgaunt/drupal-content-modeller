@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  setProjectsDir, getProjectPath, writeRegistryStub, resolveBaDir
+  setProjectsDir, writeRegistryStub, resolveBaDir
 } from '../src/io/fileSystem.js';
 
 describe('resolveBaDir', () => {
@@ -20,8 +20,8 @@ describe('resolveBaDir', () => {
     await rm(repoDir, { recursive: true, force: true });
   });
 
-  test('legacy project resolves DCM-side under projects/<slug>/ba', async () => {
-    expect(await resolveBaDir('legacy-site')).toBe(join(getProjectPath('legacy-site'), 'ba'));
+  test('unregistered project rejects (no legacy fallback)', async () => {
+    await expect(resolveBaDir('legacy-site')).rejects.toThrow('not registered');
   });
 
   test('externalized project resolves to <baseDirectory>/.dcm/ba', async () => {

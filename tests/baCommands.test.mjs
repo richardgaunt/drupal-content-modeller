@@ -4,23 +4,32 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  setProjectsDir, getProjectJsonPath, writeJsonFile, resolveBaDir, writeRegistryStub
+  setProjectsDir, writeJsonFile, getExternalProjectJsonPath, resolveBaDir, writeRegistryStub
 } from '../src/io/fileSystem.js';
 import { baInit, baStatus, baGate, baHandoff, baSyncDown } from '../src/commands/ba.js';
 
-async function seedProject(slug) {
-  await writeJsonFile(getProjectJsonPath(slug), { slug, name: slug, configDirectory: '/tmp/cfg' });
+async function seedProject(slug, repoDir, extra = {}) {
+  await writeJsonFile(getExternalProjectJsonPath(repoDir), {
+    name: slug, slug, configDirectory: repoDir, baseDirectory: repoDir,
+    baseUrl: '', drupalRoot: '', drushCommand: 'drush',
+    theme: null, editableBaseTheme: false, lastSync: null,
+    entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {} },
+    ...extra,
+  });
+  await writeRegistryStub(slug, { slug, baseDirectory: repoDir, createdAt: new Date().toISOString() });
 }
 
 describe('ba orchestration (project-gated)', () => {
-  let projectsDir;
+  let projectsDir, repoDir;
   beforeEach(async () => {
     projectsDir = await mkdtemp(join(tmpdir(), 'pdir-'));
+    repoDir = await mkdtemp(join(tmpdir(), 'repo-'));
     setProjectsDir(projectsDir);
   });
   afterEach(async () => {
     setProjectsDir(null);
     await rm(projectsDir, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
   });
 
   test('baInit on a missing project errors and writes nothing', async () => {
@@ -28,7 +37,7 @@ describe('ba orchestration (project-gated)', () => {
   });
 
   test('baInit creates state at audit phase; re-init is idempotent', async () => {
-    await seedProject('my-site');
+    await seedProject('my-site', repoDir);
     const a = await baInit('my-site');
     expect(a.created).toBe(true);
     expect(a.state.phase).toBe('audit');
@@ -38,7 +47,7 @@ describe('ba orchestration (project-gated)', () => {
   });
 
   test('baStatus reports phase + ledger summary', async () => {
-    await seedProject('my-site');
+    await seedProject('my-site', repoDir);
     await baInit('my-site');
     const st = await baStatus('my-site');
     expect(st.phase).toBe('audit');
@@ -46,7 +55,7 @@ describe('ba orchestration (project-gated)', () => {
   });
 
   test('baGate applies a signal and persists', async () => {
-    await seedProject('my-site');
+    await seedProject('my-site', repoDir);
     await baInit('my-site');
     const r = await baGate('my-site', { kind: 'new' });
     expect(r.action).toBe('created');
@@ -56,7 +65,7 @@ describe('ba orchestration (project-gated)', () => {
   });
 
   test('baHandoff refines, writes immutable manifest, persists', async () => {
-    await seedProject('my-site');
+    await seedProject('my-site', repoDir);
     await baInit('my-site');
     await baGate('my-site', { kind: 'new' }); // REQ-001
     let st = await baStatus('my-site', { raw: true });
@@ -84,7 +93,7 @@ describe('ba orchestration (project-gated)', () => {
   });
 
   test('baSyncDown reconciles and annotates requirements.md', async () => {
-    await seedProject('my-site');
+    await seedProject('my-site', repoDir);
     await baInit('my-site');
     let st = await baStatus('my-site', { raw: true });
     st.nextReqSeq = 2;

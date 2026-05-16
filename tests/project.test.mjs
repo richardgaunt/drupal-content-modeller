@@ -593,5 +593,9 @@ describe('Project Commands', () => {
         await rm(otherDir, { recursive: true, force: true });
       }
     });
+
+    test('loadProject rejects an unregistered slug with a clear message', async () => {
+      await expect(loadProject('never-registered')).rejects.toThrow('not found');
+    });
   });
 });

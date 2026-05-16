@@ -3,15 +3,29 @@ import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globa
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setProjectsDir, getProjectJsonPath, writeJsonFile } from '../src/io/fileSystem.js';
+import {
+  setProjectsDir, writeRegistryStub, writeJsonFile, getExternalProjectJsonPath
+} from '../src/io/fileSystem.js';
 import { cmdBaInit, cmdBaStatus } from '../src/cli/commands/baCmds.js';
 
+async function seedProject(slug, repoDir, extra = {}) {
+  await writeJsonFile(getExternalProjectJsonPath(repoDir), {
+    name: slug, slug, configDirectory: repoDir, baseDirectory: repoDir,
+    baseUrl: '', drupalRoot: '', drushCommand: 'drush',
+    theme: null, editableBaseTheme: false, lastSync: null,
+    entities: { node: {}, media: {}, paragraph: {}, taxonomy_term: {} },
+    ...extra,
+  });
+  await writeRegistryStub(slug, { slug, baseDirectory: repoDir, createdAt: new Date().toISOString() });
+}
+
 describe('ba CLI handlers (project-gated)', () => {
-  let projectsDir, logSpy, errSpy, exitSpy;
+  let projectsDir, repoDir, logSpy, errSpy, exitSpy;
   beforeEach(async () => {
     projectsDir = await mkdtemp(join(tmpdir(), 'pdir-'));
+    repoDir = await mkdtemp(join(tmpdir(), 'repo-'));
     setProjectsDir(projectsDir);
-    await writeJsonFile(getProjectJsonPath('my-site'), { slug: 'my-site', name: 'my-site', configDirectory: '/tmp/cfg' });
+    await seedProject('my-site', repoDir);
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
@@ -20,6 +34,7 @@ describe('ba CLI handlers (project-gated)', () => {
     jest.restoreAllMocks();
     setProjectsDir(null);
     await rm(projectsDir, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
   });
 
   test('cmdBaInit prints JSON when --json', async () => {

@@ -489,6 +489,13 @@ describe('Project Commands', () => {
       expect(loaded.baseDirectory).toBe(tempBaseDir);
     });
 
+    test('loadProject reports missing external config when stub points at a vanished repo', async () => {
+      await createProject('Vanish Repo', tempConfigDir, '', { baseDirectory: tempBaseDir });
+      // Simulate the repo (and its .dcm/project.json) being deleted while the stub remains
+      await rm(getExternalProjectJsonPath(tempBaseDir), { force: true });
+      await expect(loadProject('vanish-repo')).rejects.toThrow('missing its config');
+    });
+
     test('save writes back to external config', async () => {
       await createProject('Repo Project', tempConfigDir, '', {
         baseDirectory: tempBaseDir

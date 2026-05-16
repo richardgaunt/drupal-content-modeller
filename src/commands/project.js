@@ -148,8 +148,10 @@ export async function loadProject(slug) {
   if (!existsSync(jsonPath)) {
     const stub = await readRegistryStub(slug);
     throw new Error(
-      `Externalized project "${slug}" is missing its config at ${jsonPath}. ` +
-      `The repo at ${stub.baseDirectory} may have been moved or deleted.`
+      stub
+        ? `Externalized project "${slug}" is missing its config at ${jsonPath}. ` +
+          `The repo at ${stub.baseDirectory} may have been moved or deleted.`
+        : `Project "${slug}" config is missing at ${jsonPath}.`
     );
   }
   return readJsonFile(jsonPath);

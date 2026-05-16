@@ -12,3 +12,4 @@ export * from './commands/miscCmds.js';
 export * from './commands/spreadsheetCmds.js';
 export * from './commands/themeCmds.js';
 export * from './commands/migrationCmds.js';
+export * from './commands/baCmds.js';

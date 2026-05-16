@@ -61,13 +61,9 @@ export async function createProject(name, configDir, baseUrl = '', options = {})
     throw new Error(`Configuration directory contains no .yml files: ${configDir}`);
   }
 
-  await ensureProjectsDir();
-
-  const project = createProjectObject(name, slug, configDir, baseUrl, options);
-
   const baseDirectory = (options.baseDirectory || '').trim();
   if (!baseDirectory) {
-    throw new Error('A save directory is required (baseDirectory)');
+    throw new Error('A save directory is required');
   }
   if (!directoryExists(baseDirectory)) {
     throw new Error(`Base directory does not exist: ${baseDirectory}`);
@@ -79,6 +75,11 @@ export async function createProject(name, configDir, baseUrl = '', options = {})
       `Use \`dcm project register -b ${baseDirectory}\` to register it instead.`
     );
   }
+
+  await ensureProjectsDir();
+
+  const project = createProjectObject(name, slug, configDir, baseUrl, options);
+
   await writeJsonFile(externalPath, project);
   await writeRegistryStub(slug, {
     slug,

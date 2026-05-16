@@ -92,11 +92,12 @@ Ask in **batches by theme**. Where there are 3–5 multiple-choice style answers
 
 ### Theme 2 — Existing content and migration
 
-- Does a site already exist? If so, what platform?
+- Does a site already exist? Is so provide the URL of the existing site.
 - Roughly how many pieces of content exist? (articles, pages, events, etc.)
 - Will existing content migrate into the new site? All of it, or curated subset?
 - If curated: who decides what migrates?
 - Any content audit already done?
+- Content model - are we keeping the existing content model or starting from scratch? If existing, please provide the list of existing content types.
 
 ### Theme 3 — Editorial workflow
 
@@ -109,19 +110,18 @@ Ask in **batches by theme**. Where there are 3–5 multiple-choice style answers
 
 ### Theme 4 — Constraints
 
-- Multilingual? If yes, how many languages, URL strategy (subdomain / path / separate domain), which sections are translated?
 - Accessibility target? (WCAG 2.1 AA is default; AAA means stricter contrast, captions, etc.)
-- SEO priorities? Any schema.org / structured data requirements? Redirect strategy for old URLs?
-- Compliance? GDPR, CCPA, HIPAA, sector-specific?
-- Performance targets? (LCP, CLS, page-weight budget)
-- Hosting constraints? (Acquia, Platform.sh, Pantheon, self-hosted, Lagoon/amazee.io)
+- SEO priorities? Any schema.org / structured data requirements? 
+- Redirect strategy for old URLs?
+- Hosting constraints? (Quant, GovCMS SaaS, GovCMS PaaS, Lagoon/amazee.io, Acquia etc)
+- Multilingual? If yes, please provide languages.
 
 ### Theme 5 — Design inputs
 
 - Is there a Figma file? Provide the link (or paste screenshots).
-- Is there a design system / pattern library already?
+- Is there a design system / pattern library already? Provide links to design system documentation.
 - Is the front-end separate (decoupled Drupal)? React/Next, Vue/Nuxt, or classic Drupal theme?
-- Will the theme use **Paragraphs**, **Layout Builder**, **Single Directory Components (SDC)**, or a mix? If unknown, you'll help decide in Phase 4.
+- Will the theme use **Paragraphs**, **Layout Builder**, **Single Directory Components (SDC)**, **Canvas** or a mx? If unknown, you'll help decide in Phase 4.
 
 ### Theme 6 — Integrations
 

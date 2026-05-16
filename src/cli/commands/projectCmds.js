@@ -31,6 +31,7 @@ export async function cmdProjectCreate(options) {
       console.log(chalk.green(`Project "${project.name}" created successfully!`));
       console.log(chalk.cyan(`Slug: ${project.slug}`));
       console.log(chalk.cyan(`Config stored at: ${baseDir}/.dcm/project.json`));
+      console.log(chalk.gray('Commit .dcm/project.json to share the model with your team.'));
     }
   } catch (error) {
     handleError(error);

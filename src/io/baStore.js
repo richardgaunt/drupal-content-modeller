@@ -1,16 +1,13 @@
 // src/io/baStore.js
-/** IO for projects/<slug>/ba/ — state.json is canonical, manifest.md derived. */
+/** IO for a project's BA dir — state.json canonical, manifest.md derived. */
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
+import { resolveBaDir } from './fileSystem.js';
 import { validateState } from '../ba/state.js';
 import { renderManifest } from '../ba/manifestRender.js';
 
-export function baDir(root, slug) {
-  return join(root, 'projects', slug, 'ba');
-}
-
-export async function loadState(root, slug) {
-  const file = join(baDir(root, slug), 'state.json');
+export async function loadState(slug) {
+  const file = join(await resolveBaDir(slug), 'state.json');
   let raw;
   try {
     raw = await readFile(file, 'utf8');
@@ -24,10 +21,10 @@ export async function loadState(root, slug) {
   return state;
 }
 
-export async function saveState(root, state) {
+export async function saveState(state) {
   const v = validateState(state);
   if (!v.ok) throw new Error(`refusing to save invalid state: ${v.errors.join('; ')}`);
-  const dir = baDir(root, state.project);
+  const dir = await resolveBaDir(state.project);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'state.json'), JSON.stringify(state, null, 2) + '\n', 'utf8');
   await writeFile(join(dir, 'manifest.md'), renderManifest(state), 'utf8');
@@ -37,8 +34,8 @@ async function exists(p) {
   try { await access(p); return true; } catch { return false; }
 }
 
-export async function appendHandoffManifest(root, slug, relFile, markdown) {
-  const target = join(baDir(root, slug), relFile);
+export async function appendHandoffManifest(slug, relFile, markdown) {
+  const target = join(await resolveBaDir(slug), relFile);
   if (await exists(target)) throw new Error(`handoff manifest already exists: ${relFile}`);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, markdown, 'utf8');
@@ -50,8 +47,8 @@ export async function appendHandoffManifest(root, slug, relFile, markdown) {
  * block (appended) if the markers are absent. Pure-string find/replace so
  * other REQ blocks are untouched.
  */
-export async function rewriteRequirementBlock(root, slug, reqId, body) {
-  const file = join(baDir(root, slug), 'requirements.md');
+export async function rewriteRequirementBlock(slug, reqId, body) {
+  const file = join(await resolveBaDir(slug), 'requirements.md');
   let current = '';
   try { current = await readFile(file, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 

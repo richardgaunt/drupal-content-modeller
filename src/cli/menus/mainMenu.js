@@ -162,8 +162,8 @@ async function handleCreateProject() {
     });
 
     const baseDirectory = await input({
-      message: 'Project base directory (optional, repo root — used to auto-load dcm when run inside it)?',
-      default: ''
+      message: 'Where do you want the project saved? (.dcm/project.json is created here; dcm auto-loads when run inside this directory)',
+      default: process.cwd()
     });
 
     const baseUrl = await input({
@@ -223,10 +223,8 @@ async function handleCreateProject() {
     });
     console.log(chalk.green(`Project "${project.name}" created successfully!`));
     console.log(chalk.cyan(`Slug: ${project.slug}`));
-    if (baseDirectory.trim()) {
-      console.log(chalk.cyan(`Config stored at: ${baseDirectory.trim()}/.dcm/project.json`));
-      console.log(chalk.gray('Commit .dcm/project.json to share the model with your team.'));
-    }
+    console.log(chalk.cyan(`Config stored at: ${baseDirectory.trim()}/.dcm/project.json`));
+    console.log(chalk.gray('Commit .dcm/project.json to share the model with your team.'));
     console.log();
 
     // Check for missing recommended modules on project creation

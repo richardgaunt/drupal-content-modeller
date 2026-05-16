@@ -147,6 +147,21 @@ export async function resolveProjectJsonPath(slug) {
 }
 
 /**
+ * Resolve a project's BA artefact directory, honouring registry stubs.
+ * Externalized projects resolve to <baseDirectory>/.dcm/ba; legacy projects
+ * resolve to the DCM-side <projects>/<slug>/ba.
+ * @param {string} slug - Project slug
+ * @returns {Promise<string>} - Absolute path to the BA directory
+ */
+export async function resolveBaDir(slug) {
+  const stub = await readRegistryStub(slug);
+  if (stub) {
+    return join(stub.baseDirectory, '.dcm', 'ba');
+  }
+  return join(getProjectPath(slug), 'ba');
+}
+
+/**
  * Get the path to a project's reports directory
  * @param {string} slug - Project slug
  * @returns {string} - Absolute path to reports directory

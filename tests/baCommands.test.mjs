@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  setProjectsDir, getProjectJsonPath, writeJsonFile, resolveBaDir
+  setProjectsDir, getProjectJsonPath, writeJsonFile, resolveBaDir, writeRegistryStub
 } from '../src/io/fileSystem.js';
 import { baInit, baStatus, baGate, baHandoff, baSyncDown } from '../src/commands/ba.js';
 
@@ -71,6 +71,16 @@ describe('ba orchestration (project-gated)', () => {
     expect(ho.state.requirements['REQ-001'].status).toBe('refined');
     const dir = await resolveBaDir('my-site');
     expect(await readFile(join(dir, 'handoff/2026-05-16T00-00-00Z.md'), 'utf8')).toContain('# Handoff');
+  });
+
+  test('externalized project whose repo is gone propagates loadProject error WITHOUT the create hint', async () => {
+    await writeRegistryStub('ext-gone', { slug: 'ext-gone', baseDirectory: '/no/such/repo/path' });
+    await expect(baInit('ext-gone')).rejects.toThrow(/moved or deleted|missing its config/i);
+    await expect(baInit('ext-gone')).rejects.not.toThrow(/dcm project create/);
+  });
+
+  test('genuinely missing project still gets the create hint', async () => {
+    await expect(baInit('totally-absent')).rejects.toThrow(/not found — run `dcm project create` first/);
   });
 
   test('baSyncDown reconciles and annotates requirements.md', async () => {

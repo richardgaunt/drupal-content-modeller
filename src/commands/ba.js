@@ -1,6 +1,7 @@
 // src/commands/ba.js
 /** Personal Loop orchestration: project-gated; wires pure core + baStore. */
 import { loadProject } from './project.js';
+import { projectExists } from '../io/fileSystem.js';
 import { createInitialState } from '../ba/state.js';
 import { applySignal } from '../ba/ledger.js';
 import { buildHandoff } from '../ba/handoffManifest.js';
@@ -10,11 +11,10 @@ import {
 } from '../io/baStore.js';
 
 async function requireProject(slug) {
-  try {
-    await loadProject(slug);
-  } catch (e) {
-    throw new Error(`${e.message} — run \`dcm project create\` first`);
+  if (!projectExists(slug)) {
+    throw new Error(`Project "${slug}" not found — run \`dcm project create\` first`);
   }
+  await loadProject(slug);
 }
 
 export async function baInit(slug) {

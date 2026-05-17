@@ -736,10 +736,12 @@ describe('Field Generator', () => {
 describe('Field Creation Commands', () => {
   let tempDir;
   let tempConfigDir;
+  let tempBaseDir;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'dcm-test-'));
     tempConfigDir = await mkdtemp(join(tmpdir(), 'dcm-config-'));
+    tempBaseDir = await mkdtemp(join(tmpdir(), 'dcm-repo-'));
     setProjectsDir(tempDir);
 
     // Create a placeholder yml file and a node type
@@ -757,6 +759,7 @@ description: A page.
     setProjectsDir(null);
     await rm(tempDir, { recursive: true, force: true });
     await rm(tempConfigDir, { recursive: true, force: true });
+    await rm(tempBaseDir, { recursive: true, force: true });
   });
 
   describe('validateFieldMachineName', () => {
@@ -780,7 +783,7 @@ description: A page.
 
   describe('createField', () => {
     test('creates storage and instance files', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createField(project, 'node', ['page'], {
         fieldName: 'field_body',
@@ -805,7 +808,7 @@ name: Article
 type: article
 `);
 
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createField(project, 'node', ['page', 'article'], {
         fieldName: 'field_summary',
@@ -828,7 +831,7 @@ name: Article
 type: article
 `);
 
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       // Create first field on page
       await createField(project, 'node', ['page'], {
@@ -856,7 +859,7 @@ type: article
     });
 
     test('throws for empty bundles', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await expect(createField(project, 'node', [], {
         fieldName: 'field_body',
@@ -866,7 +869,7 @@ type: article
     });
 
     test('throws for invalid field name', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await expect(createField(project, 'node', ['page'], {
         fieldName: 'invalid-name',
@@ -1065,7 +1068,7 @@ type: article
 
   describe('updateField', () => {
     test('updates field label', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       // Create a field first
       await createField(project, 'node', ['page'], {
@@ -1091,7 +1094,7 @@ type: article
     });
 
     test('updates field description', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await createField(project, 'node', ['page'], {
         fieldName: 'field_n_summary',
@@ -1111,7 +1114,7 @@ type: article
     });
 
     test('updates field required status', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await createField(project, 'node', ['page'], {
         fieldName: 'field_n_title',
@@ -1130,7 +1133,7 @@ type: article
     });
 
     test('updates entity_reference target bundles', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       // Create taxonomy vocabulary for target
       await writeFile(join(tempConfigDir, 'taxonomy.vocabulary.tags.yml'), `
@@ -1174,14 +1177,14 @@ vid: categories
     });
 
     test('throws for missing field file', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await expect(updateField(project, 'node', 'page', 'field_nonexistent', { label: 'New' }))
         .rejects.toThrow('Field instance file not found');
     });
 
     test('updates multiple fields at once', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await createField(project, 'node', ['page'], {
         fieldName: 'field_n_multi',

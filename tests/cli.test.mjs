@@ -22,10 +22,12 @@ import { generateSlug } from '../src/utils/slug';
 describe('CLI Prompts', () => {
   let tempDir;
   let tempConfigDir;
+  let tempBaseDir;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'dcm-test-'));
     tempConfigDir = await mkdtemp(join(tmpdir(), 'dcm-config-'));
+    tempBaseDir = await mkdtemp(join(tmpdir(), 'dcm-repo-'));
     setProjectsDir(tempDir);
   });
 
@@ -33,6 +35,7 @@ describe('CLI Prompts', () => {
     setProjectsDir(null);
     await rm(tempDir, { recursive: true, force: true });
     await rm(tempConfigDir, { recursive: true, force: true });
+    await rm(tempBaseDir, { recursive: true, force: true });
   });
 
   describe('Menu Generation', () => {
@@ -160,7 +163,7 @@ describe('CLI Prompts', () => {
       await writeFile(join(tempConfigDir, 'test.yml'), 'test: true');
 
       // Create a project
-      await createProject('Test Project', tempConfigDir);
+      await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       // Validate unique
       const result = validateProjectNameUnique('Test Project');

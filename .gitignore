@@ -34,3 +34,6 @@ coverage/
 
 # Build artifacts
 dist/
+
+# Git worktrees
+.worktrees/

@@ -455,10 +455,12 @@ describe('Bundle Generator', () => {
 describe('Create Commands', () => {
   let tempDir;
   let tempConfigDir;
+  let tempBaseDir;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'dcm-test-'));
     tempConfigDir = await mkdtemp(join(tmpdir(), 'dcm-config-'));
+    tempBaseDir = await mkdtemp(join(tmpdir(), 'dcm-repo-'));
     setProjectsDir(tempDir);
 
     // Create a placeholder yml file
@@ -469,6 +471,7 @@ describe('Create Commands', () => {
     setProjectsDir(null);
     await rm(tempDir, { recursive: true, force: true });
     await rm(tempConfigDir, { recursive: true, force: true });
+    await rm(tempBaseDir, { recursive: true, force: true });
   });
 
   describe('bundleExists', () => {
@@ -518,7 +521,7 @@ describe('Create Commands', () => {
 
   describe('createBundle', () => {
     test('creates node type file', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createBundle(project, 'node', {
         label: 'Page',
@@ -535,7 +538,7 @@ describe('Create Commands', () => {
     });
 
     test('creates media type with source field files', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createBundle(project, 'media', {
         label: 'Image',
@@ -550,7 +553,7 @@ describe('Create Commands', () => {
     });
 
     test('creates paragraph type file', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createBundle(project, 'paragraph', {
         label: 'Text',
@@ -561,7 +564,7 @@ describe('Create Commands', () => {
     });
 
     test('creates vocabulary file', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       const result = await createBundle(project, 'taxonomy_term', {
         label: 'Tags',
@@ -572,7 +575,7 @@ describe('Create Commands', () => {
     });
 
     test('updates project entities after creation', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await createBundle(project, 'node', {
         label: 'Page',
@@ -588,7 +591,7 @@ describe('Create Commands', () => {
     });
 
     test('throws for invalid machine name', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await expect(createBundle(project, 'node', {
         label: 'Page',
@@ -597,7 +600,7 @@ describe('Create Commands', () => {
     });
 
     test('throws for duplicate bundle', async () => {
-      const project = await createProject('Test Project', tempConfigDir);
+      const project = await createProject('Test Project', tempConfigDir, '', { baseDirectory: tempBaseDir });
 
       await createBundle(project, 'node', {
         label: 'Page',

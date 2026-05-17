@@ -5,6 +5,7 @@ import { showMainMenu } from './src/cli/menus.js';
 import {
   cmdHelp,
   cmdProjectCreate,
+  cmdProjectRegister,
   cmdProjectList,
   cmdProjectView,
   cmdProjectEdit,
@@ -71,7 +72,12 @@ import {
   cmdWorkflowAdd,
   cmdWorkflowRemove,
   cmdGenerateTickets,
-  cmdGenerateTemplates
+  cmdGenerateTemplates,
+  cmdBaInit,
+  cmdBaStatus,
+  cmdBaGate,
+  cmdBaHandoff,
+  cmdBaSyncDown
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -111,10 +117,17 @@ projectCmd
   .description('Create a new project')
   .requiredOption('-n, --name <name>', 'Project name')
   .requiredOption('-c, --config-path <path>', 'Path to Drupal configuration directory')
-  .option('-b, --base-dir <path>', 'Project base directory (repo root; enables auto-load when dcm runs inside it)')
+  .option('-b, --base-dir <path>', 'Directory to save the project in (.dcm/ created here; defaults to the current directory)')
   .option('-u, --base-url <url>', 'Base URL of the Drupal site')
   .option('-j, --json', 'Output as JSON')
   .action(cmdProjectCreate);
+
+projectCmd
+  .command('register')
+  .description('Register an existing DCM project from a Drupal repo (reads <base-dir>/.dcm/project.json)')
+  .requiredOption('-b, --base-dir <path>', 'Path to the Drupal repo containing .dcm/project.json')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdProjectRegister);
 
 projectCmd
   .command('list')
@@ -792,6 +805,54 @@ skillCmd
   .option('-f, --force', 'Overwrite existing skill')
   .option('-j, --json', 'Output as JSON')
   .action(cmdSkillInstall);
+
+// ============================================
+// BA Personal Loop Commands
+// ============================================
+
+const baCmd = program
+  .command('ba')
+  .description('Personal Loop — BA content-modelling orchestrator');
+
+baCmd
+  .command('init')
+  .description('Initialise (or resume) the Personal Loop for a project')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaInit);
+
+baCmd
+  .command('status')
+  .description('Show phase, round and the requirement ledger')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaStatus);
+
+baCmd
+  .command('gate')
+  .description('Settled-work gate: classify an incoming signal against the ledger')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-k, --kind <kind>', 'Signal kind: new | match | conflict')
+  .option('-r, --ref <reqId>', 'REQ id the signal matches/conflicts with')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaGate);
+
+baCmd
+  .command('handoff')
+  .description('Outbound stage: mark REQs refined + write an immutable manifest (sync-up stubbed)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-r, --reqs <ids>', 'Comma-separated REQ ids to hand off')
+  .option('-t, --ts <stamp>', 'Manifest timestamp (default: now)')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaHandoff);
+
+baCmd
+  .command('sync-down')
+  .description('Inbound stage: reconcile returned team-refined tickets (Jira-fetch stubbed)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-i, --input <json>', 'JSON array: [{reqId,ticketId,content,hash}]')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdBaSyncDown);
 
 // ============================================
 // Component Commands

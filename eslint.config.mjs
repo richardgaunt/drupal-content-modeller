@@ -98,6 +98,7 @@ export default [
       'n/no-missing-import': 'off',
       'n/no-unpublished-import': 'off',
       'n/no-unsupported-features/es-syntax': 'off',
+      'n/no-unsupported-features/node-builtins': ['error', { version: '22.0.0' }],
       // Allow process.exit() in CLI applications
       'n/no-process-exit': 'off'
     }

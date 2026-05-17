@@ -78,12 +78,84 @@ export function getProjectPath(slug) {
 }
 
 /**
- * Get the path to a project's project.json file
+ * Get the path to a project's registry stub file. A stub at this path marks
+ * the project as externalized — the authoritative project.json lives inside
+ * the Drupal repo at <baseDirectory>/.dcm/project.json.
  * @param {string} slug - Project slug
- * @returns {string} - Absolute path to project.json
+ * @returns {string} - Absolute path to registry.json
  */
-export function getProjectJsonPath(slug) {
-  return join(getProjectPath(slug), 'project.json');
+export function getRegistryStubPath(slug) {
+  return join(getProjectPath(slug), 'registry.json');
+}
+
+/**
+ * Get the path to an externalized project's project.json inside a Drupal repo.
+ * @param {string} baseDirectory - Absolute path to the repo root
+ * @returns {string} - Absolute path to <baseDirectory>/.dcm/project.json
+ */
+export function getExternalProjectJsonPath(baseDirectory) {
+  return join(baseDirectory, '.dcm', 'project.json');
+}
+
+/**
+ * Read a registry stub if one exists for the slug.
+ * @param {string} slug - Project slug
+ * @returns {Promise<object|null>} - Stub contents or null if not externalized
+ */
+export async function readRegistryStub(slug) {
+  const stubPath = getRegistryStubPath(slug);
+  if (!existsSync(stubPath)) return null;
+  return readJsonFile(stubPath);
+}
+
+/**
+ * Write a registry stub for an externalized project.
+ * @param {string} slug - Project slug
+ * @param {object} stub - Stub contents (at minimum { baseDirectory })
+ * @returns {Promise<void>}
+ */
+export async function writeRegistryStub(slug, stub) {
+  if (!stub || !stub.baseDirectory) {
+    throw new Error('Registry stub must include baseDirectory');
+  }
+  await writeJsonFile(getRegistryStubPath(slug), stub);
+}
+
+/**
+ * Resolve the on-disk path of a project's project.json via its registry stub.
+ * Throws if no stub exists — only externalized (stub-backed) projects are supported.
+ * @param {string} slug - Project slug
+ * @returns {Promise<string>} - Absolute path to <baseDirectory>/.dcm/project.json
+ * @throws {Error} - If no registry stub exists for the slug
+ */
+export async function resolveProjectJsonPath(slug) {
+  const stub = await readRegistryStub(slug);
+  if (!stub) {
+    throw new Error(
+      `Project "${slug}" is not registered (no .dcm registry stub). ` +
+      `It may predate externalization — recreate it with \`dcm project create\` from your repo root.`
+    );
+  }
+  return getExternalProjectJsonPath(stub.baseDirectory);
+}
+
+/**
+ * Resolve a project's BA artefact directory via its registry stub.
+ * Throws if no stub exists — only externalized (stub-backed) projects are supported.
+ * @param {string} slug - Project slug
+ * @returns {Promise<string>} - Absolute path to <baseDirectory>/.dcm/ba
+ * @throws {Error} - If no registry stub exists for the slug
+ */
+export async function resolveBaDir(slug) {
+  const stub = await readRegistryStub(slug);
+  if (!stub) {
+    throw new Error(
+      `Project "${slug}" is not registered (no .dcm registry stub); ` +
+      `cannot resolve its BA directory. It may predate externalization — ` +
+      `recreate it with \`dcm project create\` from your repo root.`
+    );
+  }
+  return join(stub.baseDirectory, '.dcm', 'ba');
 }
 
 /**
@@ -123,13 +195,12 @@ export function directoryExists(dirPath) {
 }
 
 /**
- * Check if a project with the given slug exists
+ * Check if a project with the given slug exists (registry stub only).
  * @param {string} slug - The project slug to check
- * @returns {boolean} - True if the project exists
+ * @returns {boolean} - True if the project has a registry stub
  */
 export function projectExists(slug) {
-  const projectPath = getProjectPath(slug);
-  return existsSync(projectPath);
+  return existsSync(getRegistryStubPath(slug));
 }
 
 /**

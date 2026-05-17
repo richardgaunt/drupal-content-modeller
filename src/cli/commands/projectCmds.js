@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import { createProject, loadProject, listProjects, updateProject, deleteProject } from '../../commands/project.js';
+import { createProject, loadProject, listProjects, updateProject, deleteProject, registerProject } from '../../commands/project.js';
 import { syncProject } from '../../commands/sync.js';
 import { output, handleError, logSuccess } from '../cliUtils.js';
 
@@ -19,8 +19,9 @@ export async function cmdProjectCreate(options) {
       throw new Error('--config-path is required');
     }
 
+    const baseDir = (options.baseDir || process.cwd()).trim();
     const project = await createProject(options.name, options.configPath, options.baseUrl || '', {
-      baseDirectory: options.baseDir || ''
+      baseDirectory: baseDir
     });
     logSuccess(project.slug);
 
@@ -29,6 +30,32 @@ export async function cmdProjectCreate(options) {
     } else {
       console.log(chalk.green(`Project "${project.name}" created successfully!`));
       console.log(chalk.cyan(`Slug: ${project.slug}`));
+      console.log(chalk.cyan(`Config stored at: ${baseDir}/.dcm/project.json`));
+      console.log(chalk.gray('Commit .dcm/project.json to share the model with your team.'));
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Register an existing externalized project with DCM
+ */
+export async function cmdProjectRegister(options) {
+  try {
+    if (!options.baseDir) {
+      throw new Error('--base-dir is required');
+    }
+
+    const project = await registerProject(options.baseDir);
+    logSuccess(project.slug);
+
+    if (options.json) {
+      output(project, true);
+    } else {
+      console.log(chalk.green(`Project "${project.name}" registered successfully!`));
+      console.log(chalk.cyan(`Slug: ${project.slug}`));
+      console.log(chalk.gray(`Config source: ${options.baseDir}/.dcm/project.json`));
     }
   } catch (error) {
     handleError(error);
@@ -198,14 +225,17 @@ export async function cmdProjectDelete(options) {
     // Load project first to confirm it exists
     await loadProject(options.project);
 
-    const deleted = await deleteProject(options.project);
+    const { deleted, externalConfigPath } = await deleteProject(options.project);
 
     if (deleted) {
-      // Note: log file is deleted with the project directory
       if (options.json) {
-        output({ deleted: true, slug: options.project }, true);
+        output({ deleted: true, slug: options.project, externalConfigPath }, true);
       } else {
         console.log(chalk.green(`Project "${options.project}" deleted successfully!`));
+        if (externalConfigPath) {
+          console.log(chalk.yellow(`External config left in place: ${externalConfigPath}`));
+          console.log(chalk.gray('Delete it manually if you no longer want the repo-side config.'));
+        }
       }
     } else {
       throw new Error(`Failed to delete project "${options.project}"`);

@@ -46,6 +46,7 @@ import {
   handleBundleReport,
   handleEntityReport,
   handleProjectReport,
+  handlePermissionReport,
   handleGenerateTickets,
   handleExportJson,
   handleImportModel,
@@ -399,6 +400,9 @@ async function handleAction(project, action) {
       break;
     case 'report-project':
       await handleProjectReport(project);
+      break;
+    case 'report-permissions':
+      await handlePermissionReport(project);
       break;
     case 'export-json':
       await handleExportJson(project);

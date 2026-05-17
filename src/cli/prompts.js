@@ -54,6 +54,7 @@ export const PROJECT_SUBMENU_CHOICES = {
     { value: 'report-bundle', name: 'Generate report for bundle' },
     { value: 'report-entity', name: 'Generate report for entity type' },
     { value: 'report-project', name: 'Generate report for project' },
+    { value: 'report-permissions', name: 'Generate permissions & workflow report' },
     { value: 'export-json', name: 'Export content model to JSON' },
     { value: 'export-spreadsheet', name: 'Export content model to spreadsheet' },
     { value: 'import-model', name: 'Import content model from JSON' },

@@ -155,12 +155,14 @@ export function getPermissionLabel(entityType, permissionKey) {
 }
 
 /**
- * Parse a permission key to extract entity type and bundle
+ * Parse a permission key to extract entity type, bundle, scope, and metadata.
+ * Returns `scope:'bundle'` for per-bundle permissions and `scope:'global'` for
+ * non-bundle permissions. Returns null if the permission is not recognised.
  * @param {string} permission - Permission key
- * @returns {object|null} - { entityType, bundle, short } or null
+ * @returns {object|null} - { entityType, bundle, scope, short, label[, module] } or null
  */
 export function parsePermissionKey(permission) {
-  // Try each entity type's patterns
+  // Per-bundle templates
   for (const [entityType, templates] of Object.entries(PERMISSIONS_BY_ENTITY_TYPE)) {
     for (const template of templates) {
       const pattern = template.key.replace('{bundle}', '([a-z0-9_]+)');
@@ -171,8 +173,25 @@ export function parsePermissionKey(permission) {
         return {
           entityType,
           bundle: match[1],
+          scope: 'bundle',
           short: template.short,
           label: template.label
+        };
+      }
+    }
+  }
+
+  // Global (non-bundle) templates — exact key match
+  for (const [entityType, templates] of Object.entries(GLOBAL_PERMISSIONS_BY_ENTITY_TYPE)) {
+    for (const template of templates) {
+      if (template.key === permission) {
+        return {
+          entityType,
+          bundle: null,
+          scope: 'global',
+          short: template.short,
+          label: template.label,
+          module: template.module
         };
       }
     }
@@ -235,9 +254,11 @@ export function filterBundlePermissions(permissions, entityType, bundle) {
 }
 
 /**
- * Group permissions by entity type and bundle
+ * Group permissions by entity type and bundle.
+ * Per-bundle permissions are grouped under their bundle machine name.
+ * Global (non-bundle) permissions are grouped under GLOBAL_BUCKET_KEY ('_global').
  * @param {string[]} permissions - Array of permission keys
- * @returns {object} - Grouped permissions { entityType: { bundle: [permissions] } }
+ * @returns {object} - Grouped permissions { entityType: { bundle|'_global': [permissions] } }
  */
 export function groupPermissionsByBundle(permissions) {
   const grouped = {};
@@ -245,13 +266,14 @@ export function groupPermissionsByBundle(permissions) {
   for (const permission of permissions) {
     const parsed = parsePermissionKey(permission);
     if (parsed) {
+      const bucket = parsed.scope === 'global' ? GLOBAL_BUCKET_KEY : parsed.bundle;
       if (!grouped[parsed.entityType]) {
         grouped[parsed.entityType] = {};
       }
-      if (!grouped[parsed.entityType][parsed.bundle]) {
-        grouped[parsed.entityType][parsed.bundle] = [];
+      if (!grouped[parsed.entityType][bucket]) {
+        grouped[parsed.entityType][bucket] = [];
       }
-      grouped[parsed.entityType][parsed.bundle].push({
+      grouped[parsed.entityType][bucket].push({
         key: permission,
         short: parsed.short,
         label: parsed.label

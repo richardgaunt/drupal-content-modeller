@@ -22,6 +22,7 @@ import {
   GLOBAL_BUCKET_KEY,
   getGlobalPermissionTemplates
 } from '../src/constants/permissions.js';
+import { GLOBAL_BUCKET_KEY as GBK } from '../src/constants/permissions.js';
 
 describe('Permission Constants', () => {
   describe('NODE_PERMISSIONS', () => {
@@ -304,10 +305,45 @@ describe('groupPermissionsByBundle', () => {
     expect(grouped).toEqual({});
   });
 
-  it('ignores non-content permissions', () => {
-    const perms = ['access content', 'view published content'];
+  it('ignores unrecognized permissions', () => {
+    const perms = ['view published content', 'administer site configuration'];
     const grouped = groupPermissionsByBundle(perms);
     expect(grouped).toEqual({});
+  });
+});
+
+describe('parsePermissionKey — global perms', () => {
+  it('parses a global node perm with scope=global and bundle=null', () => {
+    expect(parsePermissionKey('access content')).toEqual({
+      entityType: 'node', bundle: null, scope: 'global',
+      short: 'view_published', label: 'View published content', module: 'node'
+    });
+    expect(parsePermissionKey('view latest version')).toMatchObject({
+      entityType: 'node', scope: 'global', short: 'view_latest', module: 'content_moderation'
+    });
+  });
+
+  it('tags per-bundle results with scope=bundle', () => {
+    expect(parsePermissionKey('create article content')).toMatchObject({
+      entityType: 'node', bundle: 'article', scope: 'bundle', short: 'create'
+    });
+  });
+
+  it('still returns null for a nonsense string', () => {
+    expect(parsePermissionKey('unknown permission format')).toBeNull();
+  });
+});
+
+describe('groupPermissionsByBundle — global bucket', () => {
+  it('places global perms under entityType._global', () => {
+    const grouped = groupPermissionsByBundle([
+      'create article content',
+      'access content',
+      'view own unpublished media'
+    ]);
+    expect(Object.keys(grouped.node)).toContain('article');
+    expect(grouped.node[GBK].map(p => p.key)).toEqual(['access content']);
+    expect(grouped.media[GBK].map(p => p.key)).toEqual(['view own unpublished media']);
   });
 });
 

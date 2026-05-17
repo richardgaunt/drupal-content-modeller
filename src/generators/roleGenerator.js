@@ -18,7 +18,7 @@ export function calculateConfigDependencies(permissions, _project) {
 
   for (const permission of permissions) {
     const parsed = parsePermissionKey(permission);
-    if (parsed) {
+    if (parsed && parsed.scope !== 'global' && parsed.bundle) {
       try {
         configDeps.add(getBundleConfigName(parsed.entityType, parsed.bundle));
       } catch {
@@ -44,6 +44,9 @@ export function calculateModuleDependencies(permissions) {
       const module = getEntityModule(parsed.entityType);
       if (module) {
         moduleDeps.add(module);
+      }
+      if (parsed.module) {
+        moduleDeps.add(parsed.module);
       }
     }
 

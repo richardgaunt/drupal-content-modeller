@@ -19,6 +19,7 @@ import {
   listReportBundles
 } from '../../commands/import.js';
 import { createEntityReport, createProjectReport, createPermissionReport } from '../../commands/report.js';
+import { generatePermissionReportData, formatPermissionReportMarkdown } from '../../generators/permissionReport.js';
 import {
   getBundleAdminUrls,
   generateEntityTypeReportData,
@@ -183,12 +184,12 @@ export async function cmdReportPermissions(options) {
     const opts = { scope, entityType: options.entityType, bundle: options.bundle, baseUrl };
 
     if (options.out === '-') {
-      const { generatePermissionReportData, formatPermissionReportMarkdown } =
-        await import('../../generators/permissionReport.js');
       const data = generatePermissionReportData(project, roles, workflows, opts);
       if (options.format === 'md') {
         console.log(formatPermissionReportMarkdown(data));
       } else {
+        // stdout cannot hold two artifacts; 'json' and 'both' both emit JSON.
+        // Use --out <path> (without '-') to write separate .md and .json files.
         output(data, true);
       }
       return;
@@ -754,7 +755,8 @@ export async function cmdWorkflowAdd(options) {
     await writeWorkflowConfig(project.configDirectory, options.workflow, yamlContent);
 
     if (options.json) {
-      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle }, true);
+      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle },
+        true);
     } else {
       console.log(chalk.green(`Added ${options.entityType}:${options.bundle} to workflow "${options.workflow}".`));
     }
@@ -797,7 +799,8 @@ export async function cmdWorkflowRemove(options) {
     await writeWorkflowConfig(project.configDirectory, options.workflow, yamlContent);
 
     if (options.json) {
-      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle }, true);
+      output({ success: true, workflow: options.workflow, entityType: options.entityType, bundle: options.bundle },
+        true);
     } else {
       console.log(chalk.green(`Removed ${options.entityType}:${options.bundle} from workflow "${options.workflow}".`));
     }

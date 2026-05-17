@@ -6,6 +6,21 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 
 import { setProjectsDir } from '../src/io/fileSystem';
+import { createProject } from '../src/commands/project';
+import {
+  getMainMenuChoices,
+  getProjectMenuChoices,
+  getSubmenuChoices,
+  validateProjectName,
+  validateProjectNameUnique,
+  validateConfigDirectory,
+  validateBaseUrl,
+  MAIN_MENU_CHOICES,
+  PROJECT_MENU_CATEGORIES,
+  PROJECT_SUBMENU_CHOICES,
+  PROJECT_MENU_CHOICES
+} from '../src/cli/prompts';
+import { generateSlug } from '../src/utils/slug';
 
 const execFileAsync = promisify(execFile);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,21 +55,6 @@ describe('report permissions CLI', () => {
     expect(stdout).toMatch(/permissions/);
   });
 });
-import { createProject } from '../src/commands/project';
-import {
-  getMainMenuChoices,
-  getProjectMenuChoices,
-  getSubmenuChoices,
-  validateProjectName,
-  validateProjectNameUnique,
-  validateConfigDirectory,
-  validateBaseUrl,
-  MAIN_MENU_CHOICES,
-  PROJECT_MENU_CATEGORIES,
-  PROJECT_SUBMENU_CHOICES,
-  PROJECT_MENU_CHOICES
-} from '../src/cli/prompts';
-import { generateSlug } from '../src/utils/slug';
 
 describe('CLI Prompts', () => {
   let tempDir;

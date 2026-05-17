@@ -165,34 +165,89 @@ export function generatePermissionReportData(project, roles, workflows, opts = {
 }
 
 /**
- * Format permission report data as a Markdown document.
+ * Render the report data as Markdown.
  * @param {object} data - Output of generatePermissionReportData
- * @returns {string} - Markdown string
+ * @returns {string} - Markdown document
  */
 export function formatPermissionReportMarkdown(data) {
-  const lines = [`# Permission Report — ${data.project}`, ''];
+  const lines = [];
+  lines.push(`# Permissions & Workflow Report`);
+  lines.push('');
+  lines.push(`- Project: \`${data.project}\``);
+  lines.push(`- Scope: \`${data.scope}\``);
+  lines.push(`- Generated: ${data.generatedAt}`);
+  lines.push('');
+
   for (const et of data.entityTypes) {
-    lines.push(`## ${et.label}`, '');
+    lines.push(`## ${et.label}`);
+    lines.push('');
+
     for (const bundle of et.bundles) {
-      lines.push(`### ${bundle.label}`, '');
+      lines.push(`### ${bundle.label} (\`${bundle.id}\`)`);
+      if (bundle.adminPermissionsUrl) {
+        lines.push(`Manage permissions: ${bundle.adminPermissionsUrl}`);
+      }
+      lines.push('');
+      const caps = bundle.roles.length
+        ? Object.keys(bundle.roles[0].capabilities)
+        : [];
+      lines.push(`| Role | ${caps.join(' | ')} |`);
+      lines.push(`|------${caps.map(() => '|------').join('')}|`);
       for (const r of bundle.roles) {
-        const caps = Object.entries(r.capabilities).filter(([, v]) => v).map(([k]) => k);
-        lines.push(`- **${r.label}**: ${caps.length > 0 ? caps.join(', ') : 'no permissions'}`);
+        const cells = caps.map(c => (r.capabilities[c] ? 'Yes' : 'No'));
+        lines.push(`| ${r.label} | ${cells.join(' | ')} |`);
+      }
+      lines.push('');
+    }
+
+    if (et.globalPermissions.length > 0) {
+      lines.push(`#### Global Permissions`);
+      lines.push('');
+      lines.push(`| Role | Permission | Module |`);
+      lines.push(`|------|------------|--------|`);
+      for (const g of et.globalPermissions) {
+        for (const p of g.perms) {
+          lines.push(`| ${g.label} | ${p.label} (\`${p.key}\`) | ${p.module} |`);
+        }
       }
       lines.push('');
     }
   }
+
   if (data.workflows.length > 0) {
-    lines.push('## Workflows', '');
+    lines.push(`## Workflows`);
+    lines.push('');
     for (const wf of data.workflows) {
-      lines.push(`### ${wf.label}`, '');
+      lines.push(`### ${wf.label} (\`${wf.id}\`)`);
+      lines.push(`- Type: ${wf.type}`);
+      lines.push(`- Default state: ${wf.defaultModerationState}`);
+      lines.push(`- States: ${wf.states.map(s => s.label).join(', ')}`);
+      lines.push(`- Bound bundles: ${wf.boundBundles.map(b => `${b.entityType}:${b.bundle}`).join(', ')}`);
+      lines.push('');
+      lines.push(`| Transition | From → To | Roles |`);
+      lines.push(`|------------|-----------|-------|`);
       for (const tp of wf.transitionPermissions) {
-        const roleLabels = tp.roles.map(r => r.label).join(', ') || 'none';
-        lines.push(`- **${tp.label}**: ${roleLabels}`);
+        const tr = wf.transitions.find(t => t.id === tp.transition);
+        const flow = tr ? `${tr.from.join(', ')} → ${tr.to}` : '';
+        const rolesTxt = tp.roles.length ? tp.roles.map(r => r.label).join(', ') : '_none_';
+        lines.push(`| ${tp.label} | ${flow} | ${rolesTxt} |`);
       }
       lines.push('');
     }
   }
+
+  lines.push(`## Suggestion Summary`);
+  lines.push('');
+  for (const [et, s] of Object.entries(data.summary)) {
+    lines.push(`### ${et}`);
+    lines.push(`- Dominant capabilities: ${s.dominantCapabilities.join(', ') || '_none_'}`);
+    for (const [role, caps] of Object.entries(s.byRole)) {
+      lines.push(`- ${role}: ${caps.join(', ')}`);
+    }
+    lines.push(`- Precedent bundles: ${s.precedentBundles.join(', ') || '_none_'}`);
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 

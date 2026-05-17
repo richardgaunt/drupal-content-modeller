@@ -103,3 +103,19 @@ describe('generatePermissionReportData', () => {
     expect(Array.isArray(data.summary.node.precedentBundles)).toBe(true);
   });
 });
+
+describe('formatPermissionReportMarkdown', () => {
+  it('renders a per-bundle matrix, global perms, workflow and summary sections', () => {
+    const data = generatePermissionReportData(project, roles, workflows, { scope: 'project' });
+    const md = formatPermissionReportMarkdown(data);
+    expect(md).toContain('# Permissions & Workflow Report');
+    expect(md).toContain('## Content Types'); // node entity label
+    expect(md).toContain('### Article');
+    expect(md).toContain('| Role |');         // matrix table header
+    expect(md).toContain('Global Permissions');
+    expect(md).toContain('## Workflows');
+    expect(md).toContain('Editorial');
+    expect(md).toContain('Publish');          // transition
+    expect(md).toContain('## Suggestion Summary');
+  });
+});

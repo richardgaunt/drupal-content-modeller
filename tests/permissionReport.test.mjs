@@ -5,6 +5,10 @@ import {
   generatePermissionReportData,
   formatPermissionReportMarkdown
 } from '../src/generators/permissionReport.js';
+import { mkdtempSync, readFileSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { createPermissionReport } from '../src/commands/report.js';
 
 const project = {
   slug: 'demo',
@@ -117,5 +121,30 @@ describe('formatPermissionReportMarkdown', () => {
     expect(md).toContain('Editorial');
     expect(md).toContain('Publish');          // transition
     expect(md).toContain('## Suggestion Summary');
+  });
+});
+
+describe('createPermissionReport', () => {
+  it('writes both .md and .json next to the given base path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dcm-permrep-'));
+    const base = join(dir, 'permissions-project');
+    const res = await createPermissionReport(project, roles, workflows,
+      { scope: 'project' }, base, 'both');
+    expect(existsSync(`${base}.md`)).toBe(true);
+    expect(existsSync(`${base}.json`)).toBe(true);
+    expect(res.markdownPath).toBe(`${base}.md`);
+    expect(res.jsonPath).toBe(`${base}.json`);
+    const parsed = JSON.parse(readFileSync(`${base}.json`, 'utf8'));
+    expect(parsed.project).toBe('demo');
+  });
+
+  it('format "json" writes only the .json file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dcm-permrep-'));
+    const base = join(dir, 'permissions-project');
+    const res = await createPermissionReport(project, roles, workflows,
+      { scope: 'project' }, base, 'json');
+    expect(existsSync(`${base}.json`)).toBe(true);
+    expect(existsSync(`${base}.md`)).toBe(false);
+    expect(res.markdownPath).toBeNull();
   });
 });

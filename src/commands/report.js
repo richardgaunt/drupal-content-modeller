@@ -3,6 +3,7 @@
  */
 
 import { generateEntityTypeReport, generateProjectReport, generateSingleBundleReport } from '../generators/reportGenerator.js';
+import { generatePermissionReportData, formatPermissionReportMarkdown } from '../generators/permissionReport.js';
 import { writeTextFile } from '../io/fileSystem.js';
 
 /**
@@ -49,4 +50,31 @@ export async function createBundleReport(project, entityType, bundleId, outputPa
   }
   await writeTextFile(outputPath, content);
   return outputPath;
+}
+
+/**
+ * Create a combined permissions + workflow report.
+ * @param {object} project - Synced project
+ * @param {object[]} roles - Parsed roles
+ * @param {object[]} workflows - Parsed workflows
+ * @param {object} opts - { scope, entityType, bundle, baseUrl }
+ * @param {string} basePath - Output path without extension
+ * @param {'md'|'json'|'both'} format - Which artifacts to write
+ * @returns {Promise<{data:object, markdownPath:string|null, jsonPath:string|null}>}
+ */
+export async function createPermissionReport(project, roles, workflows, opts, basePath, format = 'both') {
+  const data = generatePermissionReportData(project, roles, workflows, opts);
+  let markdownPath = null;
+  let jsonPath = null;
+
+  if (format === 'md' || format === 'both') {
+    markdownPath = `${basePath}.md`;
+    await writeTextFile(markdownPath, formatPermissionReportMarkdown(data));
+  }
+  if (format === 'json' || format === 'both') {
+    jsonPath = `${basePath}.json`;
+    await writeTextFile(jsonPath, JSON.stringify(data, null, 2));
+  }
+
+  return { data, markdownPath, jsonPath };
 }

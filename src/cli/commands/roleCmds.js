@@ -16,7 +16,8 @@ import {
 } from '../../commands/role.js';
 import {
   getPermissionsForBundle,
-  groupPermissionsByBundle
+  groupPermissionsByBundle,
+  GLOBAL_BUCKET_KEY
 } from '../../constants/permissions.js';
 import {
   output,
@@ -124,6 +125,7 @@ export async function cmdRoleView(options) {
         const otherPerms = role.permissions.filter(p => {
           for (const entityType of Object.keys(grouped)) {
             for (const bundle of Object.keys(grouped[entityType])) {
+              if (bundle === GLOBAL_BUCKET_KEY) continue;
               if (grouped[entityType][bundle].some(bp => bp.key === p)) {
                 return false;
               }
@@ -135,6 +137,7 @@ export async function cmdRoleView(options) {
         console.log('\n' + chalk.bold('Content Permissions:'));
         for (const [entityType, bundles] of Object.entries(grouped)) {
           for (const [bundle, perms] of Object.entries(bundles)) {
+            if (bundle === GLOBAL_BUCKET_KEY) continue;
             console.log(`  ${entityType} > ${bundle}:`);
             for (const perm of perms) {
               console.log(`    - ${perm.label}`);

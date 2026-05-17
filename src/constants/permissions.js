@@ -57,6 +57,48 @@ export const BLOCK_CONTENT_PERMISSIONS = [
 ];
 
 /**
+ * Reserved bucket key for global (non-bundle) permissions in
+ * groupPermissionsByBundle output.
+ */
+export const GLOBAL_BUCKET_KEY = '_global';
+
+/**
+ * Node global (non-bundle) permissions.
+ * `module` records which Drupal module provides the permission.
+ */
+export const NODE_GLOBAL_PERMISSIONS = [
+  { key: 'access content', label: 'View published content', short: 'view_published', module: 'node' },
+  { key: 'view own unpublished content', label: 'View own unpublished content', short: 'view_own_unpublished', module: 'node' },
+  { key: 'view any unpublished content', label: 'View any unpublished content', short: 'view_any_unpublished', module: 'content_moderation' },
+  { key: 'view latest version', label: 'View latest version', short: 'view_latest', module: 'content_moderation' }
+];
+
+/**
+ * Media global (non-bundle) permissions.
+ */
+export const MEDIA_GLOBAL_PERMISSIONS = [
+  { key: 'view all media revisions', label: 'View all media revisions', short: 'view_all_revisions', module: 'media' },
+  { key: 'view own unpublished media', label: 'View own unpublished media', short: 'view_own_unpublished', module: 'media' }
+];
+
+/**
+ * Map entity types to their global permission templates.
+ */
+export const GLOBAL_PERMISSIONS_BY_ENTITY_TYPE = {
+  node: NODE_GLOBAL_PERMISSIONS,
+  media: MEDIA_GLOBAL_PERMISSIONS
+};
+
+/**
+ * Get global permission templates for an entity type.
+ * @param {string} entityType - Entity type
+ * @returns {object[]} - Global permission templates (empty array if none)
+ */
+export function getGlobalPermissionTemplates(entityType) {
+  return GLOBAL_PERMISSIONS_BY_ENTITY_TYPE[entityType] || [];
+}
+
+/**
  * Map entity types to their permission templates
  */
 export const PERMISSIONS_BY_ENTITY_TYPE = {

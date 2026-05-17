@@ -15,7 +15,12 @@ import {
   getShortPermissionNames,
   isPermissionForBundle,
   filterBundlePermissions,
-  groupPermissionsByBundle
+  groupPermissionsByBundle,
+  NODE_GLOBAL_PERMISSIONS,
+  MEDIA_GLOBAL_PERMISSIONS,
+  GLOBAL_PERMISSIONS_BY_ENTITY_TYPE,
+  GLOBAL_BUCKET_KEY,
+  getGlobalPermissionTemplates
 } from '../src/constants/permissions.js';
 
 describe('Permission Constants', () => {
@@ -303,5 +308,34 @@ describe('groupPermissionsByBundle', () => {
     const perms = ['access content', 'view published content'];
     const grouped = groupPermissionsByBundle(perms);
     expect(grouped).toEqual({});
+  });
+});
+
+describe('Global permission constants', () => {
+  it('NODE_GLOBAL_PERMISSIONS has the four expected perms with module hints', () => {
+    const byShort = Object.fromEntries(NODE_GLOBAL_PERMISSIONS.map(p => [p.short, p]));
+    expect(byShort.view_published.key).toBe('access content');
+    expect(byShort.view_published.module).toBe('node');
+    expect(byShort.view_own_unpublished.key).toBe('view own unpublished content');
+    expect(byShort.view_any_unpublished.key).toBe('view any unpublished content');
+    expect(byShort.view_any_unpublished.module).toBe('content_moderation');
+    expect(byShort.view_latest.key).toBe('view latest version');
+    expect(byShort.view_latest.module).toBe('content_moderation');
+  });
+
+  it('MEDIA_GLOBAL_PERMISSIONS has the two expected perms', () => {
+    const keys = MEDIA_GLOBAL_PERMISSIONS.map(p => p.key);
+    expect(keys).toContain('view all media revisions');
+    expect(keys).toContain('view own unpublished media');
+  });
+
+  it('getGlobalPermissionTemplates returns [] for entity types with no globals', () => {
+    expect(getGlobalPermissionTemplates('taxonomy_term')).toEqual([]);
+    expect(getGlobalPermissionTemplates('node')).toBe(NODE_GLOBAL_PERMISSIONS);
+  });
+
+  it('GLOBAL_BUCKET_KEY is the reserved bucket name', () => {
+    expect(GLOBAL_BUCKET_KEY).toBe('_global');
+    expect(GLOBAL_PERMISSIONS_BY_ENTITY_TYPE.node).toBe(NODE_GLOBAL_PERMISSIONS);
   });
 });

@@ -21,6 +21,7 @@ import {
   cmdFieldAddToRefs,
   cmdReportEntity,
   cmdReportProject,
+  cmdReportPermissions,
   cmdAdminLinks,
   cmdFormDisplayCreate,
   cmdFormDisplayView,
@@ -316,6 +317,18 @@ reportCmd
   .option('-u, --base-url <url>', 'Base URL for admin links')
   .option('-j, --json', 'Output as JSON')
   .action(cmdReportProject);
+
+reportCmd
+  .command('permissions')
+  .description('Generate a combined permissions + workflow report')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-e, --entity-type <type>', 'Entity type (entity scope)')
+  .option('-b, --bundle <bundle>', 'Bundle machine name (bundle scope; requires -e)')
+  .option('--format <format>', 'Output format: md | json | both', 'both')
+  .option('--out <path>', 'Output base path, or "-" for stdout')
+  .option('-u, --base-url <url>', 'Base URL for admin links')
+  .option('-j, --json', 'Output result metadata as JSON')
+  .action(cmdReportPermissions);
 
 reportCmd
   .command('migration')

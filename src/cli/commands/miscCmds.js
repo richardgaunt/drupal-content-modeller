@@ -18,7 +18,7 @@ import {
   filterReportData,
   listReportBundles
 } from '../../commands/import.js';
-import { createEntityReport, createProjectReport } from '../../commands/report.js';
+import { createEntityReport, createProjectReport, createPermissionReport } from '../../commands/report.js';
 import {
   getBundleAdminUrls,
   generateEntityTypeReportData,
@@ -140,6 +140,75 @@ export async function cmdReportProject(options) {
       const outputPath = options.output || join(getReportsDir(project.slug), `${project.slug}-content-model.md`);
       await createProjectReport(project, outputPath, baseUrl, reportOptions);
       console.log(chalk.green(`Report saved to: ${outputPath}`));
+    }
+  } catch (error) {
+    handleError(error);
+  }
+}
+
+/**
+ * Generate a combined permissions + workflow report.
+ * Scope: bundle if --bundle, else entity if --entity-type, else project.
+ */
+export async function cmdReportPermissions(options) {
+  try {
+    if (!options.project) {
+      throw new Error('--project is required');
+    }
+
+    const project = await loadProject(options.project);
+    await autoSyncProject(project);
+
+    if (!project.entities) {
+      throw new Error('Project has not been synced. Run "dcm project sync" first.');
+    }
+
+    let scope = 'project';
+    if (options.bundle) scope = 'bundle';
+    else if (options.entityType) scope = 'entity';
+
+    if (scope !== 'project' && !isValidEntityType(options.entityType)) {
+      throw new Error(`Invalid entity type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
+    }
+    if (scope === 'bundle') {
+      const bundles = project.entities[options.entityType] || {};
+      if (!bundles[options.bundle]) {
+        throw new Error(`Bundle "${options.bundle}" not found in ${options.entityType}`);
+      }
+    }
+
+    const baseUrl = options.baseUrl || project.baseUrl || '';
+    const roles = await listRoles(project);
+    const workflows = await parseWorkflowConfigs(project.configDirectory);
+    const opts = { scope, entityType: options.entityType, bundle: options.bundle, baseUrl };
+
+    if (options.out === '-') {
+      const { generatePermissionReportData, formatPermissionReportMarkdown } =
+        await import('../../generators/permissionReport.js');
+      const data = generatePermissionReportData(project, roles, workflows, opts);
+      if (options.format === 'md') {
+        console.log(formatPermissionReportMarkdown(data));
+      } else {
+        output(data, true);
+      }
+      return;
+    }
+
+    const format = options.format || 'both';
+    const scopeLabel = scope === 'bundle'
+      ? `${options.entityType}-${options.bundle}`
+      : scope === 'entity' ? options.entityType : 'project';
+    const basePath = options.out
+      ? options.out.replace(/\.(md|json)$/i, '')
+      : join(getReportsDir(project.slug), `permissions-${scopeLabel}`);
+
+    const res = await createPermissionReport(project, roles, workflows, opts, basePath, format);
+
+    if (options.json) {
+      output({ success: true, scope, markdownPath: res.markdownPath, jsonPath: res.jsonPath }, true);
+    } else {
+      if (res.markdownPath) console.log(chalk.green(`Markdown report: ${res.markdownPath}`));
+      if (res.jsonPath) console.log(chalk.green(`JSON report: ${res.jsonPath}`));
     }
   } catch (error) {
     handleError(error);

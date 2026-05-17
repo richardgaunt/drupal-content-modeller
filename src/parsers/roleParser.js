@@ -3,7 +3,7 @@
  * Pure functions for parsing role configuration files.
  */
 
-import { groupPermissionsByBundle, filterBundlePermissions } from '../constants/permissions.js';
+import { groupPermissionsByBundle, filterBundlePermissions, GLOBAL_BUCKET_KEY } from '../constants/permissions.js';
 import { generateMachineName } from '../utils/slug.js';
 
 /**
@@ -147,6 +147,7 @@ export function getRoleOtherPermissions(role) {
 
   for (const entityType of Object.keys(grouped)) {
     for (const bundle of Object.keys(grouped[entityType])) {
+      if (bundle === GLOBAL_BUCKET_KEY) continue;
       for (const perm of grouped[entityType][bundle]) {
         contentPermissions.add(perm.key);
       }
@@ -226,7 +227,8 @@ export function getRoleSummary(role) {
 
   let bundleCount = 0;
   for (const entityType of Object.keys(contentPerms)) {
-    bundleCount += Object.keys(contentPerms[entityType]).length;
+    bundleCount += Object.keys(contentPerms[entityType])
+      .filter(b => b !== GLOBAL_BUCKET_KEY).length;
   }
 
   return {

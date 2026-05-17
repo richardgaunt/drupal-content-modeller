@@ -290,3 +290,30 @@ describe('Role Parser - Permission Functions', () => {
     });
   });
 });
+
+describe('roleParser — global perms do not corrupt bundle accounting', () => {
+  const role = {
+    id: 'editor', label: 'Editor', isAdmin: false,
+    permissions: [
+      'create article content',   // bundle
+      'edit any article content', // bundle
+      'access content',           // global
+      'view latest version',      // global
+      'administer nodes'          // other
+    ],
+    dependencies: {}
+  };
+
+  it('getRoleOtherPermissions keeps global perms in "other", not content', () => {
+    const other = getRoleOtherPermissions(role);
+    expect(other).toContain('access content');
+    expect(other).toContain('view latest version');
+    expect(other).toContain('administer nodes');
+    expect(other).not.toContain('create article content');
+  });
+
+  it('getRoleSummary counts 1 bundle (article), not _global', () => {
+    const summary = getRoleSummary(role);
+    expect(summary.bundlesWithPermissions).toBe(1);
+  });
+});

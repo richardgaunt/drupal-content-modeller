@@ -22,7 +22,6 @@ import {
   GLOBAL_BUCKET_KEY,
   getGlobalPermissionTemplates
 } from '../src/constants/permissions.js';
-import { GLOBAL_BUCKET_KEY as GBK } from '../src/constants/permissions.js';
 
 describe('Permission Constants', () => {
   describe('NODE_PERMISSIONS', () => {
@@ -342,8 +341,8 @@ describe('groupPermissionsByBundle — global bucket', () => {
       'view own unpublished media'
     ]);
     expect(Object.keys(grouped.node)).toContain('article');
-    expect(grouped.node[GBK].map(p => p.key)).toEqual(['access content']);
-    expect(grouped.media[GBK].map(p => p.key)).toEqual(['view own unpublished media']);
+    expect(grouped.node[GLOBAL_BUCKET_KEY].map(p => p.key)).toEqual(['access content']);
+    expect(grouped.media[GLOBAL_BUCKET_KEY].map(p => p.key)).toEqual(['view own unpublished media']);
   });
 });
 

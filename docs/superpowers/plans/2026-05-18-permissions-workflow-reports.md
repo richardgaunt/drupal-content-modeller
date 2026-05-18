@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node ES modules (`.mjs`/`type:module`), Jest-style tests (`describe/it/expect`) in `tests/*.test.mjs`, Commander for CLI (`index.mjs`), `@inquirer/prompts` for menus, `chalk` for output.
 
-**Spec:** `/home/rgaunt/obsidian/main/AI/drupal-content-modeller/todo/Create reports on permissions.md`
+**Spec:** `<personal-notes-vault>/AI/drupal-content-modeller/todo/Create reports on permissions.md` (author's local spec notes; not part of this repo)
 
 **Test commands:** `npm run test:all` (full suite / regression checkpoint); single file e.g. `npm run test -- tests/permissions.test.mjs`; lint `npm run lint`.
 

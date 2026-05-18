@@ -20,9 +20,15 @@ function resolveScope(project, { scope, entityType, bundle }) {
   const orderedTypes = ENTITY_ORDER.filter(t => entities[t] && Object.keys(entities[t]).length > 0);
 
   if (scope === 'bundle') {
+    if (!entityType || !bundle) {
+      throw new Error("resolveScope: scope 'bundle' requires both entityType and bundle");
+    }
     return [{ entityType, bundles: [bundle] }];
   }
   if (scope === 'entity') {
+    if (!entityType) {
+      throw new Error("resolveScope: scope 'entity' requires entityType");
+    }
     return [{ entityType, bundles: Object.keys(entities[entityType] || {}).sort() }];
   }
   return orderedTypes.map(t => ({ entityType: t, bundles: Object.keys(entities[t]).sort() }));

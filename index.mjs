@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { showMainMenu } from './src/cli/menus.js';
 import {
   cmdHelp,
@@ -324,7 +324,11 @@ reportCmd
   .requiredOption('-p, --project <slug>', 'Project slug')
   .option('-e, --entity-type <type>', 'Entity type (entity scope)')
   .option('-b, --bundle <bundle>', 'Bundle machine name (bundle scope; requires -e)')
-  .option('--format <format>', 'Output format: md | json | both', 'both')
+  .addOption(
+    new Option('--format <format>', 'Output format')
+      .choices(['md', 'json', 'both'])
+      .default('both')
+  )
   .option('--out <path>', 'Output base path, or "-" for stdout')
   .option('-u, --base-url <url>', 'Base URL for admin links')
   .option('-j, --json', 'Output result metadata as JSON')

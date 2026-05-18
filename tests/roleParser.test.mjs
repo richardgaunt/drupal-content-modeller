@@ -215,6 +215,27 @@ describe('Role Parser - Permission Functions', () => {
       expect(grouped.node.article).toBeDefined();
       expect(grouped.media.image).toBeDefined();
     });
+
+    it('excludes the reserved _global bucket', () => {
+      const grouped = getRoleContentPermissions(testRole);
+      expect(grouped.node._global).toBeUndefined();
+      for (const entityType of Object.keys(grouped)) {
+        expect(Object.keys(grouped[entityType])).not.toContain('_global');
+      }
+    });
+
+    it('returns {} for a role with only global permissions', () => {
+      const globalOnly = {
+        id: 'reader',
+        label: 'Reader',
+        permissions: ['access content', 'view published content']
+      };
+      expect(getRoleContentPermissions(globalOnly)).toEqual({});
+    });
+
+    it('returns {} for null role', () => {
+      expect(getRoleContentPermissions(null)).toEqual({});
+    });
   });
 
   describe('getRoleOtherPermissions', () => {

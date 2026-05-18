@@ -190,6 +190,12 @@ export async function cmdReportPermissions(options) {
       } else {
         // stdout cannot hold two artifacts; 'json' and 'both' both emit JSON.
         // Use --out <path> (without '-') to write separate .md and .json files.
+        if (options.format !== 'json') {
+          console.error(chalk.yellow(
+            'Note: --out - emits JSON only; markdown is omitted. ' +
+            'Use --format md for markdown, or --out <path> for both files.'
+          ));
+        }
         output(data, true);
       }
       return;

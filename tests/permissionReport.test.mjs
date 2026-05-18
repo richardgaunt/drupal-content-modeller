@@ -124,6 +124,41 @@ describe('formatPermissionReportMarkdown', () => {
   });
 });
 
+describe('formatPermissionReportMarkdown — edge cases', () => {
+  it('renders a note instead of a degenerate table when there are no roles', () => {
+    const data = generatePermissionReportData(project, [], workflows, { scope: 'project' });
+    const md = formatPermissionReportMarkdown(data);
+    expect(md).toContain('_No roles defined._');
+    // No malformed header/separator rows
+    expect(md).not.toContain('| Role |  |');
+    expect(md).not.toMatch(/^\|------\|$/m);
+  });
+
+  it('renders a note for an entity scope with zero bundles', () => {
+    const emptyProject = {
+      slug: 'demo',
+      entities: { node: { article: { label: 'Article' } }, media: {} }
+    };
+    const data = generatePermissionReportData(emptyProject, roles, [], { scope: 'entity', entityType: 'media' });
+    const md = formatPermissionReportMarkdown(data);
+    expect(md).toContain('_No bundles defined for this entity type._');
+  });
+});
+
+describe('scopedWorkflows resolves transition perms against supplied roles', () => {
+  it('uses the real roles list (not an empty one)', () => {
+    const data = generatePermissionReportData(project, roles, workflows, { scope: 'project' });
+    const tp = data.workflows[0].transitionPermissions.find(t => t.transition === 'publish');
+    expect(tp.roles.map(r => r.role)).toContain('editor');
+  });
+
+  it('yields empty transition roles when no roles are supplied', () => {
+    const data = generatePermissionReportData(project, [], workflows, { scope: 'project' });
+    const tp = data.workflows[0].transitionPermissions.find(t => t.transition === 'publish');
+    expect(tp.roles).toEqual([]);
+  });
+});
+
 describe('createPermissionReport', () => {
   it('writes both .md and .json next to the given base path', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dcm-permrep-'));

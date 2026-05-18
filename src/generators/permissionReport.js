@@ -74,8 +74,9 @@ function transitionPermissionsForWorkflow(workflow, roles) {
 
 /**
  * Filter workflows to those bound to any in-scope bundle.
+ * Transition permissions are resolved against the supplied roles.
  */
-function scopedWorkflows(workflows, scoped) {
+function scopedWorkflows(workflows, scoped, roles) {
   const inScope = new Set();
   for (const { entityType, bundles } of scoped) {
     for (const b of bundles) inScope.add(`${entityType}:${b}`);
@@ -99,7 +100,7 @@ function scopedWorkflows(workflows, scoped) {
       states: wf.states,
       transitions: wf.transitions.map(t => ({ id: t.id, label: t.label, from: t.from, to: t.to })),
       boundBundles,
-      transitionPermissions: transitionPermissionsForWorkflow(wf, [])
+      transitionPermissions: transitionPermissionsForWorkflow(wf, roles)
     }));
 }
 
@@ -148,11 +149,7 @@ export function generatePermissionReportData(project, roles, workflows, opts = {
   });
 
   // Workflows: filter + attach transition perms (resolved against all roles).
-  const wfBase = scopedWorkflows(workflows, scoped);
-  const wfList = wfBase.map(wf => {
-    const src = (workflows || []).find(w => w.id === wf.id);
-    return { ...wf, transitionPermissions: transitionPermissionsForWorkflow(src, rolesList) };
-  });
+  const wfList = scopedWorkflows(workflows, scoped, rolesList);
 
   return {
     scope,
@@ -182,20 +179,27 @@ export function formatPermissionReportMarkdown(data) {
     lines.push(`## ${et.label}`);
     lines.push('');
 
+    if (et.bundles.length === 0) {
+      lines.push('_No bundles defined for this entity type._');
+      lines.push('');
+    }
+
     for (const bundle of et.bundles) {
       lines.push(`### ${bundle.label} (\`${bundle.id}\`)`);
       if (bundle.adminPermissionsUrl) {
         lines.push(`Manage permissions: ${bundle.adminPermissionsUrl}`);
       }
       lines.push('');
-      const caps = bundle.roles.length
-        ? Object.keys(bundle.roles[0].capabilities)
-        : [];
-      lines.push(`| Role | ${caps.join(' | ')} |`);
-      lines.push(`|------${caps.map(() => '|------').join('')}|`);
-      for (const r of bundle.roles) {
-        const cells = caps.map(c => (r.capabilities[c] ? 'Yes' : 'No'));
-        lines.push(`| ${r.label} | ${cells.join(' | ')} |`);
+      if (bundle.roles.length === 0) {
+        lines.push('_No roles defined._');
+      } else {
+        const caps = Object.keys(bundle.roles[0].capabilities);
+        lines.push(`| Role | ${caps.join(' | ')} |`);
+        lines.push(`|------${caps.map(() => '|------').join('')}|`);
+        for (const r of bundle.roles) {
+          const cells = caps.map(c => (r.capabilities[c] ? 'Yes' : 'No'));
+          lines.push(`| ${r.label} | ${cells.join(' | ')} |`);
+        }
       }
       lines.push('');
     }

@@ -26,7 +26,7 @@ import {
   setRoleBundlePermissions,
   getRoleSummary
 } from '../../parsers/roleParser.js';
-import { getPermissionsForBundle, GLOBAL_BUCKET_KEY } from '../../constants/permissions.js';
+import { getPermissionsForBundle } from '../../constants/permissions.js';
 
 /**
  * Role management menu choices
@@ -169,7 +169,6 @@ export async function handleViewRole(project) {
       console.log(chalk.cyan('  Content Permissions:'));
       for (const [entityType, bundles] of Object.entries(contentPerms)) {
         for (const [bundle, perms] of Object.entries(bundles)) {
-          if (bundle === GLOBAL_BUCKET_KEY) continue;
           const permList = perms.map(p => p.short).join(', ');
           console.log(`    ${entityType} > ${bundle}: ${permList}`);
         }
@@ -578,7 +577,6 @@ export async function handleRemoveBundlePermissions(project, role) {
     const bundleChoices = [];
     for (const [entityType, bundles] of Object.entries(contentPerms)) {
       for (const [bundle, perms] of Object.entries(bundles)) {
-        if (bundle === GLOBAL_BUCKET_KEY) continue;
         bundleChoices.push({
           value: `${entityType}:${bundle}`,
           name: `${entityType} > ${bundle} (${perms.length} permissions)`

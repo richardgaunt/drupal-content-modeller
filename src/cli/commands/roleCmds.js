@@ -12,12 +12,12 @@ import {
   addRolePermissions,
   removeRolePermissions,
   setRoleBundlePermissionsCmd,
-  parseShortPermissions
+  parseShortPermissions,
+  getRoleContentPermissions,
+  getRoleOtherPermissions
 } from '../../commands/role.js';
 import {
-  getPermissionsForBundle,
-  groupPermissionsByBundle,
-  GLOBAL_BUCKET_KEY
+  getPermissionsForBundle
 } from '../../constants/permissions.js';
 import {
   output,
@@ -121,26 +121,17 @@ export async function cmdRoleView(options) {
       console.log(`  Permissions: ${role.permissions?.length || 0}`);
 
       if (role.permissions && role.permissions.length > 0) {
-        const grouped = groupPermissionsByBundle(role.permissions);
-        const otherPerms = role.permissions.filter(p => {
-          for (const entityType of Object.keys(grouped)) {
-            for (const bundle of Object.keys(grouped[entityType])) {
-              if (bundle === GLOBAL_BUCKET_KEY) continue;
-              if (grouped[entityType][bundle].some(bp => bp.key === p)) {
-                return false;
-              }
-            }
-          }
-          return true;
-        });
+        const grouped = getRoleContentPermissions(role);
+        const otherPerms = getRoleOtherPermissions(role);
 
-        console.log('\n' + chalk.bold('Content Permissions:'));
-        for (const [entityType, bundles] of Object.entries(grouped)) {
-          for (const [bundle, perms] of Object.entries(bundles)) {
-            if (bundle === GLOBAL_BUCKET_KEY) continue;
-            console.log(`  ${entityType} > ${bundle}:`);
-            for (const perm of perms) {
-              console.log(`    - ${perm.label}`);
+        if (Object.keys(grouped).length > 0) {
+          console.log('\n' + chalk.bold('Content Permissions:'));
+          for (const [entityType, bundles] of Object.entries(grouped)) {
+            for (const [bundle, perms] of Object.entries(bundles)) {
+              console.log(`  ${entityType} > ${bundle}:`);
+              for (const perm of perms) {
+                console.log(`    - ${perm.label}`);
+              }
             }
           }
         }

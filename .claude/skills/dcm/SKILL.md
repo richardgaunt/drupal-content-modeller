@@ -1,6 +1,6 @@
 ---
 name: dcm
-description: Use the Drupal Content Modeller (dcm) CLI to generate Drupal configuration from ticket requirements. Invoke when the user wants to create content types, bundles, fields, form displays, roles, or other Drupal content model configuration using dcm.
+description: Use when the user wants to generate Drupal configuration from ticket requirements with the Drupal Content Modeller (dcm) CLI — creating content types, bundles, fields, form displays, view modes, roles, or other content-model config. Use when a completed ticket needs to be turned into real Drupal YAML.
 disable-model-invocation: true
 allowed-tools: Bash(dcm *)
 ---
@@ -93,3 +93,15 @@ After all commands complete, run `dcm field list` and/or `dcm form-display view`
 - When the ticket is ambiguous about field types or cardinality, make a reasonable Drupal-standard choice and flag it in the plan for the user to confirm.
 - When the ticket says "select", "dropdown", or "options" for an entity reference field, use the `options_select` widget: `dcm form-display set-widget -f <field> -w options_select`.
 - After creating a form display, reorder fields to match the order they appear in the ticket: `dcm form-display reorder -p <project> -e <type> -b <bundle> -o "field1,field2,field3"`.
+
+## Related skills
+
+This skill is the **build** step, downstream of the BA Personal Loop and run
+*after* tickets are handed off.
+
+Pipeline: `personal-loop` → `discover` → `ticket-template` → `create-ticket`
+→ `suggest-permissions` → (handoff) → **this skill** → `drupal-migrate`.
+
+- `/drupal-content-modeller--create-ticket` / `/drupal-content-modeller--suggest-permissions` — produce the completed ticket this skill reads.
+- `/drupal-content-modeller--theme-ticket` — produces theme tickets this skill also builds (view modes, components, block placements).
+- `/drupal-migrate` — migrates legacy content into the bundles after they exist.

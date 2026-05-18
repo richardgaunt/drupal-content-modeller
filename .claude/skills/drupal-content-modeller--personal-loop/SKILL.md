@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--personal-loop
-description: BA-owned, resumable Personal Loop orchestrator for Drupal content modelling. Runs a capability audit, an elicitation loop with coverage tracking and an open-questions register, drafts tickets by composing the existing DCM discover/ticket skills unchanged, and manages staged, one-way handoff with stable REQ-NNN traceability and BA-initiated sync-down. Invoke to start or resume content-modelling BA work on a project; it never re-analyses refined requirements.
+description: Use when starting or resuming business-analyst content-modelling work on an existing Drupal project — eliciting or refining requirements, drafting per-bundle tickets, or handing a sequenced ticket queue off to the team. Use to pick up an in-progress Personal Loop, to ingest new stakeholder input against already-settled requirements, or to move a project from discovery toward handoff. Requires the project to already exist (`dcm project create`).
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash(dcm *), Glob, Grep, WebFetch
 ---
@@ -46,11 +46,33 @@ directory — DCM-side `projects/<slug>/ba/` for a legacy project, or
   with this explicit instruction: *"The Phase 1 project brief is already
   complete at `projects/<slug>/discovery/01-brief.md`. Do not re-run Phase 1
   questioning — read it, confirm or adjust with the user, and start at Phase 2."*
-  Then use `/drupal-content-modeller--ticket-template` and
-  `/drupal-content-modeller--create-ticket` unchanged. Record the
+  Discover composes the per-bundle skills in dependency order; the per-ticket
+  completeness loop below applies to each bundle it produces. Record the
   REQ↔ticket mapping in `requirements.md` ticket headers.
 - **ticket-refinement** → refine tickets across sessions, ingest new input
-  through the settled-work gate, per-ticket human review until approved.
+  through the settled-work gate, run the per-ticket completeness loop until
+  each ticket is ready, then per-ticket human review until approved.
+
+### Per-ticket completeness loop
+
+A ticket is **not ready** until every step below is done, in this order, for
+that bundle. Do not hand off a REQ whose ticket is incomplete.
+
+1. `/drupal-content-modeller--ticket-template` — generate the blank template
+   for the bundle (template *before* fill — it owns the load-bearing structure
+   and HTML comments).
+2. `/drupal-content-modeller--create-ticket` — fill the field rows with Drupal
+   defaults. It leaves the permissions matrix blank for step 3.
+3. `/drupal-content-modeller--suggest-permissions` — populate the permissions
+   matrix from synced precedent. On a greenfield project with no synced
+   precedent, it falls back to the BA matrix in `09-roles.md` instead.
+4. BA reviews the completed ticket. On approval, the mapped REQ becomes
+   eligible for handoff; reflect this through `dcm ba gate`/`dcm ba status` —
+   the ledger, not a heuristic, is the source of truth for "all requirements
+   for this ticket are met."
+
+Compose all three skills **unchanged** — pre-populate inputs and steer at
+invocation time only.
 
 ## Outbound stage — handoff
 
@@ -81,7 +103,13 @@ The Jira-fetch is stubbed (operate on local returned files).
 
 ## Related skills
 
-- `/drupal-content-modeller--discover` — composed at draft-tickets (steered).
-- `/drupal-content-modeller--ticket-template`, `/drupal-content-modeller--create-ticket`
-  — composed unchanged.
-- `/dcm` — downstream build, after the Team Loop. Not invoked here.
+Loop order: **this skill** → `discover` → `ticket-template` → `create-ticket`
+→ `suggest-permissions` → (per-ticket review) → handoff.
+
+- `/drupal-content-modeller--discover` — composed at draft-tickets (steered);
+  it runs the per-bundle skills below in dependency order.
+- `/drupal-content-modeller--ticket-template` → `/drupal-content-modeller--create-ticket`
+  → `/drupal-content-modeller--suggest-permissions` — the per-ticket
+  completeness loop, composed unchanged, in that order.
+- `/dcm`, `/drupal-content-modeller--theme-ticket`, `/drupal-migrate` —
+  downstream, after the Team Loop boundary. Not invoked here.

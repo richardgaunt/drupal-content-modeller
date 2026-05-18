@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--suggest-permissions
-description: Suggest role permissions for a new Drupal bundle by reading the existing site's permission patterns from `dcm report permissions`. Invoke when a developer has a filled ticket for a new bundle and needs a permission set consistent with the project's existing conventions. Does not modify config — proposes commands for the developer to run.
+description: Use when a new Drupal bundle's ticket has its fields filled but the permissions matrix is still empty and needs a role-permission set consistent with the project's existing conventions. Use on a synced project with existing bundles to match precedent. Proposes `dcm role` commands only — never modifies config.
 disable-model-invocation: true
 allowed-tools: Read, Bash(dcm *)
 ---
@@ -11,7 +11,22 @@ You are helping a developer work out which role permissions to assign to a new D
 
 ## Role context
 
-This skill serves the **Developer** reading a filled ticket. The content model and permission intent are already decided — by the business analyst in `09-roles.md` and the workflow spec in `10-workflow.md`. Do not re-litigate those decisions. If the ticket is ambiguous about which roles should have which capabilities, escalate back to the BA; do not guess.
+This skill serves whoever is finalising a bundle ticket — the **Developer**
+reading a filled ticket downstream, or the **BA** inside
+`drupal-content-modeller--personal-loop` completing a ticket's permission
+matrix before handoff. The content model and permission intent are already
+decided — by the BA in `09-roles.md` and the workflow spec in `10-workflow.md`.
+Do not re-litigate those decisions. If the ticket is ambiguous about which
+roles should have which capabilities, escalate back to the BA; do not guess.
+
+**Precedent vs. greenfield.** This skill matches the new bundle to the
+project's *existing synced* permission patterns. It only works when the project
+has been synced and already has bundles of the same entity type. On a
+greenfield project (no synced precedent), skip the precedent steps, take the
+**Fallback** path below, and treat `09-roles.md` as the authority. When invoked
+from the Personal Loop, run only after the bundle's field rows are filled
+(`drupal-content-modeller--create-ticket`) so the permissions matrix is the
+last thing the ticket needs.
 
 ---
 
@@ -86,9 +101,14 @@ The `permissionKey` has the form `use <workflow-id> transition <transition-id>`.
 
 For each role that holds any capabilities on the precedent bundle, propose:
 
-1. The capability set (use `short` names: `create`, `edit_own`, `edit_any`, `delete_own`, `delete_any`, `view_revisions`, `revert_revisions`, `delete_revisions` for nodes; see permissions.js for other entity types).
+1. The capability set, using `short` names. Get the exact valid short
+   names for the entity type/bundle from
+   `dcm role list-permissions -e <entityType> -b <bundle> --json` rather
+   than hardcoding them (node uses `create`, `edit_own`, `edit_any`,
+   `delete_own`, `delete_any`, `view_revisions`, `revert_revisions`,
+   `delete_revisions`).
 2. The cited precedent bundle.
-3. Illustrative `dcm role` commands.
+3. Illustrative `dcm role set-permissions` commands (see worked example).
 
 Always add: "Confirm exact flags and subcommand names with `dcm role --help` before running."
 
@@ -270,28 +290,22 @@ Precedent: `node:article`
 
 Confirm exact flags and subcommand names with `dcm role --help` before running.
 
+`set-permissions` replaces the role's permission set for that bundle, so it is
+idempotent and safe to re-run when applying the BA's matrix wholesale. Use
+short names (comma-separated) with `-e <entityType> -b <bundle>`.
+
 ```
 # content_author
-dcm role set-permissions -p govsite -r content_author \
-  --add "create news content" \
-  --add "edit own news content" \
-  --add "view news revisions"
+dcm role set-permissions -p govsite -r content_author -e node -b news \
+  --permissions "create,edit_own,view_revisions"
 
 # content_editor
-dcm role set-permissions -p govsite -r content_editor \
-  --add "create news content" \
-  --add "edit own news content" \
-  --add "edit any news content" \
-  --add "view news revisions" \
-  --add "revert news revisions"
+dcm role set-permissions -p govsite -r content_editor -e node -b news \
+  --permissions "create,edit_own,edit_any,view_revisions,revert_revisions"
 
 # publisher
-dcm role set-permissions -p govsite -r publisher \
-  --add "create news content" \
-  --add "edit own news content" \
-  --add "edit any news content" \
-  --add "view news revisions" \
-  --add "revert news revisions"
+dcm role set-permissions -p govsite -r publisher -e node -b news \
+  --permissions "create,edit_own,edit_any,view_revisions,revert_revisions"
 ```
 
 After adding the bundle to the `editorial` workflow, verify that all three roles retain their existing transition permissions (`use editorial transition create_new_draft`, etc.) — no further grants should be needed.
@@ -300,6 +314,15 @@ After adding the bundle to the `editorial` workflow, verify that all three roles
 
 ## Related skills
 
-- `/dcm` — builds the actual Drupal config from a filled ticket, including creating the bundle before permissions are set.
-- `/drupal-content-modeller--discover` — produces the role and workflow specs (`09-roles.md`, `10-workflow.md`) that this skill reads against.
-- `/drupal-content-modeller--create-ticket` — fills in Drupal defaults on a partially-complete ticket, including the permissions matrix section.
+Pipeline: `personal-loop` → `discover` → `ticket-template` → `create-ticket`
+→ **this skill** → (handoff) → `dcm`.
+
+- `/drupal-content-modeller--personal-loop` — the BA orchestrator that invokes
+  this skill per-bundle as the final step before a REQ is handoff-ready.
+- `/drupal-content-modeller--discover` — produces the role and workflow specs
+  (`09-roles.md`, `10-workflow.md`) this skill reads against.
+- `/drupal-content-modeller--create-ticket` — fills field defaults and runs
+  immediately before this skill; it leaves the permissions matrix for this
+  skill to populate from precedent.
+- `/dcm` — builds the actual Drupal config from the filled ticket after
+  handoff, creating the bundle before permissions are set.

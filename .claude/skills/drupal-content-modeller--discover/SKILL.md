@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--discover
-description: Guide a business-analyst-style discovery and content-modeling session for a Drupal project. Interviews the user about goals, audiences, editorial workflow, existing content, constraints, and design system; produces a structured content model (content types, fields, paragraphs, taxonomies, media, blocks, menus, webforms, roles, workflow) as markdown artifacts; then generates a queue of DCM implementation tickets ready for the `drupal-content-modeller--create-ticket` and `dcm` skills. Invoke at the START of a new Drupal project, or when bringing structure to an ad-hoc list of requirements.
+description: Use at the start of a new Drupal project, or when an ad-hoc pile of requirements, a client brief, or a Figma file needs to become a structured content model. Use when there is no agreed content model yet and content types, fields, paragraphs, media types, taxonomies, blocks, roles, and workflow must be decided before any tickets or YAML are written. Also use when bringing structure to a vague or unordered list of requirements.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash(dcm *), Glob, Grep, WebFetch
 ---
@@ -39,10 +39,10 @@ The full specification of those primitives — who has which fields, how they re
 
 **How this skill is used.**
 
-1. User invokes `/drupal-content-modeller--discover`, optionally naming a project slug.
+1. User invokes `/drupal-content-modeller--discover`, optionally naming a project slug. (Inside the Personal Loop, `drupal-content-modeller--personal-loop` invokes it with Phase 1 pre-filled.)
 2. You run the five phases below *sequentially*, confirming each phase's output with the user before moving to the next. The user can skip or revisit any phase.
 3. Each phase writes one or more markdown artifacts to `projects/<slug>/discovery/`.
-4. At the end, you generate one ticket per bundle using existing DCM capabilities, then hand off to the `drupal-content-modeller--create-ticket` and `dcm` skills.
+4. In Phase 5 you generate one ticket per bundle in dependency order via `ticket-template`, fill defaults via `create-ticket`, then populate the permissions matrix via `suggest-permissions`. `dcm` builds the config later (post-handoff in the loop).
 
 ---
 
@@ -440,8 +440,8 @@ For each generated template, populate the fields table based on the decisions ca
 - Field labels from `02-content-types.md` / `05-paragraphs.md` / etc.
 - Field types inferred from the design mapping (`11-design-mapping.md`)
 - Machine names using the entity's field prefix (`field_n_`, `field_m_`, `field_p_`, `field_t_`, `field_b_`)
-- Permissions from `09-roles.md`
 - Dependencies from the reference fields
+- Permissions: do **not** fill here — see the Permissions matrix note below
 
 Two ways to complete the fills:
 
@@ -450,6 +450,12 @@ Two ways to complete the fills:
 **Option B — Fill inline.** Edit the ticket yourself using the decisions from Phases 2–4 where you already know more than the default rules. Use this when the BA work captured specific constraints (e.g., "Body is NOT text_long, it's a Paragraphs field because we deblobbed it").
 
 In practice, use a mix: fill the non-obvious cells inline, then hand off to `create-ticket` to finish the routine ones.
+
+**Permissions matrix.** Do not fill the permissions matrix here. After fields
+are complete, invoke `/drupal-content-modeller--suggest-permissions` per bundle
+— it matches the bundle to synced precedent, and on a greenfield project falls
+back to the `09-roles.md` matrix. This keeps one skill responsible for the
+matrix instead of two writing the same cells.
 
 ### Step 5d — Produce planning tickets for menus and webforms
 
@@ -520,7 +526,12 @@ End the skill with a summary message to the user:
 
 ## Related skills
 
-- `/drupal-content-modeller--ticket-template` — generates a blank ticket for one bundle. This skill calls it in Phase 5.
-- `/drupal-content-modeller--create-ticket` — applies Drupal defaults (widgets, cardinality, machine-name prefixes) to a partially-filled ticket. This skill hands off to it in Phase 5.
-- `/dcm` — reads a completed ticket and writes Drupal YAML config. Runs after this skill's ticket queue is produced.
-- `/drupal-migrate` — generates migrations when existing content needs to land in the new bundles. Use this after content types are built but before go-live.
+Pipeline: `personal-loop` → **this skill** → `ticket-template` →
+`create-ticket` → `suggest-permissions` → (handoff) → `dcm` → `drupal-migrate`.
+
+- `/drupal-content-modeller--personal-loop` — the BA orchestrator; invokes this skill at draft-tickets with Phase 1 pre-filled.
+- `/drupal-content-modeller--ticket-template` — generates a blank ticket for one bundle. Called per bundle in Phase 5.
+- `/drupal-content-modeller--create-ticket` — applies Drupal field defaults to the blank ticket. Called after `ticket-template` in Phase 5.
+- `/drupal-content-modeller--suggest-permissions` — populates the permissions matrix from precedent. Called last in Phase 5, per bundle.
+- `/dcm` — writes Drupal YAML config after the ticket queue is handed off.
+- `/drupal-migrate` — migrations when existing content must land in the new bundles. After build, before go-live.

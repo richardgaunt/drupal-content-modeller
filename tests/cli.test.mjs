@@ -1,6 +1,9 @@
+import { execFile } from 'child_process';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { promisify } from 'util';
+import { fileURLToPath } from 'url';
 
 import { setProjectsDir } from '../src/io/fileSystem';
 import { createProject } from '../src/commands/project';
@@ -18,6 +21,40 @@ import {
   PROJECT_MENU_CHOICES
 } from '../src/cli/prompts';
 import { generateSlug } from '../src/utils/slug';
+
+const execFileAsync = promisify(execFile);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const dcmPath = join(__dirname, '..', 'index.mjs');
+
+/**
+ * Helper to run dcm CLI and capture output
+ */
+async function runDcm(...args) {
+  const { stdout, stderr } = await execFileAsync('node', [dcmPath, ...args], {
+    timeout: 10000,
+    env: { ...process.env, NODE_ENV: 'test' }
+  });
+  return { stdout, stderr };
+}
+
+describe('report permissions CLI', () => {
+  test('exits non-zero and reports required option when --project is missing', async () => {
+    let err;
+    try {
+      await runDcm('report', 'permissions');
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    const out = `${err.stderr || ''}${err.stdout || ''}`;
+    expect(out).toMatch(/--project is required|required option/i);
+  });
+
+  test('dcm report --help includes permissions subcommand', async () => {
+    const { stdout } = await runDcm('report', '--help');
+    expect(stdout).toMatch(/permissions/);
+  });
+});
 
 describe('CLI Prompts', () => {
   let tempDir;

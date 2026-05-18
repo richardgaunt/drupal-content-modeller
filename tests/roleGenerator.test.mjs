@@ -138,7 +138,10 @@ describe('Role Generator - Dependencies', () => {
     });
 
     it('omits module key when no module dependencies', () => {
-      const permissions = ['access content'];
+      // 'access content' is now a recognised global node perm (module: 'node'),
+      // so it correctly contributes a module dependency. Use a truly-unrecognised
+      // permission to test the "no module deps" path.
+      const permissions = ['administer nodes'];
       const deps = generateRoleDependencies(permissions, null);
       expect(deps.module).toBeUndefined();
     });
@@ -325,6 +328,22 @@ describe('Role Generator - YAML Generation', () => {
     it('returns "No permissions" for null', () => {
       expect(formatPermissionsForDisplay(null)).toBe('No permissions');
     });
+  });
+});
+
+describe('roleGenerator — global perms', () => {
+  const perms = ['create article content', 'access content', 'view latest version'];
+
+  it('calculateConfigDependencies ignores global perms (no node.type.null)', () => {
+    const deps = calculateConfigDependencies(perms, {});
+    expect(deps).toEqual(['node.type.article']);
+    expect(deps.some(d => d.includes('null'))).toBe(false);
+  });
+
+  it('calculateModuleDependencies adds content_moderation for view latest version', () => {
+    const mods = calculateModuleDependencies(perms);
+    expect(mods).toContain('node');
+    expect(mods).toContain('content_moderation');
   });
 });
 

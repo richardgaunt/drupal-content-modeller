@@ -3,7 +3,7 @@
  * Pure functions for parsing role configuration files.
  */
 
-import { groupPermissionsByBundle, filterBundlePermissions } from '../constants/permissions.js';
+import { groupPermissionsByBundle, filterBundlePermissions, GLOBAL_BUCKET_KEY } from '../constants/permissions.js';
 import { generateMachineName } from '../utils/slug.js';
 
 /**
@@ -120,20 +120,37 @@ export function getRolePermissionsForBundle(role, entityType, bundle) {
 }
 
 /**
- * Get all content-related permissions grouped by bundle
+ * Get per-bundle content permissions grouped by entity type and bundle.
+ * The reserved `_global` bucket (non-bundle permissions such as
+ * `access content`) is excluded — callers can treat every key as a real
+ * bundle. Global permissions surface via getRoleOtherPermissions instead.
  * @param {object} role - Parsed role object
- * @returns {object} - Grouped permissions
+ * @returns {object} - Grouped permissions { entityType: { bundle: [...] } }
  */
 export function getRoleContentPermissions(role) {
   if (!role || !role.permissions) {
     return {};
   }
 
-  return groupPermissionsByBundle(role.permissions);
+  const grouped = groupPermissionsByBundle(role.permissions);
+  const bundleOnly = {};
+
+  for (const entityType of Object.keys(grouped)) {
+    for (const bundle of Object.keys(grouped[entityType])) {
+      if (bundle === GLOBAL_BUCKET_KEY) continue;
+      if (!bundleOnly[entityType]) {
+        bundleOnly[entityType] = {};
+      }
+      bundleOnly[entityType][bundle] = grouped[entityType][bundle];
+    }
+  }
+
+  return bundleOnly;
 }
 
 /**
- * Get non-content permissions (system, workflow, etc.)
+ * Get non-content permissions (system, workflow, global, etc.)
+ * Global (non-bundle) permissions are reported here, not under content.
  * @param {object} role - Parsed role object
  * @returns {string[]} - Other permissions
  */
@@ -142,7 +159,7 @@ export function getRoleOtherPermissions(role) {
     return [];
   }
 
-  const grouped = groupPermissionsByBundle(role.permissions);
+  const grouped = getRoleContentPermissions(role);
   const contentPermissions = new Set();
 
   for (const entityType of Object.keys(grouped)) {
@@ -221,7 +238,7 @@ export function setRoleBundlePermissions(role, entityType, bundle, permissions) 
  * @returns {object} - Summary
  */
 export function getRoleSummary(role) {
-  const contentPerms = groupPermissionsByBundle(role.permissions || []);
+  const contentPerms = getRoleContentPermissions(role);
   const otherPerms = getRoleOtherPermissions(role);
 
   let bundleCount = 0;

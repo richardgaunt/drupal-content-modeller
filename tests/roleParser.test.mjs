@@ -215,6 +215,27 @@ describe('Role Parser - Permission Functions', () => {
       expect(grouped.node.article).toBeDefined();
       expect(grouped.media.image).toBeDefined();
     });
+
+    it('excludes the reserved _global bucket', () => {
+      const grouped = getRoleContentPermissions(testRole);
+      expect(grouped.node._global).toBeUndefined();
+      for (const entityType of Object.keys(grouped)) {
+        expect(Object.keys(grouped[entityType])).not.toContain('_global');
+      }
+    });
+
+    it('returns {} for a role with only global permissions', () => {
+      const globalOnly = {
+        id: 'reader',
+        label: 'Reader',
+        permissions: ['access content', 'view published content']
+      };
+      expect(getRoleContentPermissions(globalOnly)).toEqual({});
+    });
+
+    it('returns {} for null role', () => {
+      expect(getRoleContentPermissions(null)).toEqual({});
+    });
   });
 
   describe('getRoleOtherPermissions', () => {
@@ -288,5 +309,32 @@ describe('Role Parser - Permission Functions', () => {
       expect(summary.totalPermissions).toBe(6);
       expect(summary.otherPermissions).toBe(2);
     });
+  });
+});
+
+describe('roleParser — global perms do not corrupt bundle accounting', () => {
+  const role = {
+    id: 'editor', label: 'Editor', isAdmin: false,
+    permissions: [
+      'create article content',   // bundle
+      'edit any article content', // bundle
+      'access content',           // global
+      'view latest version',      // global
+      'administer nodes'          // other
+    ],
+    dependencies: {}
+  };
+
+  it('getRoleOtherPermissions keeps global perms in "other", not content', () => {
+    const other = getRoleOtherPermissions(role);
+    expect(other).toContain('access content');
+    expect(other).toContain('view latest version');
+    expect(other).toContain('administer nodes');
+    expect(other).not.toContain('create article content');
+  });
+
+  it('getRoleSummary counts 1 bundle (article), not _global', () => {
+    const summary = getRoleSummary(role);
+    expect(summary.bundlesWithPermissions).toBe(1);
   });
 });

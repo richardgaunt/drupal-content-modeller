@@ -3,11 +3,23 @@
  * Tests for pure functions in role.js
  */
 
+import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   getRoleChoices,
   getPermissionChoices,
   parseShortPermissions
 } from '../src/commands/role.js';
+import {
+  setProjectsDir,
+  writeRegistryStub,
+  writeJsonFile,
+  getExternalProjectJsonPath
+} from '../src/io/fileSystem.js';
+import { cmdRoleView } from '../src/cli/commands/roleCmds.js';
+import { GLOBAL_BUCKET_KEY } from '../src/constants/permissions.js';
 
 describe('Role Commands', () => {
   describe('getRoleChoices', () => {
@@ -143,5 +155,125 @@ describe('Role Commands', () => {
 
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('cmdRoleView — global perms', () => {
+  let projectsDir;
+  let repoDir;
+  let logSpy;
+  let errSpy;
+  let exitSpy;
+
+  beforeEach(async () => {
+    projectsDir = await mkdtemp(join(tmpdir(), 'role-view-pdir-'));
+    repoDir = await mkdtemp(join(tmpdir(), 'role-view-repo-'));
+    setProjectsDir(projectsDir);
+    await writeJsonFile(getExternalProjectJsonPath(repoDir), {
+      name: 'rv-site', slug: 'rv-site', configDirectory: repoDir, baseDirectory: repoDir,
+      baseUrl: '', drupalRoot: '', drushCommand: 'drush',
+      theme: null, editableBaseTheme: false, lastSync: null,
+      entities: { node: { article: { label: 'Article' } }, media: {}, paragraph: {}, taxonomy_term: {} }
+    });
+    await writeRegistryStub('rv-site', { slug: 'rv-site', baseDirectory: repoDir, createdAt: new Date().toISOString() });
+    await writeFile(join(repoDir, 'user.role.editor.yml'), [
+      'id: editor',
+      'label: Editor',
+      'weight: 0',
+      'is_admin: false',
+      'permissions:',
+      "  - 'create article content'",
+      "  - 'edit any article content'",
+      "  - 'access content'",
+      "  - 'view latest version'",
+      "  - 'administer nodes'",
+      'dependencies: {}',
+      ''
+    ].join('\n'));
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    setProjectsDir(null);
+    await rm(projectsDir, { recursive: true, force: true });
+    await rm(repoDir, { recursive: true, force: true });
+  });
+
+  test('does not render a _global content bucket and keeps global perms under Other', async () => {
+    await cmdRoleView({ project: 'rv-site', role: 'editor' });
+
+    expect(errSpy).not.toHaveBeenCalled();
+    const out = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+
+    // Real bundle still shown under Content Permissions
+    expect(out).toContain('node > article:');
+    // The reserved bucket key must never surface as a content "bundle"
+    expect(out).not.toContain(GLOBAL_BUCKET_KEY);
+    // Global perms fall through to Other Permissions (consistent with getRoleOtherPermissions)
+    const otherIdx = out.indexOf('Other Permissions:');
+    expect(otherIdx).toBeGreaterThan(-1);
+    const otherSection = out.slice(otherIdx);
+    expect(otherSection).toContain('access content');
+    expect(otherSection).toContain('view latest version');
+    expect(otherSection).toContain('administer nodes');
+  });
+
+  test('global-only role: no crash, no empty Content Permissions header', async () => {
+    await writeFile(join(repoDir, 'user.role.reader.yml'), [
+      'id: reader',
+      'label: Reader',
+      'weight: 0',
+      'is_admin: false',
+      'permissions:',
+      "  - 'access content'",
+      "  - 'view latest version'",
+      'dependencies: {}',
+      ''
+    ].join('\n'));
+
+    await cmdRoleView({ project: 'rv-site', role: 'reader' });
+
+    expect(errSpy).not.toHaveBeenCalled();
+    const out = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+
+    // No bundle perms → the Content Permissions header must not appear at all
+    expect(out).not.toContain('Content Permissions:');
+    expect(out).not.toContain(GLOBAL_BUCKET_KEY);
+    // Globals still surface under Other Permissions
+    const otherIdx = out.indexOf('Other Permissions:');
+    expect(otherIdx).toBeGreaterThan(-1);
+    const otherSection = out.slice(otherIdx);
+    expect(otherSection).toContain('access content');
+    expect(otherSection).toContain('view latest version');
+  });
+});
+
+describe('handleRemoveBundlePermissions — global-only role', () => {
+  test('reports nothing to remove instead of throwing', async () => {
+    const { handleRemoveBundlePermissions } = await import('../src/cli/menus/roleMenus.js');
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    const globalOnlyRole = {
+      id: 'reader',
+      label: 'Reader',
+      isAdmin: false,
+      permissions: ['access content', 'view latest version'],
+      dependencies: {}
+    };
+
+    // project is `{}` because the empty-guard returns before project is used.
+    let result;
+    await expect(
+      (async () => { result = await handleRemoveBundlePermissions({}, globalOnlyRole); })()
+    ).resolves.not.toThrow();
+
+    expect(result).toBeNull();
+    const out = logSpy.mock.calls.map(c => c.join(' ')).join('\n');
+    expect(out).toContain('No bundle permissions to remove.');
+
+    jest.restoreAllMocks();
   });
 });

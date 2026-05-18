@@ -57,6 +57,48 @@ export const BLOCK_CONTENT_PERMISSIONS = [
 ];
 
 /**
+ * Reserved bucket key for global (non-bundle) permissions in
+ * groupPermissionsByBundle output.
+ */
+export const GLOBAL_BUCKET_KEY = '_global';
+
+/**
+ * Node global (non-bundle) permissions.
+ * `module` records which Drupal module provides the permission.
+ */
+export const NODE_GLOBAL_PERMISSIONS = [
+  { key: 'access content', label: 'View published content', short: 'view_published', module: 'node' },
+  { key: 'view own unpublished content', label: 'View own unpublished content', short: 'view_own_unpublished', module: 'node' },
+  { key: 'view any unpublished content', label: 'View any unpublished content', short: 'view_any_unpublished', module: 'content_moderation' },
+  { key: 'view latest version', label: 'View latest version', short: 'view_latest', module: 'content_moderation' }
+];
+
+/**
+ * Media global (non-bundle) permissions.
+ */
+export const MEDIA_GLOBAL_PERMISSIONS = [
+  { key: 'view all media revisions', label: 'View all media revisions', short: 'view_all_revisions', module: 'media' },
+  { key: 'view own unpublished media', label: 'View own unpublished media', short: 'view_own_unpublished', module: 'media' }
+];
+
+/**
+ * Map entity types to their global permission templates.
+ */
+export const GLOBAL_PERMISSIONS_BY_ENTITY_TYPE = {
+  node: NODE_GLOBAL_PERMISSIONS,
+  media: MEDIA_GLOBAL_PERMISSIONS
+};
+
+/**
+ * Get global permission templates for an entity type.
+ * @param {string} entityType - Entity type
+ * @returns {object[]} - Global permission templates (empty array if none)
+ */
+export function getGlobalPermissionTemplates(entityType) {
+  return GLOBAL_PERMISSIONS_BY_ENTITY_TYPE[entityType] || [];
+}
+
+/**
  * Map entity types to their permission templates
  */
 export const PERMISSIONS_BY_ENTITY_TYPE = {
@@ -113,12 +155,14 @@ export function getPermissionLabel(entityType, permissionKey) {
 }
 
 /**
- * Parse a permission key to extract entity type and bundle
+ * Parse a permission key to extract entity type, bundle, scope, and metadata.
+ * Returns `scope:'bundle'` for per-bundle permissions and `scope:'global'` for
+ * non-bundle permissions. Returns null if the permission is not recognised.
  * @param {string} permission - Permission key
- * @returns {object|null} - { entityType, bundle, short } or null
+ * @returns {object|null} - { entityType, bundle, scope, short, label[, module] } or null
  */
 export function parsePermissionKey(permission) {
-  // Try each entity type's patterns
+  // Per-bundle templates
   for (const [entityType, templates] of Object.entries(PERMISSIONS_BY_ENTITY_TYPE)) {
     for (const template of templates) {
       const pattern = template.key.replace('{bundle}', '([a-z0-9_]+)');
@@ -129,8 +173,25 @@ export function parsePermissionKey(permission) {
         return {
           entityType,
           bundle: match[1],
+          scope: 'bundle',
           short: template.short,
           label: template.label
+        };
+      }
+    }
+  }
+
+  // Global (non-bundle) templates — exact key match
+  for (const [entityType, templates] of Object.entries(GLOBAL_PERMISSIONS_BY_ENTITY_TYPE)) {
+    for (const template of templates) {
+      if (template.key === permission) {
+        return {
+          entityType,
+          bundle: null,
+          scope: 'global',
+          short: template.short,
+          label: template.label,
+          module: template.module
         };
       }
     }
@@ -193,9 +254,11 @@ export function filterBundlePermissions(permissions, entityType, bundle) {
 }
 
 /**
- * Group permissions by entity type and bundle
+ * Group permissions by entity type and bundle.
+ * Per-bundle permissions are grouped under their bundle machine name.
+ * Global (non-bundle) permissions are grouped under GLOBAL_BUCKET_KEY ('_global').
  * @param {string[]} permissions - Array of permission keys
- * @returns {object} - Grouped permissions { entityType: { bundle: [permissions] } }
+ * @returns {object} - Grouped permissions { entityType: { bundle|'_global': [permissions] } }
  */
 export function groupPermissionsByBundle(permissions) {
   const grouped = {};
@@ -203,13 +266,14 @@ export function groupPermissionsByBundle(permissions) {
   for (const permission of permissions) {
     const parsed = parsePermissionKey(permission);
     if (parsed) {
+      const bucket = parsed.scope === 'global' ? GLOBAL_BUCKET_KEY : parsed.bundle;
       if (!grouped[parsed.entityType]) {
         grouped[parsed.entityType] = {};
       }
-      if (!grouped[parsed.entityType][parsed.bundle]) {
-        grouped[parsed.entityType][parsed.bundle] = [];
+      if (!grouped[parsed.entityType][bucket]) {
+        grouped[parsed.entityType][bucket] = [];
       }
-      grouped[parsed.entityType][parsed.bundle].push({
+      grouped[parsed.entityType][bucket].push({
         key: permission,
         short: parsed.short,
         label: parsed.label

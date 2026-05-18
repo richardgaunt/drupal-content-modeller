@@ -37,3 +37,6 @@ dist/
 
 # Git worktrees
 .worktrees/
+
+# Serena MCP plugin artifacts
+.serena/

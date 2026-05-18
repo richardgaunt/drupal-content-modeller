@@ -6,10 +6,11 @@
 import { select, input, checkbox, search, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { join, dirname } from 'path';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 
 import { getBundleSummary } from '../../commands/list.js';
-import { createEntityReport, createProjectReport, createBundleReport } from '../../commands/report.js';
+import { createEntityReport, createProjectReport, createBundleReport, createPermissionReport } from '../../commands/report.js';
+import { parseWorkflowConfigs } from '../../io/configReader.js';
 import { createTickets } from '../../commands/ticket.js';
 import { getEntityTypeLabel } from '../../generators/reportGenerator.js';
 import { listRoles } from '../../commands/role.js';
@@ -284,6 +285,96 @@ export async function handleProjectReport(project) {
 
     await createProjectReport(project, outputPath, baseUrl, { roles, preprocessData, formDisplays });
     console.log(chalk.green(`Report saved to: ${outputPath}`));
+  } catch (error) {
+    if (error.name === 'ExitPromptError') {
+      return;
+    }
+    console.log(chalk.red(`Error: ${error.message}`));
+  }
+}
+
+/**
+ * Handle combined permissions + workflow report generation.
+ * @param {object} project - The current project
+ * @returns {Promise<void>}
+ */
+export async function handlePermissionReport(project) {
+  try {
+    const summary = getBundleSummary(project);
+    if (!summary.synced) {
+      console.log(chalk.yellow('Project has not been synced. Run sync first.'));
+      return;
+    }
+
+    const scope = await select({
+      message: 'Report scope:',
+      choices: [
+        { value: 'project', name: 'Whole project' },
+        { value: 'entity', name: 'One entity type' },
+        { value: 'bundle', name: 'One bundle' }
+      ]
+    });
+
+    let entityType;
+    let bundle;
+    if (scope !== 'project') {
+      const entityTypes = ENTITY_ORDER.filter(
+        t => project.entities[t] && Object.keys(project.entities[t]).length > 0
+      );
+      entityType = await select({
+        message: 'Entity type:',
+        choices: entityTypes.map(t => ({ value: t, name: getEntityTypeLabel(t) }))
+      });
+      if (scope === 'bundle') {
+        const bundles = Object.keys(project.entities[entityType]);
+        bundle = await select({
+          message: 'Bundle:',
+          choices: bundles.map(b => ({ value: b, name: b }))
+        });
+      }
+    }
+
+    const format = await select({
+      message: 'Output format:',
+      choices: [
+        { value: 'both', name: 'Markdown + JSON' },
+        { value: 'md', name: 'Markdown only' },
+        { value: 'json', name: 'JSON only' }
+      ]
+    });
+
+    const baseUrl = await promptForReportUrl(project);
+
+    const scopeLabel = scope === 'bundle'
+      ? `${entityType}-${bundle}`
+      : scope === 'entity' ? entityType : 'project';
+    const outputDir = await promptForOutputDirectory();
+    const defaultBase = join(outputDir, `${project.slug}-permissions-${scopeLabel}`);
+    const basePath = (await input({
+      message: 'Output base path (no extension):',
+      default: defaultBase
+    })).trim();
+
+    for (const ext of (format === 'both' ? ['md', 'json'] : [format])) {
+      const candidate = `${basePath}.${ext}`;
+      if (existsSync(candidate)) {
+        const ok = await confirm({ message: `${candidate} exists. Overwrite?`, default: false });
+        if (!ok) {
+          console.log(chalk.yellow('Cancelled.'));
+          return;
+        }
+      }
+    }
+
+    const roles = await listRoles(project);
+    const workflows = await parseWorkflowConfigs(project.configDirectory);
+    const res = await createPermissionReport(
+      project, roles, workflows,
+      { scope, entityType, bundle, baseUrl },
+      basePath, format
+    );
+    if (res.markdownPath) console.log(chalk.green(`Markdown report: ${res.markdownPath}`));
+    if (res.jsonPath) console.log(chalk.green(`JSON report: ${res.jsonPath}`));
   } catch (error) {
     if (error.name === 'ExitPromptError') {
       return;

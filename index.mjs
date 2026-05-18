@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { showMainMenu } from './src/cli/menus.js';
 import {
   cmdHelp,
@@ -21,6 +21,7 @@ import {
   cmdFieldAddToRefs,
   cmdReportEntity,
   cmdReportProject,
+  cmdReportPermissions,
   cmdAdminLinks,
   cmdFormDisplayCreate,
   cmdFormDisplayView,
@@ -316,6 +317,22 @@ reportCmd
   .option('-u, --base-url <url>', 'Base URL for admin links')
   .option('-j, --json', 'Output as JSON')
   .action(cmdReportProject);
+
+reportCmd
+  .command('permissions')
+  .description('Generate a combined permissions + workflow report')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-e, --entity-type <type>', 'Entity type (entity scope)')
+  .option('-b, --bundle <bundle>', 'Bundle machine name (bundle scope; requires -e)')
+  .addOption(
+    new Option('--format <format>', 'Output format')
+      .choices(['md', 'json', 'both'])
+      .default('both')
+  )
+  .option('--out <path>', 'Output base path, or "-" for stdout')
+  .option('-u, --base-url <url>', 'Base URL for admin links')
+  .option('-j, --json', 'Output result metadata as JSON')
+  .action(cmdReportPermissions);
 
 reportCmd
   .command('migration')

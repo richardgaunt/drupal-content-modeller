@@ -15,7 +15,12 @@ import {
   getShortPermissionNames,
   isPermissionForBundle,
   filterBundlePermissions,
-  groupPermissionsByBundle
+  groupPermissionsByBundle,
+  NODE_GLOBAL_PERMISSIONS,
+  MEDIA_GLOBAL_PERMISSIONS,
+  GLOBAL_PERMISSIONS_BY_ENTITY_TYPE,
+  GLOBAL_BUCKET_KEY,
+  getGlobalPermissionTemplates
 } from '../src/constants/permissions.js';
 
 describe('Permission Constants', () => {
@@ -299,9 +304,73 @@ describe('groupPermissionsByBundle', () => {
     expect(grouped).toEqual({});
   });
 
-  it('ignores non-content permissions', () => {
-    const perms = ['access content', 'view published content'];
+  it('ignores unrecognized permissions', () => {
+    const perms = ['view published content', 'administer site configuration'];
     const grouped = groupPermissionsByBundle(perms);
     expect(grouped).toEqual({});
+  });
+});
+
+describe('parsePermissionKey — global perms', () => {
+  it('parses a global node perm with scope=global and bundle=null', () => {
+    expect(parsePermissionKey('access content')).toEqual({
+      entityType: 'node', bundle: null, scope: 'global',
+      short: 'view_published', label: 'View published content', module: 'node'
+    });
+    expect(parsePermissionKey('view latest version')).toMatchObject({
+      entityType: 'node', scope: 'global', short: 'view_latest', module: 'content_moderation'
+    });
+  });
+
+  it('tags per-bundle results with scope=bundle', () => {
+    expect(parsePermissionKey('create article content')).toMatchObject({
+      entityType: 'node', bundle: 'article', scope: 'bundle', short: 'create'
+    });
+  });
+
+  it('still returns null for a nonsense string', () => {
+    expect(parsePermissionKey('unknown permission format')).toBeNull();
+  });
+});
+
+describe('groupPermissionsByBundle — global bucket', () => {
+  it('places global perms under entityType._global', () => {
+    const grouped = groupPermissionsByBundle([
+      'create article content',
+      'access content',
+      'view own unpublished media'
+    ]);
+    expect(Object.keys(grouped.node)).toContain('article');
+    expect(grouped.node[GLOBAL_BUCKET_KEY].map(p => p.key)).toEqual(['access content']);
+    expect(grouped.media[GLOBAL_BUCKET_KEY].map(p => p.key)).toEqual(['view own unpublished media']);
+  });
+});
+
+describe('Global permission constants', () => {
+  it('NODE_GLOBAL_PERMISSIONS has the four expected perms with module hints', () => {
+    const byShort = Object.fromEntries(NODE_GLOBAL_PERMISSIONS.map(p => [p.short, p]));
+    expect(byShort.view_published.key).toBe('access content');
+    expect(byShort.view_published.module).toBe('node');
+    expect(byShort.view_own_unpublished.key).toBe('view own unpublished content');
+    expect(byShort.view_any_unpublished.key).toBe('view any unpublished content');
+    expect(byShort.view_any_unpublished.module).toBe('content_moderation');
+    expect(byShort.view_latest.key).toBe('view latest version');
+    expect(byShort.view_latest.module).toBe('content_moderation');
+  });
+
+  it('MEDIA_GLOBAL_PERMISSIONS has the two expected perms', () => {
+    const keys = MEDIA_GLOBAL_PERMISSIONS.map(p => p.key);
+    expect(keys).toContain('view all media revisions');
+    expect(keys).toContain('view own unpublished media');
+  });
+
+  it('getGlobalPermissionTemplates returns [] for entity types with no globals', () => {
+    expect(getGlobalPermissionTemplates('taxonomy_term')).toEqual([]);
+    expect(getGlobalPermissionTemplates('node')).toBe(NODE_GLOBAL_PERMISSIONS);
+  });
+
+  it('GLOBAL_BUCKET_KEY is the reserved bucket name', () => {
+    expect(GLOBAL_BUCKET_KEY).toBe('_global');
+    expect(GLOBAL_PERMISSIONS_BY_ENTITY_TYPE.node).toBe(NODE_GLOBAL_PERMISSIONS);
   });
 });

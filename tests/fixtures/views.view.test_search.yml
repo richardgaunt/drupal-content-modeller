@@ -1,0 +1,46 @@
+uuid: 33333333-3333-3333-3333-333333333333
+langcode: en
+status: true
+dependencies:
+  module:
+    - search_api
+id: test_search
+label: 'Test Search'
+module: views
+description: 'A search page backed by the test_content index.'
+base_table: search_api_index_test_content
+base_field: search_api_id
+display:
+  default:
+    id: default
+    display_title: Default
+    display_plugin: default
+    position: 0
+    display_options:
+      title: 'Search results'
+      row:
+        type: search_api
+        options:
+          view_modes:
+            'entity:node':
+              test_page: teaser
+      filters:
+        search_api_fulltext:
+          id: search_api_fulltext
+          field: search_api_fulltext
+          exposed: true
+          expose:
+            identifier: keys
+            label: Keywords
+        status:
+          id: status
+          field: status
+          value: '1'
+          exposed: false
+  page_1:
+    id: page_1
+    display_title: 'Search Page'
+    display_plugin: page
+    position: 1
+    display_options:
+      path: search

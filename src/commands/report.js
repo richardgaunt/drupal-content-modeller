@@ -4,6 +4,7 @@
 
 import { generateEntityTypeReport, generateProjectReport, generateSingleBundleReport } from '../generators/reportGenerator.js';
 import { generatePermissionReportData, formatPermissionReportMarkdown } from '../generators/permissionReport.js';
+import { generateSearchReportData, formatSearchReportMarkdown } from '../generators/searchReport.js';
 import { writeTextFile } from '../io/fileSystem.js';
 
 /**
@@ -77,4 +78,18 @@ export async function createPermissionReport(project, roles, workflows, opts, ba
   }
 
   return { data, markdownPath, jsonPath };
+}
+
+/**
+ * Create a Search API configuration report.
+ * @param {object} project - Synced project
+ * @param {object} sources - { servers, indexes, views }
+ * @param {object} opts - { baseUrl }
+ * @param {string} outputPath - Path to write the markdown report
+ * @returns {Promise<{data:object, outputPath:string}>}
+ */
+export async function createSearchReport(project, sources, opts, outputPath) {
+  const data = generateSearchReportData(project, sources, opts);
+  await writeTextFile(outputPath, formatSearchReportMarkdown(data));
+  return { data, outputPath };
 }

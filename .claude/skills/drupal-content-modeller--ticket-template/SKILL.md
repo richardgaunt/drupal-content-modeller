@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--ticket-template
-description: Generate a pre-filled QA ticket template for a specific Drupal entity type and bundle. Uses dcm to pull real field data from a project and creates a ticket markdown that the user can review and edit.
+description: Use when you need a QA ticket for a specific Drupal entity type and bundle — either pre-filled from a synced project's real field data, or a blank template for a bundle that does not exist yet. Use before completing field defaults with `drupal-content-modeller--create-ticket`.
 disable-model-invocation: true
 allowed-tools: Read, Write, Bash(dcm *)
 ---
@@ -140,3 +140,14 @@ Save the ticket and confirm the path to the user.
 - **Include all custom fields** from the bundle, sorted alphabetically by label.
 - **The ticket should be ready to use as-is** but the user may want to edit it — that's expected.
 - **If the bundle has no fields yet** (newly created), generate the template with just the base fields and empty rows for the user to fill in.
+- **Keep all HTML comments** the template emits (`<!-- entity_type: … -->`, `<!-- bundle: … -->`, the Dependencies hint) — downstream skills key off them.
+
+## Related skills
+
+Pipeline: `personal-loop` → `discover` → **this skill** → `create-ticket` →
+`suggest-permissions` → (handoff) → `dcm`.
+
+- `/drupal-content-modeller--discover` — the BA workflow that calls this skill per bundle in Phase 5 (canonical primitives glossary lives there).
+- `/drupal-content-modeller--create-ticket` — fills the blank field cells with Drupal defaults. Runs immediately after this skill.
+- `/drupal-content-modeller--suggest-permissions` — populates the permissions matrix after fields are filled.
+- `/dcm` — builds Drupal YAML from the completed ticket after handoff.

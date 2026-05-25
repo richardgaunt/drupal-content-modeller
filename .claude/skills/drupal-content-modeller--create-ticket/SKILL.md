@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--create-ticket
-description: Fill in Drupal-default widget, machine name, field type, cardinality, and required values on a partially-complete bundle ticket. Part of the BA content-modeling → DCM implementation pipeline; runs after `drupal-content-modeller--ticket-template` has produced a blank template or after discovery has drafted field names. Invoke when the user has a ticket markdown file with incomplete field info and wants it completed using sensible Drupal defaults.
+description: Use when a bundle ticket markdown file has blank or incomplete field cells (machine name, field type, widget, cardinality, required) that need completing with sensible Drupal defaults. Use after `drupal-content-modeller--ticket-template` has produced a blank template, or after discovery has drafted field names but not their types.
 disable-model-invocation: true
 allowed-tools: Read, Edit, Bash(dcm *)
 ---
@@ -11,21 +11,28 @@ You are helping the user complete a partially-filled QA ticket markdown file. Th
 
 ## Background — why this skill exists
 
-**What a Drupal site is made of.** Every Drupal site is assembled from a small set of building-block primitives: **content types** (nodes), **fields** on those types, **paragraphs** (reusable structured components within a node), **media types** (images, video, documents), **taxonomies** (controlled vocabularies and tags), **blocks and custom block types** (`block_content`, for reusable sidebars / CTAs / footers), **menus** (site navigation), **webforms** (user input), **views** (listings), **user roles and permissions**, and **workflow / moderation states**. The full list of these — who has which fields, how they relate, who can edit what — is called the *content model*. The content model is the skeleton of the site; everything else (theme, frontend, migrations) hangs off it.
+For the Drupal primitives glossary (content types, fields, paragraphs, media,
+taxonomies, blocks, the content model), see the Background section of
+`/drupal-content-modeller--discover` — it is the canonical reference; not
+repeated here.
 
-**Where tickets fit.** A business analyst (or whoever plays that role on the project) decides *what* to build and *why*. A developer or site-builder runs `dcm` to make it real. The hand-off between them is a **ticket**: one markdown file per bundle, with a Given/When/Then acceptance-criteria section a QA engineer can verify, a field table (name / machine name / type / widget / cardinality / required / notes), a permissions matrix, and a dependency list. Every bundle in the site — every content type, every paragraph, every media type, every vocabulary, every block type — gets its own ticket. Tickets are numbered in dependency order so they can be built one at a time.
+A **ticket** is the BA→developer hand-off: one markdown file per bundle,
+produced by `dcm report templates`, with a Given/When/Then AC section, a field
+table, a permissions matrix, and a dependency list. A freshly-generated
+template has blank cells wherever a decision hasn't been made — that is an
+incomplete spec.
 
-**Why we template them.** DCM ticket templates (produced by `dcm report templates`) guarantee that every ticket has the same shape: same AC sections, same field-table columns, same permissions matrix. That uniformity is what makes them useful — QA reads one format, devs write one format, editors can eventually be trained on one format. But a freshly-generated template has blank cells wherever the BA hasn't filled in a decision yet. A partially-filled template is an incomplete spec.
+**What this skill does.** It fills the blank field-table cells with the
+defaults an experienced Drupal developer would pick (`string`/Textfield for
+short labels, `text_long`/CKEditor for body, `entity_reference_revisions`/Paragraphs
+for component lists, `Unlimited` for plurals, `field_n_`/`field_m_`/`field_p_`/`field_t_`/`field_b_`
+prefixes). It never overwrites a cell the user already filled — only blanks.
+Within the Personal Loop it leaves the **permissions matrix** for
+`/drupal-content-modeller--suggest-permissions` to populate from precedent;
+outside the loop, fall back to Step 6.
 
-**What this skill does.** This skill takes a partially-filled ticket and completes the blanks using the defaults an experienced Drupal developer would pick: `string` with a Textfield widget for short labels, `text_long` with a CKEditor area for body copy, `entity_reference_revisions` with the Paragraphs widget for component lists, `Unlimited` cardinality for plurals, `field_n_` / `field_m_` / `field_p_` / `field_t_` / `field_b_` prefixes per entity type, and so on. It never overwrites a cell the user filled in — only blanks. The output is a ticket that's ready to hand to the `dcm` skill, which builds the actual Drupal config.
-
-**Where this skill sits in the broader workflow:**
-
-1. **Discovery** — `/drupal-content-modeller--discover` (the BA phase: goals, users, editorial workflow, design-to-field mapping, a shortlist of bundles to build)
-2. **Template** — `/drupal-content-modeller--ticket-template` (generates a blank or partially-pre-filled ticket for one bundle)
-3. **Complete** — *this skill* applies Drupal defaults to the blanks
-4. **Build** — `/dcm` reads the completed ticket and runs the `dcm bundle create` / `dcm field create` commands that write Drupal YAML config
-5. **Migrate (optional)** — `/drupal-migrate` generates migration YAML + source/process plugins when content needs to move from a legacy system
+Pipeline: `personal-loop` → `discover` → `ticket-template` → **this skill** →
+`suggest-permissions` → (handoff) → `dcm` → `drupal-migrate` (optional).
 
 ---
 
@@ -142,7 +149,12 @@ If admin URLs have `<admin_url>` or `<machine_name>` placeholders, fill them in 
 
 ## Step 6: Complete permissions (if empty)
 
-If the permissions table has empty rows:
+**Inside the Personal Loop, skip this step** — leave the permissions matrix
+blank for `/drupal-content-modeller--suggest-permissions`, which populates it
+from the project's synced precedent. Only run this step when invoked
+standalone (no loop, no precedent skill following).
+
+If the permissions table has empty rows and no precedent skill will run:
 - Add a reasonable default: an "Administrator" row with all Yes, and a "Content Author" or "Content Editor" row with Create/Edit own = Yes, others = No.
 - If the user has specified roles, use those instead.
 
@@ -155,12 +167,16 @@ Before writing, show the user what you've filled in. List each field and what wa
 - **Never overwrite values the user has already filled in.** Only fill empty cells.
 - **When uncertain about a field type, ask the user** rather than guessing wrong.
 - **Preserve the exact markdown structure** — only modify cell values, don't rearrange the table.
-- **Remove the instruction HTML comment** (`<!-- INSTRUCTIONS: ... -->`) after completing the ticket.
-- **Keep the entity_type HTML comment** for future reference.
+- **Keep all HTML comments** (`<!-- entity_type: … -->`, `<!-- bundle: … -->`, the Dependencies hint) — they are load-bearing for downstream skills. Only fill placeholder *values*, never strip the comments.
 
 ## Related skills
 
-- `/drupal-content-modeller--discover` — runs the upstream BA workflow (discovery → content model → per-bundle tickets). Use this when a project doesn't yet have tickets or a clear content model.
-- `/drupal-content-modeller--ticket-template` — generates a blank or pre-filled ticket for a single bundle. Runs before this skill.
-- `/dcm` — reads a completed ticket and writes the actual Drupal YAML config via `dcm bundle create` and `dcm field create`. Runs after this skill.
-- `/drupal-migrate` — generates migrations when content from a legacy system needs to land in the bundles this ticket describes.
+Pipeline: `personal-loop` → `discover` → `ticket-template` → **this skill** →
+`suggest-permissions` → (handoff) → `dcm` → `drupal-migrate`.
+
+- `/drupal-content-modeller--personal-loop` — the BA orchestrator; invokes this skill inside the per-ticket completeness loop.
+- `/drupal-content-modeller--discover` — upstream BA workflow (canonical primitives glossary lives here). Run when a project has no tickets or content model yet.
+- `/drupal-content-modeller--ticket-template` — generates the blank template. Runs immediately before this skill.
+- `/drupal-content-modeller--suggest-permissions` — populates the permissions matrix from precedent. Runs immediately after this skill in the loop.
+- `/dcm` — writes the actual Drupal YAML (`dcm bundle create` / `dcm field create`) after handoff.
+- `/drupal-migrate` — migrations when legacy content must land in these bundles.

@@ -1,6 +1,6 @@
 ---
 name: drupal-content-modeller--theme-ticket
-description: Generate theme/presentation-layer tickets for Drupal bundles — view modes, component bindings, text format assignments, block region placements, and Twig/preprocess overrides. Introspects the live site via `dcm view-mode`, `dcm component`, `dcm filter-list`, `dcm theme-regions`, `dcm theme-suggestions`, and `dcm theme-preprocesses`, then produces per-bundle theme tickets that sit alongside BA tickets in `projects/<slug>/tickets/`. Invoke after BA content-model tickets are drafted and before `/dcm` builds the Drupal config.
+description: Use after BA content-model tickets are drafted and before `/dcm` builds config, when a Tech Lead needs presentation-layer tickets decided per bundle — view modes, component/SDC bindings, text-format assignments, block region placements, or Twig/preprocess overrides — against the live site. Use when the editor-facing content model is settled but how each bundle renders publicly is not.
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash(dcm *), Glob, Grep
 ---
@@ -15,13 +15,13 @@ You are helping a Tech Lead produce **theme tickets** — the presentation-layer
 
 **Where the output lives.** One theme ticket per bundle, named `<NNN> - Theme — <Bundle>.md`, written under `projects/<slug>/tickets/` alongside the BA ticket. A BA ticket and a theme ticket for the same bundle share a number stem (e.g. `012 - Article.md` + `012 - Theme — Article.md`) so they sort together.
 
-**Where the skill sits in the pipeline.**
+**Where the skill sits in the pipeline.** This is Tech-Lead-owned and runs
+*outside* the BA Personal Loop, after BA tickets exist:
 
-1. BA discovery → `/drupal-content-modeller--discover` produces content-model tickets
-2. BA fills → `/drupal-content-modeller--create-ticket` applies defaults
-3. **Theme tickets — *this skill*** produces per-bundle theme tickets
-4. Build → `/dcm` reads both ticket types and writes Drupal YAML. BA tickets drive bundles, fields, and form displays (editor UX). Theme tickets drive view modes, component bindings, text-format assignments, and block placements (public rendering).
-5. Migrate (optional) → `/drupal-migrate`
+1. BA loop produces content-model tickets (`personal-loop` → `discover` → `ticket-template` → `create-ticket` → `suggest-permissions`)
+2. **Theme tickets — *this skill*** produces per-bundle theme tickets alongside the BA tickets
+3. Build → `/dcm` reads both ticket types and writes Drupal YAML. BA tickets drive bundles, fields, form displays, and permissions (editor UX); theme tickets drive view modes, component bindings, text-format assignments, and block placements (public rendering).
+4. Migrate (optional) → `/drupal-migrate`
 
 **Form display stays with the BA ticket.** Form displays are editor experience — field order, widget choice, field groups, tabs. They belong to the content-model decision, not the theme. This skill does not touch form displays.
 
@@ -166,7 +166,10 @@ End with a short summary for the user:
 
 ## Related skills
 
-- `/drupal-content-modeller--discover` — produces the BA content-model tickets this skill builds on.
-- `/drupal-content-modeller--create-ticket` — fills BA ticket defaults. Run before this skill.
+Theme tickets are produced *after* the BA Personal Loop hands off, not inside
+it. They pair with BA tickets by number stem.
+
+- `/drupal-content-modeller--discover` — produces the BA content-model tickets this skill builds on (canonical primitives glossary lives there).
+- `/drupal-content-modeller--create-ticket` / `/drupal-content-modeller--suggest-permissions` — complete the BA ticket (fields + permissions). Run before this skill.
 - `/dcm` — builds Drupal YAML from both BA and theme tickets.
 - `/drupal-migrate` — migrations; independent of theme work.

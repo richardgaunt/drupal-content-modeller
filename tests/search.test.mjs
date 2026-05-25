@@ -1,0 +1,265 @@
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+import {
+  parseSearchServers,
+  parseSearchIndexes,
+  parseSingleSearchIndex,
+  parseSearchBoundViews
+} from '../src/io/configReader.js';
+import {
+  generateSearchReportData,
+  formatSearchReportMarkdown
+} from '../src/generators/searchReport.js';
+import {
+  getIndexableProperties,
+  listSearchIndexes,
+  getSearchIndex
+} from '../src/commands/search.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixturesPath = join(__dirname, 'fixtures');
+const dcmPath = join(__dirname, '..', 'index.mjs');
+const execFileAsync = promisify(execFile);
+
+async function runDcm(...args) {
+  const { stdout, stderr } = await execFileAsync('node', [dcmPath, ...args], {
+    timeout: 10000,
+    env: { ...process.env, NODE_ENV: 'test' }
+  });
+  return { stdout, stderr };
+}
+
+describe('Search Config Reader (I/O against fixtures)', () => {
+  test('parseSearchServers reads the test server', async () => {
+    const servers = await parseSearchServers(fixturesPath);
+    expect(servers).toHaveLength(1);
+    expect(servers[0].id).toBe('test_db');
+    expect(servers[0].label).toBe('Test Database Server');
+    expect(servers[0].backend).toBe('search_api_db');
+    expect(servers[0].status).toBe(true);
+  });
+
+  test('parseSearchIndexes reads the test index with fields and bundles', async () => {
+    const indexes = await parseSearchIndexes(fixturesPath);
+    const index = indexes.find(i => i.id === 'test_content');
+    expect(index).toBeDefined();
+    expect(index.server).toBe('test_db');
+    expect(index.tracker).toBe('default');
+    // Pure parser surfaces the raw selected list (allow-list datasource).
+    expect(index.bundles).toEqual(['test_page']);
+    expect(index.languages.sort()).toEqual(['und', 'zxx']);
+    expect(index.fieldCount).toBe(4);
+  });
+
+  test('parseSingleSearchIndex returns processed and nested-paragraph field paths', async () => {
+    const index = await parseSingleSearchIndex(fixturesPath, 'test_content');
+    expect(index).not.toBeNull();
+    const body = index.fields.find(f => f.name === 'body');
+    expect(body.propertyPath).toBe('field_body:processed');
+    const panel = index.fields.find(f => f.name === 'panel_title');
+    expect(panel.propertyPath).toBe('field_n_components:entity:field_p_title');
+    expect(index.processors.map(p => p.id).sort()).toEqual(['add_url', 'html_filter', 'rendered_item']);
+  });
+
+  test('parseSingleSearchIndex returns null for unknown id', async () => {
+    expect(await parseSingleSearchIndex(fixturesPath, 'nope')).toBeNull();
+  });
+
+  test('parseSearchBoundViews finds the search view with index + displays', async () => {
+    const views = await parseSearchBoundViews(fixturesPath);
+    expect(views).toHaveLength(1);
+    const view = views[0];
+    expect(view.id).toBe('test_search');
+    expect(view.indexId).toBe('test_content');
+
+    const def = view.displays.find(d => d.displayId === 'default');
+    expect(def.exposedFilters.map(f => f.identifier)).toEqual(['keys']);
+    expect(def.rowViewModes).toEqual([
+      { datasourceId: 'entity:node', bundle: 'test_page', viewMode: 'teaser' }
+    ]);
+
+    const page = view.displays.find(d => d.displayId === 'page_1');
+    expect(page.path).toBe('search');
+  });
+});
+
+describe('Search Report Generator', () => {
+  function buildSources() {
+    return Promise.all([
+      parseSearchServers(fixturesPath),
+      parseSearchIndexes(fixturesPath),
+      parseSearchBoundViews(fixturesPath)
+    ]).then(([servers, indexes, views]) => ({ servers, indexes, views }));
+  }
+
+  test('generateSearchReportData groups views under their index', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {});
+    expect(data.project).toBe('demo');
+    expect(data.summary.serverCount).toBe(1);
+    expect(data.summary.indexCount).toBe(2);
+    expect(data.summary.viewCount).toBe(1);
+
+    const index = data.indexes.find(i => i.id === 'test_content');
+    expect(index).toBeDefined();
+    expect(index.views).toHaveLength(1);
+    expect(index.views[0].id).toBe('test_search');
+  });
+
+  test('formatSearchReportMarkdown renders servers, fields and views', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {});
+    const md = formatSearchReportMarkdown(data);
+    expect(md).toContain('# Search API Configuration Report');
+    expect(md).toContain('Test Database Server');
+    expect(md).toContain('`field_body:processed`');
+    expect(md).toContain('`field_n_components:entity:field_p_title`');
+    expect(md).toContain('Search Views');
+    expect(md).toContain('test_search');
+  });
+
+  test('formatSearchReportMarkdown handles empty config', () => {
+    const data = generateSearchReportData({ slug: 'demo' }, { servers: [], indexes: [], views: [] }, {});
+    const md = formatSearchReportMarkdown(data);
+    expect(md).toContain('_No Search API servers defined._');
+    expect(md).toContain('_No Search API indexes defined._');
+  });
+
+  test('formatSearchReportMarkdown renders admin links when baseUrl is set', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {
+      baseUrl: 'https://example.com'
+    });
+    const md = formatSearchReportMarkdown(data);
+    expect(md).toContain('https://example.com/admin/config/search/search-api');
+    expect(md).toContain('https://example.com/admin/config/search/search-api/index/test_content');
+  });
+
+  test('formatSearchReportMarkdown renders no admin links when baseUrl is empty', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {});
+    const md = formatSearchReportMarkdown(data);
+    expect(md).not.toContain('/admin/config/search/search-api');
+  });
+});
+
+describe('getIndexableProperties (command orchestration)', () => {
+  const project = {
+    entities: {
+      node: {
+        page: {
+          fields: {
+            field_n_body: { name: 'field_n_body', label: 'Body', type: 'text_long', settings: {} },
+            field_n_ref: {
+              name: 'field_n_ref',
+              label: 'Ref',
+              type: 'entity_reference_revisions',
+              settings: { handler_settings: { target_bundles: { card: 'card' } } }
+            }
+          }
+        }
+      },
+      paragraph: {
+        card: {
+          fields: {
+            field_p_title: { name: 'field_p_title', label: 'Card Title', type: 'string', settings: {} }
+          }
+        }
+      }
+    }
+  };
+
+  test('traverses an :entity: hop and emits :processed', () => {
+    const props = getIndexableProperties(project, 'node', 'page', 2);
+    const paths = props.map(p => p.propertyPath);
+    expect(paths).toContain('field_n_body');
+    expect(paths).toContain('field_n_body:processed');
+    expect(paths).toContain('field_n_ref:entity:field_p_title');
+  });
+});
+
+describe('Resolved index bundles (negation semantics, command layer)', () => {
+  // configDirectory points at fixtures so autoSyncProject parses the fixture
+  // node types (test_page, test_article) into project.entities. The unregistered
+  // slug means the silent saveProject inside autoSync no-ops, but .entities is
+  // populated before that, so resolution has a real entity model to work with.
+  const project = { slug: 'fixture-search-proj', configDirectory: fixturesPath };
+
+  test('listSearchIndexes resolves a deny-list datasource to all-bundles-minus-selected', async () => {
+    const indexes = await listSearchIndexes(project);
+    const excl = indexes.find(i => i.id === 'test_excluded');
+    expect(excl).toBeDefined();
+    const ds = excl.datasources.find(d => d.entityType === 'node');
+    expect(ds.bundlesAreExclusions).toBe(true);
+    // node has test_page + test_article in fixtures; deny-list excludes test_article.
+    expect(ds.resolvedBundles.sort()).toEqual(['test_page']);
+    // Index-level bundles is the union of resolved bundles across datasources.
+    expect(excl.bundles.sort()).toEqual(['test_page']);
+  });
+
+  test('listSearchIndexes leaves an allow-list datasource at its selected bundles', async () => {
+    const indexes = await listSearchIndexes(project);
+    const content = indexes.find(i => i.id === 'test_content');
+    expect(content).toBeDefined();
+    const ds = content.datasources.find(d => d.entityType === 'node');
+    expect(ds.bundlesAreExclusions).toBe(false);
+    expect(ds.resolvedBundles).toEqual(['test_page']);
+    expect(content.bundles).toEqual(['test_page']);
+  });
+
+  test('getSearchIndex annotates resolvedBundles for the requested index', async () => {
+    const index = await getSearchIndex(project, 'test_excluded');
+    expect(index).not.toBeNull();
+    const ds = index.datasources.find(d => d.entityType === 'node');
+    expect(ds.resolvedBundles.sort()).toEqual(['test_page']);
+  });
+});
+
+describe('Search CLI integration', () => {
+  test('dcm search --help lists subcommands', async () => {
+    const { stdout } = await runDcm('search', '--help');
+    expect(stdout).toMatch(/server/);
+    expect(stdout).toMatch(/index/);
+    expect(stdout).toMatch(/view/);
+    expect(stdout).toMatch(/indexable/);
+  });
+
+  test('dcm search index --help lists list/show/fields', async () => {
+    const { stdout } = await runDcm('search', 'index', '--help');
+    expect(stdout).toMatch(/list/);
+    expect(stdout).toMatch(/show/);
+    expect(stdout).toMatch(/fields/);
+  });
+
+  test('dcm report --help includes search subcommand', async () => {
+    const { stdout } = await runDcm('report', '--help');
+    expect(stdout).toMatch(/search/);
+  });
+
+  test('dcm search server list exits non-zero when --project missing', async () => {
+    let err;
+    try {
+      await runDcm('search', 'server', 'list');
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    const out = `${err.stderr || ''}${err.stdout || ''}`;
+    expect(out).toMatch(/--project is required|required option/i);
+  });
+
+  test('dcm search indexable exits non-zero when --entity-type missing', async () => {
+    let err;
+    try {
+      await runDcm('search', 'indexable', '-p', 'nope-project');
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    const out = `${err.stderr || ''}${err.stdout || ''}`;
+    expect(out).toMatch(/--entity-type|required option/i);
+  });
+});

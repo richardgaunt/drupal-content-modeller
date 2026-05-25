@@ -51,6 +51,14 @@ import {
   parseViewMode,
   getViewModeFilename
 } from '../parsers/viewModeParser.js';
+import {
+  filterSearchServerFiles,
+  filterSearchIndexFiles,
+  filterViewFiles,
+  parseSearchServer,
+  parseSearchIndex,
+  parseSearchView
+} from '../parsers/searchParser.js';
 
 /**
  * Parse bundle configs from a config directory
@@ -834,6 +842,131 @@ export async function parseSingleMigrationConfig(configPath, migrationId) {
   }
 
   return null;
+}
+
+// ============================================
+// Search API Functions
+// ============================================
+
+/**
+ * Parse all Search API servers from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed servers
+ */
+export async function parseSearchServers(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const serverFiles = filterSearchServerFiles(files);
+  const servers = [];
+
+  for (const filename of serverFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const server = parseSearchServer(config);
+        if (server && server.id) {
+          servers.push(server);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return servers.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Parse all Search API indexes from a config directory
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed indexes
+ */
+export async function parseSearchIndexes(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const indexFiles = filterSearchIndexFiles(files);
+  const indexes = [];
+
+  for (const filename of indexFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const index = parseSearchIndex(config);
+        if (index && index.id) {
+          indexes.push(index);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return indexes.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Parse a single Search API index by id
+ * @param {string} configPath - Path to config directory
+ * @param {string} indexId - Index machine name
+ * @returns {Promise<object|null>} - Parsed index or null if not found
+ */
+export async function parseSingleSearchIndex(configPath, indexId) {
+  const filePath = join(configPath, `search_api.index.${indexId}.yml`);
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    const content = await readTextFile(filePath);
+    const config = parseYaml(content);
+    if (config) {
+      return parseSearchIndex(config);
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not parse search index ${indexId}: ${error.message}`);
+  }
+
+  return null;
+}
+
+/**
+ * Parse all views that are bound to a Search API index.
+ * @param {string} configPath - Path to config directory
+ * @returns {Promise<object[]>} - Array of parsed search views
+ */
+export async function parseSearchBoundViews(configPath) {
+  if (!directoryExists(configPath)) {
+    return [];
+  }
+
+  const files = await listFiles(configPath);
+  const viewFiles = filterViewFiles(files);
+  const views = [];
+
+  for (const filename of viewFiles) {
+    try {
+      const content = await readTextFile(join(configPath, filename));
+      const config = parseYaml(content);
+      if (config) {
+        const view = parseSearchView(config);
+        if (view) {
+          views.push(view);
+        }
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not parse ${filename}: ${error.message}`);
+    }
+  }
+
+  return views.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /**

@@ -1,0 +1,35 @@
+uuid: 44444444-4444-4444-4444-444444444444
+langcode: en
+status: true
+dependencies:
+  config:
+    - search_api.server.test_db
+  module:
+    - node
+    - search_api
+id: test_excluded
+name: 'Test Excluded Index'
+description: 'Indexes all node bundles except test_article (deny-list datasource).'
+read_only: false
+field_settings:
+  title:
+    label: Title
+    datasource_id: 'entity:node'
+    property_path: title
+    type: text
+datasource_settings:
+  'entity:node':
+    bundles:
+      default: true
+      selected:
+        - test_article
+    languages:
+      default: false
+      selected: {  }
+tracker_settings:
+  default:
+    indexing_order: fifo
+server: test_db
+options:
+  index_directly: true
+  cron_limit: 50

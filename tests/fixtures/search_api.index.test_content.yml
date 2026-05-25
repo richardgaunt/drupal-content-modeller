@@ -1,0 +1,65 @@
+uuid: 22222222-2222-2222-2222-222222222222
+langcode: en
+status: true
+dependencies:
+  config:
+    - search_api.server.test_db
+    - node.type.test_page
+  module:
+    - node
+    - search_api
+id: test_content
+name: 'Test Content Index'
+description: 'Indexes test_page nodes including a nested paragraph path.'
+read_only: false
+field_settings:
+  title:
+    label: Title
+    datasource_id: 'entity:node'
+    property_path: title
+    type: text
+    boost: 5.0
+  body:
+    label: Body
+    datasource_id: 'entity:node'
+    property_path: 'field_body:processed'
+    type: text
+  panel_title:
+    label: 'Panel title'
+    datasource_id: 'entity:node'
+    property_path: 'field_n_components:entity:field_p_title'
+    type: string
+  status:
+    label: 'Published status'
+    datasource_id: 'entity:node'
+    property_path: status
+    type: boolean
+datasource_settings:
+  'entity:node':
+    bundles:
+      default: false
+      selected:
+        - test_page
+    languages:
+      default: true
+      selected:
+        - und
+        - zxx
+processor_settings:
+  add_url: {}
+  rendered_item: {}
+  html_filter:
+    all_fields: false
+    fields:
+      - title
+      - body
+    tags:
+      h1: 5
+      strong: 2
+tracker_settings:
+  default:
+    indexing_order: fifo
+server: test_db
+options:
+  index_directly: true
+  cron_limit: 50

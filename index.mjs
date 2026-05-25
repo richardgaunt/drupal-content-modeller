@@ -78,7 +78,14 @@ import {
   cmdBaStatus,
   cmdBaGate,
   cmdBaHandoff,
-  cmdBaSyncDown
+  cmdBaSyncDown,
+  cmdSearchServerList,
+  cmdSearchIndexList,
+  cmdSearchIndexShow,
+  cmdSearchIndexFields,
+  cmdSearchViewList,
+  cmdSearchIndexable,
+  cmdReportSearch
 } from './src/cli/commands.js';
 import {
   PROJECT_HELP, PROJECT_HELP_DATA,
@@ -359,6 +366,15 @@ reportCmd
   .action(cmdGenerateTickets);
 
 reportCmd
+  .command('search')
+  .description('Generate a Search API configuration report (servers, indexes, fields, views)')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-o, --output <path>', 'Output file path, or "-" for stdout')
+  .option('-u, --base-url <url>', 'Base URL for admin links')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdReportSearch);
+
+reportCmd
   .command('templates')
   .description('Generate blank ticket templates for manual authoring')
   .option('-e, --entity-type <type>', 'Entity type (omit for all types)')
@@ -399,6 +415,75 @@ migrationCmd
       await cmdMigrationReport(options);
     }
   });
+
+// ============================================
+// Search API Commands
+// ============================================
+
+const searchCmd = program
+  .command('search')
+  .description('Search API introspection commands');
+
+const searchServerCmd = searchCmd
+  .command('server')
+  .description('Search API server commands');
+
+searchServerCmd
+  .command('list')
+  .description('List Search API servers')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchServerList);
+
+const searchIndexCmd = searchCmd
+  .command('index')
+  .description('Search API index commands');
+
+searchIndexCmd
+  .command('list')
+  .description('List Search API indexes')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchIndexList);
+
+searchIndexCmd
+  .command('show')
+  .description('Show full configuration for a Search API index')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-i, --index <id>', 'Search index id')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchIndexShow);
+
+searchIndexCmd
+  .command('fields')
+  .description('List the indexed fields for a Search API index')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-i, --index <id>', 'Search index id')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchIndexFields);
+
+const searchViewCmd = searchCmd
+  .command('view')
+  .description('Search-bound views commands');
+
+searchViewCmd
+  .command('list')
+  .description('List views bound to a Search API index')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .option('-i, --index <id>', 'Restrict to views bound to this index')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchViewList);
+
+searchCmd
+  .command('indexable')
+  .description('Emit the Search API indexable property tree for a bundle')
+  .requiredOption('-p, --project <slug>', 'Project slug')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
+  .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
+  .option('--depth <num>', 'Maximum reference hops to traverse (default: 2)')
+  .option('-a, --all', 'Show all field types, not just text/formatted-text fields')
+  .option('-j, --json', 'Output as JSON')
+  .action(cmdSearchIndexable);
 
 // ============================================
 // Admin Commands

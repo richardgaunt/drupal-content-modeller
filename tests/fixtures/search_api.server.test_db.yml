@@ -1,0 +1,14 @@
+uuid: 11111111-1111-1111-1111-111111111111
+langcode: en
+status: true
+dependencies:
+  module:
+    - search_api_db
+id: test_db
+name: 'Test Database Server'
+description: 'A database-backed Search API server for tests.'
+backend: search_api_db
+backend_config:
+  database: 'default:default'
+  min_chars: 3
+  matching: words

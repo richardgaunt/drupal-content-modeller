@@ -123,6 +123,23 @@ describe('Search Report Generator', () => {
     expect(md).toContain('_No Search API servers defined._');
     expect(md).toContain('_No Search API indexes defined._');
   });
+
+  test('formatSearchReportMarkdown renders admin links when baseUrl is set', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {
+      baseUrl: 'https://example.com'
+    });
+    const md = formatSearchReportMarkdown(data);
+    expect(md).toContain('https://example.com/admin/config/search/search-api');
+    expect(md).toContain('https://example.com/admin/config/search/search-api/index/test_content');
+  });
+
+  test('formatSearchReportMarkdown renders no admin links when baseUrl is empty', async () => {
+    const sources = await buildSources();
+    const data = generateSearchReportData({ slug: 'demo' }, sources, {});
+    const md = formatSearchReportMarkdown(data);
+    expect(md).not.toContain('/admin/config/search/search-api');
+  });
 });
 
 describe('getIndexableProperties (command orchestration)', () => {
@@ -193,7 +210,7 @@ describe('Search CLI integration', () => {
     expect(out).toMatch(/--project is required|required option/i);
   });
 
-  test('dcm search indexable exits non-zero when --entity missing', async () => {
+  test('dcm search indexable exits non-zero when --entity-type missing', async () => {
     let err;
     try {
       await runDcm('search', 'indexable', '-p', 'nope-project');
@@ -202,6 +219,6 @@ describe('Search CLI integration', () => {
     }
     expect(err).toBeDefined();
     const out = `${err.stderr || ''}${err.stdout || ''}`;
-    expect(out).toMatch(/--entity|required option/i);
+    expect(out).toMatch(/--entity-type|required option/i);
   });
 });

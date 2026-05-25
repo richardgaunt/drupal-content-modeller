@@ -290,9 +290,9 @@ export async function cmdSearchViewList(options) {
 export async function cmdSearchIndexable(options) {
   try {
     requireProject(options);
-    const entityType = options.entity;
+    const entityType = options.entityType;
     if (!entityType) {
-      throw new Error('--entity is required');
+      throw new Error('--entity-type is required');
     }
     if (!isValidEntityType(entityType)) {
       throw new Error(`Invalid entity type. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);

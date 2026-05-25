@@ -195,9 +195,11 @@ export function parseSearchView(config) {
   for (const [displayId, display] of Object.entries(config.display || {})) {
     const opts = display?.display_options || {};
 
-    // Exposed filters: filters with `exposed: true` (or an expose.identifier).
+    // Exposed filters: only filters explicitly flagged `exposed: true`.
+    // Drupal can populate `expose.identifier` on non-exposed filters, so the
+    // `exposed` flag is the authoritative signal.
     const exposedFilters = Object.entries(opts.filters || {})
-      .filter(([, f]) => f && (f.exposed === true || (f.expose && f.expose.identifier)))
+      .filter(([, f]) => f && f.exposed === true)
       .map(([key, f]) => ({
         id: f.id || key,
         field: f.field || key,

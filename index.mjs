@@ -478,7 +478,7 @@ searchCmd
   .command('indexable')
   .description('Emit the Search API indexable property tree for a bundle')
   .requiredOption('-p, --project <slug>', 'Project slug')
-  .requiredOption('-e, --entity <type>', 'Entity type')
+  .requiredOption('-e, --entity-type <type>', 'Entity type')
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .option('--depth <num>', 'Maximum reference hops to traverse (default: 2)')
   .option('-j, --json', 'Output as JSON')

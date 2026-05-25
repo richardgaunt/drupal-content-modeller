@@ -160,7 +160,15 @@ describe('Search Parser - parseSearchView', () => {
               exposed: true,
               expose: { identifier: 'keys', label: 'Keywords' }
             },
-            status: { id: 'status', field: 'status', value: '1', exposed: false }
+            status: { id: 'status', field: 'status', value: '1', exposed: false },
+            // Non-exposed filter that still carries an expose.identifier — Drupal
+            // populates this even when the filter is not exposed. Must be ignored.
+            langcode: {
+              id: 'langcode',
+              field: 'langcode',
+              exposed: false,
+              expose: { identifier: 'langcode', label: 'Language' }
+            }
           }
         }
       },
@@ -182,6 +190,8 @@ describe('Search Parser - parseSearchView', () => {
     const def = result.displays.find(d => d.displayId === 'default');
     expect(def.exposedFilters).toHaveLength(1);
     expect(def.exposedFilters[0].identifier).toBe('keys');
+    // A non-exposed filter carrying expose.identifier must NOT count as exposed.
+    expect(def.exposedFilters.map(f => f.identifier)).not.toContain('langcode');
     expect(def.rowViewModes).toEqual([
       { datasourceId: 'entity:node', bundle: 'article', viewMode: 'teaser' },
       { datasourceId: 'entity:node', bundle: 'page', viewMode: 'full' }
@@ -311,5 +321,62 @@ describe('Search Parser - buildIndexableTree', () => {
 
   test('returns empty for unknown bundle', () => {
     expect(buildIndexableTree(entities, 'node', 'missing', 2)).toEqual([]);
+  });
+});
+
+describe('Search Parser - buildIndexableTree reference cycles', () => {
+  // node:a references node:b, and node:b references back to node:a.
+  // Without a cycle guard this would recurse forever.
+  const cyclicEntities = {
+    node: {
+      a: {
+        id: 'a',
+        label: 'A',
+        fields: {
+          field_n_to_b: {
+            name: 'field_n_to_b',
+            label: 'To B',
+            type: 'entity_reference',
+            settings: {
+              target_type: 'node',
+              handler: 'default:node',
+              handler_settings: { target_bundles: { b: 'b' } }
+            }
+          }
+        }
+      },
+      b: {
+        id: 'b',
+        label: 'B',
+        fields: {
+          field_n_to_a: {
+            name: 'field_n_to_a',
+            label: 'To A',
+            type: 'entity_reference',
+            settings: {
+              target_type: 'node',
+              handler: 'default:node',
+              handler_settings: { target_bundles: { a: 'a' } }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  test('terminates on a reference cycle and bounds recursion via the cycle guard', () => {
+    // A high depth would loop indefinitely without the visited-path guard.
+    const tree = buildIndexableTree(cyclicEntities, 'node', 'a', 50);
+    const paths = tree.map(t => t.propertyPath);
+
+    // The direct field and one hop into B are emitted.
+    expect(paths).toContain('field_n_to_b');
+    expect(paths).toContain('field_n_to_b:entity:field_n_to_a');
+
+    // The cycle guard stops re-entering A: no path closes the loop back to A's field.
+    expect(paths).not.toContain('field_n_to_b:entity:field_n_to_a:entity:field_n_to_b');
+
+    // Result is finite and small — the guard prevented runaway recursion.
+    expect(tree.length).toBeLessThanOrEqual(2);
   });
 });

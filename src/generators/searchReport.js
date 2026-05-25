@@ -64,6 +64,8 @@ function fmtBool(value) {
  * @returns {string} - Markdown document
  */
 export function formatSearchReportMarkdown(data) {
+  const baseUrl = data.baseUrl || '';
+  const searchAdminPath = '/admin/config/search/search-api';
   const lines = [];
   lines.push(`# Search API Configuration Report`);
   lines.push('');
@@ -77,6 +79,10 @@ export function formatSearchReportMarkdown(data) {
   // Servers
   lines.push(`## Servers`);
   lines.push('');
+  if (baseUrl) {
+    lines.push(`Manage Search API: ${baseUrl}${searchAdminPath}`);
+    lines.push('');
+  }
   if (data.servers.length === 0) {
     lines.push('_No Search API servers defined._');
     lines.push('');
@@ -103,6 +109,9 @@ export function formatSearchReportMarkdown(data) {
     lines.push(`- Server: ${index.server ? `\`${index.server}\`` : '_none_'}`);
     lines.push(`- Tracker: ${index.tracker ? `\`${index.tracker}\`` : '_none_'}`);
     lines.push(`- Indexed fields: ${index.fieldCount}`);
+    if (baseUrl) {
+      lines.push(`- Admin: ${baseUrl}${searchAdminPath}/index/${index.id}`);
+    }
     lines.push('');
 
     // Datasources

@@ -13,7 +13,11 @@ import {
   generateSearchReportData,
   formatSearchReportMarkdown
 } from '../src/generators/searchReport.js';
-import { getIndexableProperties } from '../src/commands/search.js';
+import {
+  getIndexableProperties,
+  listSearchIndexes,
+  getSearchIndex
+} from '../src/commands/search.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesPath = join(__dirname, 'fixtures');
@@ -40,11 +44,11 @@ describe('Search Config Reader (I/O against fixtures)', () => {
 
   test('parseSearchIndexes reads the test index with fields and bundles', async () => {
     const indexes = await parseSearchIndexes(fixturesPath);
-    expect(indexes).toHaveLength(1);
-    const index = indexes[0];
-    expect(index.id).toBe('test_content');
+    const index = indexes.find(i => i.id === 'test_content');
+    expect(index).toBeDefined();
     expect(index.server).toBe('test_db');
     expect(index.tracker).toBe('default');
+    // Pure parser surfaces the raw selected list (allow-list datasource).
     expect(index.bundles).toEqual(['test_page']);
     expect(index.languages.sort()).toEqual(['und', 'zxx']);
     expect(index.fieldCount).toBe(4);
@@ -96,11 +100,11 @@ describe('Search Report Generator', () => {
     const data = generateSearchReportData({ slug: 'demo' }, sources, {});
     expect(data.project).toBe('demo');
     expect(data.summary.serverCount).toBe(1);
-    expect(data.summary.indexCount).toBe(1);
+    expect(data.summary.indexCount).toBe(2);
     expect(data.summary.viewCount).toBe(1);
 
-    const index = data.indexes[0];
-    expect(index.id).toBe('test_content');
+    const index = data.indexes.find(i => i.id === 'test_content');
+    expect(index).toBeDefined();
     expect(index.views).toHaveLength(1);
     expect(index.views[0].id).toBe('test_search');
   });
@@ -174,6 +178,43 @@ describe('getIndexableProperties (command orchestration)', () => {
     expect(paths).toContain('field_n_body');
     expect(paths).toContain('field_n_body:processed');
     expect(paths).toContain('field_n_ref:entity:field_p_title');
+  });
+});
+
+describe('Resolved index bundles (negation semantics, command layer)', () => {
+  // configDirectory points at fixtures so autoSyncProject parses the fixture
+  // node types (test_page, test_article) into project.entities. The unregistered
+  // slug means the silent saveProject inside autoSync no-ops, but .entities is
+  // populated before that, so resolution has a real entity model to work with.
+  const project = { slug: 'fixture-search-proj', configDirectory: fixturesPath };
+
+  test('listSearchIndexes resolves a deny-list datasource to all-bundles-minus-selected', async () => {
+    const indexes = await listSearchIndexes(project);
+    const excl = indexes.find(i => i.id === 'test_excluded');
+    expect(excl).toBeDefined();
+    const ds = excl.datasources.find(d => d.entityType === 'node');
+    expect(ds.bundlesAreExclusions).toBe(true);
+    // node has test_page + test_article in fixtures; deny-list excludes test_article.
+    expect(ds.resolvedBundles.sort()).toEqual(['test_page']);
+    // Index-level bundles is the union of resolved bundles across datasources.
+    expect(excl.bundles.sort()).toEqual(['test_page']);
+  });
+
+  test('listSearchIndexes leaves an allow-list datasource at its selected bundles', async () => {
+    const indexes = await listSearchIndexes(project);
+    const content = indexes.find(i => i.id === 'test_content');
+    expect(content).toBeDefined();
+    const ds = content.datasources.find(d => d.entityType === 'node');
+    expect(ds.bundlesAreExclusions).toBe(false);
+    expect(ds.resolvedBundles).toEqual(['test_page']);
+    expect(content.bundles).toEqual(['test_page']);
+  });
+
+  test('getSearchIndex annotates resolvedBundles for the requested index', async () => {
+    const index = await getSearchIndex(project, 'test_excluded');
+    expect(index).not.toBeNull();
+    const ds = index.datasources.find(d => d.entityType === 'node');
+    expect(ds.resolvedBundles.sort()).toEqual(['test_page']);
   });
 });
 

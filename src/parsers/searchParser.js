@@ -275,6 +275,47 @@ export function suggestSearchType(fieldType) {
 const PROCESSED_TEXT_TYPES = new Set(['text_long', 'text_with_summary', 'text']);
 
 /**
+ * Text-family field types treated as fulltext-indexable content by default.
+ * Covers plain text, textarea, and formatted (rich) text. Used to restrict the
+ * indexable tree to searchable text unless the caller opts into all field types.
+ */
+const TEXT_FIELD_TYPES = new Set([
+  'string',
+  'string_long',
+  'text',
+  'text_long',
+  'text_with_summary'
+]);
+
+/**
+ * Resolve the actual set of indexed bundles for a parsed datasource, applying
+ * Drupal's negation semantics.
+ *
+ * Drupal `datasource_settings[...]['bundles']` carries `{ default, selected }`:
+ *   - `default: false` → ONLY `selected` bundles are indexed (allow-list).
+ *   - `default: true`  → ALL bundles of the entity type EXCEPT `selected`
+ *     are indexed (deny-list; empty `selected` ⇒ every bundle).
+ *
+ * @param {object} datasource - Parsed datasource (entityType, bundles, bundlesAreExclusions)
+ * @param {object} entities - Project entities model (entities[entityType][bundleId])
+ * @returns {string[]} - The resolved indexed bundle ids
+ */
+export function resolveDatasourceBundles(datasource, entities) {
+  if (!datasource) return [];
+  const selected = Array.isArray(datasource.bundles) ? datasource.bundles : [];
+  if (!datasource.bundlesAreExclusions) {
+    return selected;
+  }
+  const all = Object.keys(entities?.[datasource.entityType] || {});
+  // No entity model for this type → can't expand "all"; fall back to selected.
+  if (all.length === 0) {
+    return selected;
+  }
+  const excluded = new Set(selected);
+  return all.filter(bundle => !excluded.has(bundle));
+}
+
+/**
  * Resolve the target entity type for an entity-reference style field.
  * Mirrors findEntityReferenceFieldsTargeting in commands/list.js.
  * @param {object} field - Parsed field (with .type and .settings)
@@ -315,13 +356,28 @@ function resolveTargetBundles(field, entities, targetEntityType) {
  * hops through entity_reference / entity_reference_revisions fields up to
  * `maxDepth`, and offering `:processed` for formatted-text fields.
  *
+ * By default only text-family fields (string/textarea/formatted text) are
+ * emitted as leaves, since those are what fulltext search indexes. Pass
+ * `{ includeAllTypes: true }` to emit every field type. Reference fields are
+ * always traversed to reach nested text, regardless of mode. `layout_section`
+ * (Layout Builder structure) is never indexable content and is excluded in
+ * both modes.
+ *
  * @param {object} entities - Parsed project entities model (project.entities)
  * @param {string} entityType - Starting entity type
  * @param {string} bundle - Starting bundle
  * @param {number} maxDepth - Maximum reference hops (default 2)
+ * @param {object} [opts] - { includeAllTypes }
+ * @param {boolean} [opts.includeAllTypes=false] - Emit all field types, not just text
  * @returns {Array<{propertyPath, label, drupalType, searchType}>}
  */
-export function buildIndexableTree(entities, entityType, bundle, maxDepth = 2) {
+export function buildIndexableTree(
+  entities,
+  entityType,
+  bundle,
+  maxDepth = 2,
+  { includeAllTypes = false } = {}
+) {
   const results = [];
 
   /**
@@ -346,25 +402,36 @@ export function buildIndexableTree(entities, entityType, bundle, maxDepth = 2) {
         ? `${labelPrefix} › ${field.label || fieldName}`
         : (field.label || fieldName);
 
-      // Always emit the field itself as a leaf with its suggested type.
-      results.push({
-        propertyPath: path,
-        label,
-        drupalType: field.type || '',
-        searchType: suggestSearchType(field.type)
-      });
-
-      // Formatted-text fields can also be indexed as processed (rendered) text.
-      if (PROCESSED_TEXT_TYPES.has(field.type)) {
-        results.push({
-          propertyPath: `${path}:processed`,
-          label: `${label} (processed)`,
-          drupalType: field.type || '',
-          searchType: 'text'
-        });
+      // layout_section is a Layout Builder structure, not searchable content.
+      // Never emit it as a leaf — but also never recurse into it.
+      if (field.type === 'layout_section') {
+        continue;
       }
 
-      // Reference fields can be traversed into their target bundle(s).
+      // Emit the field as a leaf unless restricted mode filters out its type.
+      // Restricted mode keeps only text-family fields; :processed rows derive
+      // from PROCESSED_TEXT_TYPES (a subset of the text family) and so survive.
+      if (includeAllTypes || TEXT_FIELD_TYPES.has(field.type)) {
+        results.push({
+          propertyPath: path,
+          label,
+          drupalType: field.type || '',
+          searchType: suggestSearchType(field.type)
+        });
+
+        // Formatted-text fields can also be indexed as processed (rendered) text.
+        if (PROCESSED_TEXT_TYPES.has(field.type)) {
+          results.push({
+            propertyPath: `${path}:processed`,
+            label: `${label} (processed)`,
+            drupalType: field.type || '',
+            searchType: 'text'
+          });
+        }
+      }
+
+      // Reference fields are always traversed (even in restricted mode) so that
+      // nested text on the referenced bundle is reachable.
       const isReference =
         field.type === 'entity_reference' || field.type === 'entity_reference_revisions';
       if (isReference && depth > 0) {

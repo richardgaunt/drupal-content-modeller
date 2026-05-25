@@ -147,10 +147,20 @@ export async function cmdSearchIndexShow(options) {
       console.log('  (none)');
     } else {
       for (const ds of index.datasources) {
-        const bundles = ds.bundles.length
-          ? `${ds.bundles.join(', ')}${ds.bundlesAreExclusions ? ' (excluded)' : ''}`
-          : (ds.bundlesAreExclusions ? 'all' : 'none');
-        const langs = ds.languages.length ? ds.languages.join(', ') : 'all';
+        const resolved = ds.resolvedBundles || ds.bundles;
+        let bundles;
+        if (ds.bundlesAreExclusions) {
+          // Deny-list: show the resolved (actually-indexed) set, noting the
+          // exclusion. Empty selected ⇒ every bundle of the type.
+          bundles = ds.bundles.length
+            ? `${resolved.join(', ') || '(none)'} (all except ${ds.bundles.join(', ')})`
+            : 'all';
+        } else {
+          bundles = resolved.length ? resolved.join(', ') : 'none';
+        }
+        const langs = ds.languages.length
+          ? (ds.languagesAreExclusions ? `all except ${ds.languages.join(', ')}` : ds.languages.join(', '))
+          : 'all';
         console.log(`  ${ds.datasourceId}  bundles: ${bundles}  languages: ${langs}`);
       }
     }
@@ -316,7 +326,14 @@ export async function cmdSearchIndexable(options) {
       throw new Error('--depth must be a non-negative integer');
     }
 
-    const properties = getIndexableProperties(project, entityType, options.bundle, depth);
+    const includeAllTypes = Boolean(options.all);
+    const properties = getIndexableProperties(
+      project,
+      entityType,
+      options.bundle,
+      depth,
+      { includeAllTypes }
+    );
 
     if (options.json) {
       output(properties, true);
@@ -337,9 +354,12 @@ export async function cmdSearchIndexable(options) {
       ],
       properties
     );
+    const restriction = includeAllTypes
+      ? ''
+      : ' (text fields only; use --all for every field)';
     console.log();
     console.log(chalk.cyan(
-      `Indexable properties for ${entityType}:${options.bundle} (depth ${depth}, ${properties.length}):`
+      `Indexable properties for ${entityType}:${options.bundle} (depth ${depth}, ${properties.length})${restriction}:`
     ));
     console.log(table);
   } catch (error) {

@@ -481,6 +481,7 @@ searchCmd
   .requiredOption('-e, --entity-type <type>', 'Entity type')
   .requiredOption('-b, --bundle <bundle>', 'Bundle machine name')
   .option('--depth <num>', 'Maximum reference hops to traverse (default: 2)')
+  .option('-a, --all', 'Show all field types, not just text/formatted-text fields')
   .option('-j, --json', 'Output as JSON')
   .action(cmdSearchIndexable);
 

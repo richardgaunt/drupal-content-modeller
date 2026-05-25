@@ -121,10 +121,18 @@ export function formatSearchReportMarkdown(data) {
       lines.push(`| Datasource | Bundles | Languages |`);
       lines.push(`|------------|---------|-----------|`);
       for (const ds of index.datasources) {
-        const bundles = ds.bundles.length
-          ? `${ds.bundles.join(', ')}${ds.bundlesAreExclusions ? ' (excluded)' : ''}`
-          : (ds.bundlesAreExclusions ? 'all' : '_none_');
-        const langs = ds.languages.length ? ds.languages.join(', ') : '_all_';
+        const resolved = ds.resolvedBundles || ds.bundles;
+        let bundles;
+        if (ds.bundlesAreExclusions) {
+          bundles = ds.bundles.length
+            ? `${resolved.join(', ') || '_none_'} (all except ${ds.bundles.join(', ')})`
+            : 'all';
+        } else {
+          bundles = resolved.length ? resolved.join(', ') : '_none_';
+        }
+        const langs = ds.languages.length
+          ? (ds.languagesAreExclusions ? `all except ${ds.languages.join(', ')}` : ds.languages.join(', '))
+          : '_all_';
         lines.push(`| \`${ds.datasourceId}\` | ${bundles} | ${langs} |`);
       }
       lines.push('');

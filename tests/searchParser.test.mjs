@@ -10,7 +10,8 @@ import {
   parseSearchIndex,
   parseSearchView,
   suggestSearchType,
-  buildIndexableTree
+  buildIndexableTree,
+  resolveDatasourceBundles
 } from '../src/parsers/searchParser.js';
 
 describe('Search Parser - File matchers', () => {
@@ -225,6 +226,43 @@ describe('Search Parser - suggestSearchType', () => {
   });
 });
 
+describe('Search Parser - resolveDatasourceBundles', () => {
+  const entities = {
+    node: {
+      page: { id: 'page', label: 'Page', fields: {} },
+      article: { id: 'article', label: 'Article', fields: {} },
+      landing: { id: 'landing', label: 'Landing', fields: {} }
+    }
+  };
+
+  test('non-exclusion datasource returns the selected allow-list verbatim', () => {
+    const ds = { entityType: 'node', bundles: ['page'], bundlesAreExclusions: false };
+    expect(resolveDatasourceBundles(ds, entities)).toEqual(['page']);
+  });
+
+  test('exclusion datasource returns all bundles of the type minus selected', () => {
+    const ds = { entityType: 'node', bundles: ['article'], bundlesAreExclusions: true };
+    const resolved = resolveDatasourceBundles(ds, entities);
+    expect(resolved.sort()).toEqual(['landing', 'page']);
+    expect(resolved).not.toContain('article');
+  });
+
+  test('exclusion datasource with empty selected returns all bundles', () => {
+    const ds = { entityType: 'node', bundles: [], bundlesAreExclusions: true };
+    expect(resolveDatasourceBundles(ds, entities).sort()).toEqual(['article', 'landing', 'page']);
+  });
+
+  test('falls back to selected list when entity model is missing the type', () => {
+    const ds = { entityType: 'node', bundles: ['article'], bundlesAreExclusions: true };
+    // No entities for "node" → cannot expand "all"; keep current behavior.
+    expect(resolveDatasourceBundles(ds, {})).toEqual(['article']);
+  });
+
+  test('returns empty array for null datasource', () => {
+    expect(resolveDatasourceBundles(null, entities)).toEqual([]);
+  });
+});
+
 describe('Search Parser - buildIndexableTree', () => {
   // A node bundle referencing a paragraph, which has a processed text field
   // and a nested reference back through another paragraph.
@@ -277,7 +315,8 @@ describe('Search Parser - buildIndexableTree', () => {
   };
 
   test('emits direct fields with suggested search types', () => {
-    const tree = buildIndexableTree(entities, 'node', 'page', 0);
+    // includeAllTypes so the reference field is emitted as a leaf for its type mapping.
+    const tree = buildIndexableTree(entities, 'node', 'page', 0, { includeAllTypes: true });
     const byPath = Object.fromEntries(tree.map(t => [t.propertyPath, t]));
     expect(byPath.field_n_title.searchType).toBe('string');
     expect(byPath.field_n_body.searchType).toBe('text');
@@ -298,7 +337,8 @@ describe('Search Parser - buildIndexableTree', () => {
   });
 
   test('traverses an :entity: hop through a reference field at depth 1', () => {
-    const tree = buildIndexableTree(entities, 'node', 'page', 1);
+    // includeAllTypes so the nested integer (field_t_weight) is emitted too.
+    const tree = buildIndexableTree(entities, 'node', 'page', 1, { includeAllTypes: true });
     const paths = tree.map(t => t.propertyPath);
     expect(paths).toContain('field_n_components:entity:field_p_heading');
     expect(paths).toContain('field_n_components:entity:field_p_text');
@@ -321,6 +361,101 @@ describe('Search Parser - buildIndexableTree', () => {
 
   test('returns empty for unknown bundle', () => {
     expect(buildIndexableTree(entities, 'node', 'missing', 2)).toEqual([]);
+  });
+});
+
+describe('Search Parser - buildIndexableTree field-type restriction', () => {
+  // A bundle mixing text-family fields, non-text fields, a layout_section, and
+  // a reference into a paragraph that holds nested text.
+  const entities = {
+    node: {
+      page: {
+        id: 'page',
+        label: 'Page',
+        fields: {
+          field_n_title: { name: 'field_n_title', label: 'Title', type: 'string', settings: {} },
+          field_n_body: { name: 'field_n_body', label: 'Body', type: 'text_long', settings: {} },
+          field_n_promoted: { name: 'field_n_promoted', label: 'Promoted', type: 'boolean', settings: {} },
+          field_n_link: { name: 'field_n_link', label: 'Link', type: 'link', settings: {} },
+          field_n_weight: { name: 'field_n_weight', label: 'Weight', type: 'integer', settings: {} },
+          layout_builder__layout: {
+            name: 'layout_builder__layout',
+            label: 'Layout',
+            type: 'layout_section',
+            settings: {}
+          },
+          field_n_components: {
+            name: 'field_n_components',
+            label: 'Components',
+            type: 'entity_reference_revisions',
+            settings: { handler_settings: { target_bundles: { panel: 'panel' } } }
+          }
+        }
+      }
+    },
+    paragraph: {
+      panel: {
+        id: 'panel',
+        label: 'Panel',
+        fields: {
+          field_p_text: { name: 'field_p_text', label: 'Text', type: 'text_long', settings: {} },
+          field_p_flag: { name: 'field_p_flag', label: 'Flag', type: 'boolean', settings: {} }
+        }
+      }
+    }
+  };
+
+  test('restricted (default) emits only text-family fields and excludes non-text', () => {
+    const tree = buildIndexableTree(entities, 'node', 'page', 1);
+    const paths = tree.map(t => t.propertyPath);
+
+    // Text-family fields kept, with :processed for formatted text.
+    expect(paths).toContain('field_n_title');
+    expect(paths).toContain('field_n_body');
+    expect(paths).toContain('field_n_body:processed');
+
+    // Non-text fields excluded.
+    expect(paths).not.toContain('field_n_promoted');
+    expect(paths).not.toContain('field_n_link');
+    expect(paths).not.toContain('field_n_weight');
+
+    // The reference field itself is not a leaf in restricted mode.
+    expect(paths).not.toContain('field_n_components');
+
+    // layout_section never appears.
+    expect(paths).not.toContain('layout_builder__layout');
+  });
+
+  test('restricted mode still traverses references to reach nested text', () => {
+    const tree = buildIndexableTree(entities, 'node', 'page', 1);
+    const paths = tree.map(t => t.propertyPath);
+
+    // Nested text on the referenced paragraph is reached despite the reference
+    // field itself not being emitted.
+    expect(paths).toContain('field_n_components:entity:field_p_text');
+    expect(paths).toContain('field_n_components:entity:field_p_text:processed');
+
+    // Nested non-text (boolean) is still excluded under restricted mode.
+    expect(paths).not.toContain('field_n_components:entity:field_p_flag');
+  });
+
+  test('--all (includeAllTypes) emits every field type including references', () => {
+    const tree = buildIndexableTree(entities, 'node', 'page', 1, { includeAllTypes: true });
+    const paths = tree.map(t => t.propertyPath);
+
+    expect(paths).toContain('field_n_promoted');
+    expect(paths).toContain('field_n_link');
+    expect(paths).toContain('field_n_weight');
+    // The reference field is emitted as a leaf in --all mode (current behavior).
+    expect(paths).toContain('field_n_components');
+    // Nested boolean now also appears.
+    expect(paths).toContain('field_n_components:entity:field_p_flag');
+  });
+
+  test('layout_section is excluded even under --all', () => {
+    const tree = buildIndexableTree(entities, 'node', 'page', 1, { includeAllTypes: true });
+    const paths = tree.map(t => t.propertyPath);
+    expect(paths).not.toContain('layout_builder__layout');
   });
 });
 
@@ -366,7 +501,8 @@ describe('Search Parser - buildIndexableTree reference cycles', () => {
 
   test('terminates on a reference cycle and bounds recursion via the cycle guard', () => {
     // A high depth would loop indefinitely without the visited-path guard.
-    const tree = buildIndexableTree(cyclicEntities, 'node', 'a', 50);
+    // includeAllTypes so the reference fields are emitted as leaves to assert against.
+    const tree = buildIndexableTree(cyclicEntities, 'node', 'a', 50, { includeAllTypes: true });
     const paths = tree.map(t => t.propertyPath);
 
     // The direct field and one hop into B are emitted.

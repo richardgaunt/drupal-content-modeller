@@ -11,7 +11,33 @@ import {
   parseSingleSearchIndex,
   parseSearchBoundViews
 } from '../io/configReader.js';
-import { buildIndexableTree } from '../parsers/searchParser.js';
+import { buildIndexableTree, resolveDatasourceBundles } from '../parsers/searchParser.js';
+import { autoSyncProject } from '../cli/cliUtils.js';
+
+/**
+ * Annotate a parsed index with the actual indexed bundle set, applying Drupal's
+ * negation semantics against the project's entity model.
+ *
+ * Adds `resolvedBundles` to each datasource and recomputes the index-level
+ * `bundles` to be the unique union of resolved bundles across datasources.
+ * When the project has no entity model (e.g. unsynced), each datasource falls
+ * back to its `selected` list — the previous behavior.
+ *
+ * @param {object} index - Parsed index (from parseSearchIndex)
+ * @param {object} entities - Project entities model (may be undefined)
+ * @returns {object} - The same index object, mutated with resolved bundles
+ */
+function annotateResolvedBundles(index, entities) {
+  if (!index) return index;
+  const union = new Set();
+  for (const ds of index.datasources || []) {
+    const resolved = resolveDatasourceBundles(ds, entities || {});
+    ds.resolvedBundles = resolved;
+    for (const bundle of resolved) union.add(bundle);
+  }
+  index.bundles = Array.from(union);
+  return index;
+}
 
 /**
  * List Search API servers for a project.
@@ -28,7 +54,12 @@ export async function listSearchServers(project) {
  * @returns {Promise<object[]>}
  */
 export async function listSearchIndexes(project) {
-  return parseSearchIndexes(project.configDirectory);
+  await autoSyncProject(project);
+  const indexes = await parseSearchIndexes(project.configDirectory);
+  for (const index of indexes) {
+    annotateResolvedBundles(index, project.entities);
+  }
+  return indexes;
 }
 
 /**
@@ -38,7 +69,9 @@ export async function listSearchIndexes(project) {
  * @returns {Promise<object|null>}
  */
 export async function getSearchIndex(project, indexId) {
-  return parseSingleSearchIndex(project.configDirectory, indexId);
+  await autoSyncProject(project);
+  const index = await parseSingleSearchIndex(project.configDirectory, indexId);
+  return annotateResolvedBundles(index, project.entities);
 }
 
 /**
@@ -62,10 +95,12 @@ export async function listSearchViews(project, indexId = null) {
  * @param {string} entityType
  * @param {string} bundle
  * @param {number} depth - Maximum reference hops (default 2)
+ * @param {object} [opts] - { includeAllTypes }
+ * @param {boolean} [opts.includeAllTypes=false] - Emit all field types, not just text
  * @returns {object[]} - Indexable property entries (empty if .entities absent)
  */
-export function getIndexableProperties(project, entityType, bundle, depth = 2) {
-  return buildIndexableTree(project.entities || {}, entityType, bundle, depth);
+export function getIndexableProperties(project, entityType, bundle, depth = 2, opts = {}) {
+  return buildIndexableTree(project.entities || {}, entityType, bundle, depth, opts);
 }
 
 /**
@@ -74,10 +109,14 @@ export function getIndexableProperties(project, entityType, bundle, depth = 2) {
  * @returns {Promise<{servers, indexes, views}>}
  */
 export async function gatherSearchSources(project) {
+  await autoSyncProject(project);
   const [servers, indexes, views] = await Promise.all([
     parseSearchServers(project.configDirectory),
     parseSearchIndexes(project.configDirectory),
     parseSearchBoundViews(project.configDirectory)
   ]);
+  for (const index of indexes) {
+    annotateResolvedBundles(index, project.entities);
+  }
   return { servers, indexes, views };
 }

@@ -56,11 +56,13 @@ export async function listSearchViews(project, indexId = null) {
 /**
  * Build the indexable property tree for a bundle.
  * Operates on the parsed project model (project.entities), not raw YAML.
- * @param {object} project - Synced project (must have .entities)
+ * The CLI handler syncs the project first; when .entities is absent
+ * (e.g. an unsynced project) this returns an empty tree rather than throwing.
+ * @param {object} project - Project model; .entities is optional
  * @param {string} entityType
  * @param {string} bundle
  * @param {number} depth - Maximum reference hops (default 2)
- * @returns {object[]} - Indexable property entries
+ * @returns {object[]} - Indexable property entries (empty if .entities absent)
  */
 export function getIndexableProperties(project, entityType, bundle, depth = 2) {
   return buildIndexableTree(project.entities || {}, entityType, bundle, depth);
